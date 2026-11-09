@@ -892,3 +892,4 @@ CREATE POLICY "Admins can view audit logs"
   USING (
     EXISTS (SELECT 1 FROM public.profiles p WHERE p.id = (SELECT auth.uid()) AND p.role = 'admin')
   );
+

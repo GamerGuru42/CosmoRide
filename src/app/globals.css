@@ -1,40 +1,51 @@
 @import "tailwindcss";
 
 /* 
- * CosmoRide — Global Styles
- * Cosmopolitan University Bus Booking and Mobility Platform
+ * CosmoRide — Official Transport Platform of Cosmopolitan University
+ * Powered by NextGen Technologies
  */
 
 :root {
-  /* Brand colors — Cosmopolitan University theme */
-  --color-primary: #1e3a5f;       /* Deep university blue */
-  --color-primary-light: #2d5a8e;
-  --color-primary-dark: #0f2440;
-  --color-secondary: #c9a84c;     /* Gold accent */
-  --color-secondary-light: #dfc06e;
-  --color-secondary-dark: #a88a3a;
-  --color-success: #16a34a;
-  --color-warning: #f59e0b;
-  --color-danger: #dc2626;
-  --color-info: #2563eb;
+  /* Brand colour palette */
+  --midnight-navy: #102D4A;
+  --white: #FFFFFF;
+  --bg-canvas: #F6F8FA;
+  --slate: #526B82;
+  --transit-green: #20A477;
+  --warning-amber: #E5A13B;
+  --error-red: #D9534F;
+
+  /* Semantic UI mappings */
+  --color-primary: #102D4A;
+  --color-primary-light: #18426C;
+  --color-primary-dark: #0A1D31;
+  --color-secondary: #526B82;
+  --color-success: #20A477;
+  --color-warning: #E5A13B;
+  --color-danger: #D9534F;
   
-  /* Layout */
+  /* Layout tokens */
   --sidebar-width: 16rem;
   --header-height: 4rem;
 }
 
-/* Base styles */
 body {
-  font-family: system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto,
-    'Helvetica Neue', Arial, sans-serif;
+  background-color: var(--bg-canvas);
+  color: var(--midnight-navy);
+  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
 }
 
-/* Focus styles for accessibility */
+/* Accessible focus ring */
 *:focus-visible {
-  outline: 2px solid var(--color-primary);
+  outline: 2px solid var(--midnight-navy);
   outline-offset: 2px;
+}
+
+/* Airline-inspired FIDS typography & tabular numbers */
+.tabular-nums {
+  font-variant-numeric: tabular-nums;
 }
 
 /* Scrollbar styling */

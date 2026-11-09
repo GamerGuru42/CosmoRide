@@ -1,127 +1,268 @@
 import type { Metadata } from "next";
+import { redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
-import { PageHeader } from "@/components/ui/page-header";
-import { EmptyState } from "@/components/ui/empty-state";
+import { StudentHomeView, type AnnouncementItem } from "@/components/student/student-home-view";
+import type { DepartureJourney } from "@/components/student/departure-board";
 
 export const metadata: Metadata = {
-  title: "Student Dashboard",
+  title: "Student Hub | CosmoRide",
+  description: "Official University Bus Booking and Mobility Platform",
 };
 
-/**
- * Student Dashboard — shows upcoming journeys and recent bookings.
- * Displays honest empty states when no data exists.
- */
-export default async function StudentDashboardPage() {
+export default async function StudentHomePage() {
   const supabase = await createClient();
 
   const {
     data: { user },
   } = await supabase.auth.getUser();
 
-  // Fetch upcoming bookings for this student
-  const { data: bookings, error: bookingsError } = await supabase
+  if (!user) {
+    redirect("/login");
+  }
+
+  // 1. Fetch user profile
+  const { data: profile } = await supabase
+    .from("profiles")
+    .select("id, full_name, student_id, role")
+    .eq("id", user.id)
+    .single();
+
+  const student = {
+    id: user.id,
+    fullName: profile?.full_name || "Student",
+    studentId: profile?.student_id || null,
+  };
+
+  // 2. Fetch the student's next upcoming active booking
+  const nowIso = new Date(Date.now() - 3600 * 1000).toISOString(); // within last hour or future
+  const { data: rawBookings } = await supabase
     .from("bookings")
     .select(`
-      *,
+      id,
+      ticket_token,
+      status,
+      booked_at,
       journey:journeys (
-        *,
-        route:routes ( name, code ),
-        vehicle:vehicles ( name, registration_number )
+        id,
+        scheduled_departure,
+        status,
+        delay_minutes,
+        delay_reason,
+        route:routes ( id, name, code ),
+        vehicle:vehicles ( name, registration_number ),
+        stops:stops ( name )
       )
     `)
-    .eq("student_id", user?.id ?? "")
+    .eq("student_id", user.id)
     .in("status", ["confirmed", "checked_in"])
     .order("booked_at", { ascending: false })
-    .limit(10);
+    .limit(1);
 
-  // Fetch count of today's available journeys
-  const today = new Date().toISOString().split("T")[0];
-  const { count: availableJourneys } = await supabase
-    .from("journeys")
+  let nextBooking = null;
+  if (rawBookings && rawBookings.length > 0) {
+    const b = rawBookings[0];
+    const j = b.journey as unknown as {
+      id: string;
+      scheduled_departure: string;
+      status: "scheduled" | "boarding" | "in_transit" | "completed" | "cancelled";
+      delay_minutes: number;
+      delay_reason: string | null;
+      route: { id: string; name: string; code: string };
+      vehicle: { name: string | null; registration_number: string };
+      stops?: { name: string };
+    } | null;
+
+    if (j) {
+      nextBooking = {
+        id: b.id,
+        ticketToken: b.ticket_token,
+        status: b.status as "confirmed" | "checked_in",
+        bookedAt: b.booked_at,
+        journey: {
+          id: j.id,
+          scheduledDeparture: j.scheduled_departure,
+          status: j.status,
+          delayMinutes: j.delay_minutes ?? 0,
+          delayReason: j.delay_reason,
+          route: {
+            id: j.route.id,
+            name: j.route.name,
+            code: j.route.code,
+          },
+          vehicle: {
+            name: j.vehicle.name,
+            registrationNumber: j.vehicle.registration_number,
+          },
+          boardingStop: {
+            name: j.stops?.name || "Terminal Entrance",
+          },
+        },
+      };
+    }
+  }
+
+  // 3. Fetch count of active bookings and waitlist entries
+  const { count: totalActiveBookings } = await supabase
+    .from("bookings")
     .select("*", { count: "exact", head: true })
-    .eq("journey_date", today)
-    .in("status", ["scheduled", "boarding"]);
+    .eq("student_id", user.id)
+    .in("status", ["confirmed", "checked_in"]);
+
+  const { count: waitlistCount } = await supabase
+    .from("waitlists")
+    .select("*", { count: "exact", head: true })
+    .eq("student_id", user.id)
+    .eq("status", "waiting");
+
+  // 4. Fetch upcoming journeys for departure board preview (today and tomorrow)
+  const today = new Date().toISOString().split("T")[0];
+  const { data: journeysData } = await supabase
+    .from("journeys")
+    .select(`
+      id,
+      journey_date,
+      scheduled_departure,
+      actual_departure,
+      status,
+      delay_minutes,
+      delay_reason,
+      proposed_allocation,
+      route:routes (
+        id,
+        name,
+        code,
+        gender_group,
+        transport_group:transport_groups ( name )
+      ),
+      vehicle:vehicles (
+        name,
+        registration_number,
+        safe_capacity
+      )
+    `)
+    .gte("journey_date", today)
+    .in("status", ["scheduled", "boarding", "in_transit"])
+    .order("scheduled_departure", { ascending: true })
+    .limit(8);
+
+  // For each journey, fetch route stops, booking counts, and user's reservation status
+  const upcomingDepartures: DepartureJourney[] = [];
+
+  if (journeysData && journeysData.length > 0) {
+    for (const jd of journeysData) {
+      const routeInfo = jd.route as unknown as {
+        id: string;
+        name: string;
+        code: string;
+        gender_group?: string;
+        transport_group?: { name: string } | null;
+      } | null;
+
+      const vehicleInfo = jd.vehicle as unknown as {
+        name: string | null;
+        registration_number: string;
+        safe_capacity: number;
+      } | null;
+
+      // Count booked seats
+      const { count: bookedCount } = await supabase
+        .from("bookings")
+        .select("*", { count: "exact", head: true })
+        .eq("journey_id", jd.id)
+        .in("status", ["confirmed", "checked_in"]);
+
+      // Check if current user has a booking
+      const { data: userBooking } = await supabase
+        .from("bookings")
+        .select("id")
+        .eq("journey_id", jd.id)
+        .eq("student_id", user.id)
+        .in("status", ["confirmed", "checked_in"])
+        .maybeSingle();
+
+      // Check if current user is on waitlist
+      const { data: userWaitlist } = await supabase
+        .from("waitlists")
+        .select("position")
+        .eq("journey_id", jd.id)
+        .eq("student_id", user.id)
+        .eq("status", "waiting")
+        .maybeSingle();
+
+      // Fetch route stops
+      const { data: routeStops } = await supabase
+        .from("route_stops")
+        .select(`
+          stop_order,
+          estimated_minutes_from_start,
+          stop:stops ( id, name )
+        `)
+        .eq("route_id", routeInfo?.id ?? "")
+        .order("stop_order", { ascending: true });
+
+      const stopsList = (routeStops || []).map((rs) => {
+        const s = rs.stop as unknown as { id: string; name: string } | null;
+        return {
+          id: s?.id || rs.stop_order.toString(),
+          name: s?.name || `Stop ${rs.stop_order}`,
+          order: rs.stop_order,
+          estimatedMinutesFromStart: rs.estimated_minutes_from_start,
+        };
+      });
+
+      const origin = stopsList[0]?.name || "Main Terminal";
+      const destination = stopsList[stopsList.length - 1]?.name || "Destination";
+
+      upcomingDepartures.push({
+        id: jd.id,
+        journeyDate: jd.journey_date,
+        scheduledDeparture: jd.scheduled_departure,
+        actualDeparture: jd.actual_departure,
+        status: jd.status,
+        delayMinutes: jd.delay_minutes ?? 0,
+        delayReason: jd.delay_reason,
+        proposedAllocation: jd.proposed_allocation,
+        safeCapacity: vehicleInfo?.safe_capacity ?? 30,
+        bookedCount: bookedCount ?? 0,
+        routeId: routeInfo?.id ?? "",
+        routeName: routeInfo?.name ?? "Campus Route",
+        routeCode: routeInfo?.code ?? "CR",
+        originName: origin,
+        destinationName: destination,
+        transportGroupName: routeInfo?.transport_group?.name,
+        genderGroup: routeInfo?.gender_group,
+        vehicleRegistration: vehicleInfo?.registration_number ?? "TBD",
+        vehicleName: vehicleInfo?.name ?? null,
+        stops: stopsList,
+        userBookingId: userBooking?.id ?? null,
+        userWaitlistPosition: userWaitlist?.position ?? null,
+      });
+    }
+  }
+
+  // 5. Fetch active announcements
+  const { data: rawAnnouncements } = await supabase
+    .from("announcements")
+    .select("id, title, content, created_at")
+    .eq("is_active", true)
+    .order("created_at", { ascending: false })
+    .limit(2);
+
+  const announcements: AnnouncementItem[] = (rawAnnouncements || []).map((a) => ({
+    id: a.id,
+    title: a.title,
+    content: a.content,
+    createdAt: a.created_at,
+  }));
 
   return (
-    <div>
-      <PageHeader
-        title="Welcome back!"
-        description="View your upcoming rides and book new journeys."
-      />
-
-      {/* Stats Cards */}
-      <div className="mb-8 grid gap-4 sm:grid-cols-3">
-        <div className="rounded-xl border border-gray-200 bg-white p-5">
-          <p className="text-sm font-medium text-gray-500">Active Bookings</p>
-          <p className="mt-1 text-2xl font-bold text-gray-900">
-            {bookings?.length ?? 0}
-          </p>
-        </div>
-        <div className="rounded-xl border border-gray-200 bg-white p-5">
-          <p className="text-sm font-medium text-gray-500">
-            Today&apos;s Available Journeys
-          </p>
-          <p className="mt-1 text-2xl font-bold text-gray-900">
-            {availableJourneys ?? 0}
-          </p>
-        </div>
-        <div className="rounded-xl border border-gray-200 bg-white p-5">
-          <p className="text-sm font-medium text-gray-500">Status</p>
-          <p className="mt-1 text-sm font-medium text-green-600">
-            ● Connected
-          </p>
-        </div>
-      </div>
-
-      {/* Upcoming Bookings */}
-      <h2 className="mb-4 text-lg font-semibold text-gray-900">
-        Your Upcoming Rides
-      </h2>
-
-      {bookingsError ? (
-        <div className="rounded-lg border border-amber-200 bg-amber-50 p-4 text-sm text-amber-700">
-          Unable to load bookings. The database may not be configured yet.
-          Please check your Supabase connection.
-        </div>
-      ) : !bookings || bookings.length === 0 ? (
-        <EmptyState
-          icon="🎫"
-          title="No upcoming rides"
-          description="You don't have any active bookings. Browse available journeys to book your next ride."
-          action={{
-            label: "Browse Journeys",
-            href: "/student/journeys",
-          }}
-        />
-      ) : (
-        <div className="space-y-3">
-          {bookings.map((booking) => (
-            <div
-              key={booking.id}
-              className="rounded-xl border border-gray-200 bg-white p-4"
-            >
-              <div className="flex items-center justify-between">
-                <div>
-                  <p className="font-medium text-gray-900">
-                    {(booking.journey as Record<string, unknown>)?.route
-                      ? String(
-                          ((booking.journey as Record<string, unknown>).route as Record<string, unknown>)?.name ?? "Route"
-                        )
-                      : "Journey"}
-                  </p>
-                  <p className="text-sm text-gray-500">
-                    Booking #{booking.id.slice(0, 8)}
-                  </p>
-                </div>
-                <span className="inline-flex items-center rounded-full bg-green-100 px-2.5 py-0.5 text-xs font-medium text-green-800">
-                  {booking.status}
-                </span>
-              </div>
-            </div>
-          ))}
-        </div>
-      )}
-    </div>
+    <StudentHomeView
+      student={student}
+      nextBooking={nextBooking}
+      upcomingDepartures={upcomingDepartures}
+      announcements={announcements}
+      waitlistCount={waitlistCount ?? 0}
+      totalActiveBookings={totalActiveBookings ?? 0}
+    />
   );
 }
-

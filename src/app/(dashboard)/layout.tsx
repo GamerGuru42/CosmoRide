@@ -34,8 +34,8 @@ export default async function DashboardLayout({
     return (
       <div className="flex min-h-screen items-center justify-center">
         <div className="text-center">
-          <div className="mx-auto mb-4 h-8 w-8 animate-spin rounded-full border-4 border-gray-300 border-t-[var(--color-primary)]" />
-          <p className="text-sm text-gray-500">Setting up your profile…</p>
+          <div className="mx-auto mb-4 h-8 w-8 animate-spin rounded-full border-4 border-gray-300 border-t-[#102D4A]" />
+          <p className="text-sm text-[#526B82]">Setting up your profile…</p>
         </div>
       </div>
     );
@@ -49,10 +49,10 @@ export default async function DashboardLayout({
         fullName: profile.full_name,
         role: profile.role,
         avatarUrl: profile.avatar_url,
+        studentId: profile.student_id,
       }}
     >
       {children}
     </DashboardShell>
   );
 }
-
