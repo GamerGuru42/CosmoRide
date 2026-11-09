@@ -1,0 +1,56 @@
+@import "tailwindcss";
+
+/* 
+ * CosmoRide — Global Styles
+ * Cosmopolitan University Bus Booking and Mobility Platform
+ */
+
+:root {
+  /* Brand colors — Cosmopolitan University theme */
+  --color-primary: #1e3a5f;       /* Deep university blue */
+  --color-primary-light: #2d5a8e;
+  --color-primary-dark: #0f2440;
+  --color-secondary: #c9a84c;     /* Gold accent */
+  --color-secondary-light: #dfc06e;
+  --color-secondary-dark: #a88a3a;
+  --color-success: #16a34a;
+  --color-warning: #f59e0b;
+  --color-danger: #dc2626;
+  --color-info: #2563eb;
+  
+  /* Layout */
+  --sidebar-width: 16rem;
+  --header-height: 4rem;
+}
+
+/* Base styles */
+body {
+  font-family: system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto,
+    'Helvetica Neue', Arial, sans-serif;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+/* Focus styles for accessibility */
+*:focus-visible {
+  outline: 2px solid var(--color-primary);
+  outline-offset: 2px;
+}
+
+/* Scrollbar styling */
+@media (pointer: fine) {
+  ::-webkit-scrollbar {
+    width: 6px;
+    height: 6px;
+  }
+  ::-webkit-scrollbar-track {
+    background: transparent;
+  }
+  ::-webkit-scrollbar-thumb {
+    background: #cbd5e1;
+    border-radius: 3px;
+  }
+  ::-webkit-scrollbar-thumb:hover {
+    background: #94a3b8;
+  }
+}

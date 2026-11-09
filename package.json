@@ -1,0 +1,33 @@
+{
+  "name": "cosmoride",
+  "version": "0.1.0",
+  "private": true,
+  "description": "CosmoRide — Cosmopolitan University Bus Booking and Mobility Platform",
+  "scripts": {
+    "dev": "next dev --turbopack",
+    "build": "next build",
+    "start": "next start",
+    "lint": "eslint .",
+    "type-check": "tsc --noEmit"
+  },
+  "dependencies": {
+    "next": "16.4.5",
+    "react": "19.3.0",
+    "react-dom": "19.3.0",
+    "@supabase/supabase-js": "^2",
+    "@supabase/ssr": "^0",
+    "zod": "^3",
+    "lucide-react": "^0",
+    "date-fns": "^4"
+  },
+  "devDependencies": {
+    "@tailwindcss/turbopack": "^4",
+    "@types/node": "^20",
+    "@types/react": "^19",
+    "@types/react-dom": "^19",
+    "eslint": "^9",
+    "eslint-config-next": "16.4.5",
+    "tailwindcss": "^4",
+    "typescript": "^5"
+  }
+}
