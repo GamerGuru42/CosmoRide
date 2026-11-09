@@ -1043,3 +1043,4 @@ $$;
 -- Defense in depth: Ensure unauthenticated anon callers cannot invoke public RPCs
 REVOKE EXECUTE ON ALL FUNCTIONS IN SCHEMA public FROM anon;
 GRANT EXECUTE ON ALL FUNCTIONS IN SCHEMA public TO authenticated, service_role;
+
