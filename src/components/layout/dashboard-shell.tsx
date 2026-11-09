@@ -183,6 +183,7 @@ function getNavItems(
       return [
         { href: basePath, label: "Dashboard", icon: "🏠" },
         { href: `${basePath}/boarding`, label: "Boarding", icon: "📋" },
+        { href: `${basePath}/assisted`, label: "Assisted Trips", icon: "🤝" },
         { href: `${basePath}/passengers`, label: "Passengers", icon: "👥" },
         { href: `${basePath}/profile`, label: "Profile", icon: "👤" },
       ];

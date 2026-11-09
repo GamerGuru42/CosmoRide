@@ -145,20 +145,27 @@ export default async function BoardingOfficerDashboardPage() {
         </div>
 
         {/* Quick Actions */}
-        <div className="flex items-center gap-2.5 shrink-0">
+        <div className="flex items-center gap-2.5 shrink-0 flex-wrap">
           <Link
             href="/boarding/boarding"
             className="flex items-center gap-2 rounded-xl bg-[#20A477] px-4 py-2.5 text-xs font-bold text-white shadow-sm hover:bg-[#1a8560] transition-colors"
           >
             <QrCodeIcon className="h-4 w-4" />
-            <span>Launch QR Scanner</span>
+            <span>Launch Scanner</span>
+          </Link>
+          <Link
+            href="/boarding/assisted"
+            className="flex items-center gap-2 rounded-xl bg-amber-500/20 px-3.5 py-2.5 text-xs font-bold text-amber-200 hover:bg-amber-500/30 transition-colors"
+          >
+            <span>🤝</span>
+            <span>Assisted Driver Ops</span>
           </Link>
           <Link
             href="/boarding/passengers"
             className="flex items-center gap-2 rounded-xl bg-white/10 px-4 py-2.5 text-xs font-bold text-white hover:bg-white/20 transition-colors"
           >
             <UserIcon className="h-4 w-4" />
-            <span>Passenger Manifest</span>
+            <span>Manifest</span>
           </Link>
         </div>
       </div>

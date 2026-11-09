@@ -172,3 +172,24 @@ VALUES
   ('v1000000-0000-0000-0000-000000000005', 'CU-EB-05', 'Electric Bus 05 (Inter-Campus)', 30, 'electric_bus', TRUE)
 ON CONFLICT (registration_number) DO NOTHING;
 
+-- ============================================================
+-- 7. INSTITUTIONAL DRIVERS (MODE A & MODE B)
+-- Demonstrating both direct smartphone access and assisted operations
+-- ============================================================
+
+INSERT INTO public.drivers (id, full_name, phone, driver_reference, assigned_vehicle_id, status, has_app_access, notes)
+VALUES
+  -- Girls' Fleet Drivers
+  ('d1000000-0000-0000-0000-000000000001', 'Malam Ibrahim Musa', '+234 803 555 0101', 'DRV-CU-01', 'v1000000-0000-0000-0000-000000000001', 'active', TRUE, 'Direct smartphone app user'),
+  ('d1000000-0000-0000-0000-000000000002', 'Mr. Sunday Okafor', '+234 802 555 0102', 'DRV-CU-02', 'v1000000-0000-0000-0000-000000000002', 'active', TRUE, 'Direct smartphone app user'),
+  ('d1000000-0000-0000-0000-000000000003', 'Malam Usman Garba', '+234 814 555 0103', 'DRV-CU-03', 'v1000000-0000-0000-0000-000000000003', 'active', FALSE, 'Assisted Mode: Non-smartphone driver, assisted by Hostel Representative'),
+
+  -- Boys' Fleet Drivers
+  ('d1000000-0000-0000-0000-000000000004', 'Mr. Emeka Eze', '+234 805 555 0104', 'DRV-CU-04', 'v1000000-0000-0000-0000-000000000004', 'active', TRUE, 'Direct smartphone app user'),
+  ('d1000000-0000-0000-0000-000000000005', 'Malam Haruna Bello', '+234 809 555 0105', 'DRV-CU-05', 'v1000000-0000-0000-0000-000000000004', 'active', FALSE, 'Assisted Mode: Non-smartphone driver, assisted by Hostel Representative'),
+
+  -- Inter-Campus Shuttle Driver
+  ('d1000000-0000-0000-0000-000000000006', 'Mr. Babatunde Adeleke', '+234 807 555 0106', 'DRV-CU-06', 'v1000000-0000-0000-0000-000000000005', 'active', TRUE, 'Direct smartphone app user')
+ON CONFLICT (driver_reference) DO NOTHING;
+
+

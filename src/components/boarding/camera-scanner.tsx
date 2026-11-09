@@ -299,3 +299,4 @@ export function CameraScanner({ onScan, isPaused = false }: CameraScannerProps) 
     </div>
   );
 }
+

@@ -36,6 +36,12 @@ export interface DepartureJourney {
   stops: DepartureStop[];
   userBookingId?: string | null;
   userWaitlistPosition?: number | null;
+  latestStopUpdate?: {
+    eventType: string;
+    stopName: string;
+    timestamp: string;
+    isAssisted: boolean;
+  } | null;
 }
 
 interface DepartureBoardProps {
@@ -317,6 +323,21 @@ export function DepartureBoard({ journeys, currentUserId, onBookingSuccess }: De
                     </div>
                   </div>
                 </div>
+
+                {/* Latest Operational Milestone Banner */}
+                {j.latestStopUpdate && (
+                  <div className="bg-emerald-50 px-4 py-2 border-t border-emerald-100 flex flex-col sm:flex-row sm:items-center justify-between gap-1 text-[11px] text-emerald-900">
+                    <div className="flex items-center gap-1.5 font-medium">
+                      <span>📍</span>
+                      <span>
+                        Bus {j.latestStopUpdate.eventType.replace("_", " ")} at <strong>{j.latestStopUpdate.stopName}</strong> ({formatTime(j.latestStopUpdate.timestamp)})
+                      </span>
+                    </div>
+                    <span className="text-[10px] text-emerald-700 font-semibold shrink-0">
+                      {j.latestStopUpdate.isAssisted ? "Representative recorded" : "Driver reported"}
+                    </span>
+                  </div>
+                )}
 
                 {/* Pickup Stops Accordion / Footer Preview */}
                 {j.stops.length > 0 && (

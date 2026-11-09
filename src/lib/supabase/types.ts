@@ -42,6 +42,9 @@ export type IncidentStatus =
   | "investigating"
   | "resolved"
   | "dismissed";
+export type DriverStatus = "active" | "on_leave" | "suspended" | "inactive";
+export type StopEventType = "approaching" | "arrived" | "pickup_completed" | "departed";
+export type ReadinessStatus = "pending" | "passed" | "failed_unsafe";
 
 export type Database = {
   public: {
@@ -353,6 +356,69 @@ export type Database = {
         };
         Relationships: [];
       };
+      drivers: {
+        Row: {
+          id: string;
+          profile_id: string | null;
+          full_name: string;
+          phone: string | null;
+          driver_reference: string;
+          license_number: string | null;
+          assigned_vehicle_id: string | null;
+          status: DriverStatus;
+          has_app_access: boolean;
+          emergency_contact: string | null;
+          notes: string | null;
+          created_at: string;
+          updated_at: string;
+        };
+        Insert: {
+          id?: string;
+          profile_id?: string | null;
+          full_name: string;
+          phone?: string | null;
+          driver_reference: string;
+          license_number?: string | null;
+          assigned_vehicle_id?: string | null;
+          status?: DriverStatus;
+          has_app_access?: boolean;
+          emergency_contact?: string | null;
+          notes?: string | null;
+          created_at?: string;
+          updated_at?: string;
+        };
+        Update: {
+          id?: string;
+          profile_id?: string | null;
+          full_name?: string;
+          phone?: string | null;
+          driver_reference?: string;
+          license_number?: string | null;
+          assigned_vehicle_id?: string | null;
+          status?: DriverStatus;
+          has_app_access?: boolean;
+          emergency_contact?: string | null;
+          notes?: string | null;
+          created_at?: string;
+          updated_at?: string;
+        };
+        Relationships: [
+          {
+            foreignKeyName: "drivers_profile_id_fkey";
+            columns: ["profile_id"];
+            isOneToOne: true;
+            referencedRelation: "profiles";
+            referencedColumns: ["id"];
+          },
+          {
+            foreignKeyName: "drivers_assigned_vehicle_id_fkey";
+            columns: ["assigned_vehicle_id"];
+            isOneToOne: false;
+            referencedRelation: "vehicles";
+            referencedColumns: ["id"];
+          }
+        ];
+      };
       schedules: {
         Row: {
           id: string;
@@ -403,15 +469,21 @@ export type Database = {
           schedule_id: string | null;
           route_id: string;
           vehicle_id: string;
-          driver_id: string;
+          driver_id: string | null;
+          driver_record_id: string | null;
           journey_date: string;
           scheduled_departure: string;
           actual_departure: string | null;
+          actual_arrival: string | null;
           estimated_arrival: string | null;
           proposed_allocation: number;
           status: JourneyStatus;
           delay_minutes: number;
           delay_reason: string | null;
+          readiness_status: ReadinessStatus;
+          readiness_checked_at: string | null;
+          readiness_checked_by: string | null;
+          is_assisted_operation: boolean;
           created_by: string;
           created_at: string;
           updated_at: string;
@@ -421,15 +493,21 @@ export type Database = {
           schedule_id?: string | null;
           route_id: string;
           vehicle_id: string;
-          driver_id: string;
+          driver_id?: string | null;
+          driver_record_id?: string | null;
           journey_date: string;
           scheduled_departure: string;
           actual_departure?: string | null;
+          actual_arrival?: string | null;
           estimated_arrival?: string | null;
           proposed_allocation: number;
           status?: JourneyStatus;
           delay_minutes?: number;
           delay_reason?: string | null;
+          readiness_status?: ReadinessStatus;
+          readiness_checked_at?: string | null;
+          readiness_checked_by?: string | null;
+          is_assisted_operation?: boolean;
           created_by: string;
           created_at?: string;
           updated_at?: string;
@@ -439,15 +517,21 @@ export type Database = {
           schedule_id?: string | null;
           route_id?: string;
           vehicle_id?: string;
-          driver_id?: string;
+          driver_id?: string | null;
+          driver_record_id?: string | null;
           journey_date?: string;
           scheduled_departure?: string;
           actual_departure?: string | null;
+          actual_arrival?: string | null;
           estimated_arrival?: string | null;
           proposed_allocation?: number;
           status?: JourneyStatus;
           delay_minutes?: number;
           delay_reason?: string | null;
+          readiness_status?: ReadinessStatus;
+          readiness_checked_at?: string | null;
+          readiness_checked_by?: string | null;
+          is_assisted_operation?: boolean;
           created_by?: string;
           created_at?: string;
           updated_at?: string;
@@ -479,6 +563,13 @@ export type Database = {
             columns: ["driver_id"];
             isOneToOne: false;
             referencedRelation: "profiles";
+            referencedColumns: ["id"];
+          },
+          {
+            foreignKeyName: "journeys_driver_record_id_fkey";
+            columns: ["driver_record_id"];
+            isOneToOne: false;
+            referencedRelation: "drivers";
             referencedColumns: ["id"];
           },
           {
@@ -956,6 +1047,198 @@ export type Database = {
           }
         ];
       };
+      vehicle_readiness_checks: {
+        Row: {
+          id: string;
+          journey_id: string;
+          vehicle_id: string;
+          checked_by_user_id: string;
+          is_assisted: boolean;
+          assisted_by_role: string | null;
+          vehicle_available: boolean;
+          vehicle_safe: boolean;
+          mechanical_fault_reported: boolean;
+          fault_description: string | null;
+          journey_reviewed: boolean;
+          odometer_reading: number | null;
+          battery_level_percent: number | null;
+          tires_and_lights_checked: boolean;
+          status: string;
+          notes: string | null;
+          created_at: string;
+        };
+        Insert: {
+          id?: string;
+          journey_id: string;
+          vehicle_id: string;
+          checked_by_user_id: string;
+          is_assisted?: boolean;
+          assisted_by_role?: string | null;
+          vehicle_available?: boolean;
+          vehicle_safe?: boolean;
+          mechanical_fault_reported?: boolean;
+          fault_description?: string | null;
+          journey_reviewed?: boolean;
+          odometer_reading?: number | null;
+          battery_level_percent?: number | null;
+          tires_and_lights_checked?: boolean;
+          status?: string;
+          notes?: string | null;
+          created_at?: string;
+        };
+        Update: {
+          id?: string;
+          journey_id?: string;
+          vehicle_id?: string;
+          checked_by_user_id?: string;
+          is_assisted?: boolean;
+          assisted_by_role?: string | null;
+          vehicle_available?: boolean;
+          vehicle_safe?: boolean;
+          mechanical_fault_reported?: boolean;
+          fault_description?: string | null;
+          journey_reviewed?: boolean;
+          odometer_reading?: number | null;
+          battery_level_percent?: number | null;
+          tires_and_lights_checked?: boolean;
+          status?: string;
+          notes?: string | null;
+          created_at?: string;
+        };
+        Relationships: [
+          {
+            foreignKeyName: "vehicle_readiness_checks_journey_id_fkey";
+            columns: ["journey_id"];
+            isOneToOne: false;
+            referencedRelation: "journeys";
+            referencedColumns: ["id"];
+          },
+          {
+            foreignKeyName: "vehicle_readiness_checks_vehicle_id_fkey";
+            columns: ["vehicle_id"];
+            isOneToOne: false;
+            referencedRelation: "vehicles";
+            referencedColumns: ["id"];
+          },
+          {
+            foreignKeyName: "vehicle_readiness_checks_checked_by_user_id_fkey";
+            columns: ["checked_by_user_id"];
+            isOneToOne: false;
+            referencedRelation: "profiles";
+            referencedColumns: ["id"];
+          }
+        ];
+      };
+      journey_stop_updates: {
+        Row: {
+          id: string;
+          journey_id: string;
+          stop_id: string;
+          recorded_by_user_id: string;
+          event_type: StopEventType;
+          is_assisted: boolean;
+          notes: string | null;
+          created_at: string;
+        };
+        Insert: {
+          id?: string;
+          journey_id: string;
+          stop_id: string;
+          recorded_by_user_id: string;
+          event_type: StopEventType;
+          is_assisted?: boolean;
+          notes?: string | null;
+          created_at?: string;
+        };
+        Update: {
+          id?: string;
+          journey_id?: string;
+          stop_id?: string;
+          recorded_by_user_id?: string;
+          event_type?: StopEventType;
+          is_assisted?: boolean;
+          notes?: string | null;
+          created_at?: string;
+        };
+        Relationships: [
+          {
+            foreignKeyName: "journey_stop_updates_journey_id_fkey";
+            columns: ["journey_id"];
+            isOneToOne: false;
+            referencedRelation: "journeys";
+            referencedColumns: ["id"];
+          },
+          {
+            foreignKeyName: "journey_stop_updates_stop_id_fkey";
+            columns: ["stop_id"];
+            isOneToOne: false;
+            referencedRelation: "stops";
+            referencedColumns: ["id"];
+          },
+          {
+            foreignKeyName: "journey_stop_updates_recorded_by_user_id_fkey";
+            columns: ["recorded_by_user_id"];
+            isOneToOne: false;
+            referencedRelation: "profiles";
+            referencedColumns: ["id"];
+          }
+        ];
+      };
+      journey_operational_logs: {
+        Row: {
+          id: string;
+          journey_id: string;
+          driver_id: string | null;
+          recorded_by_user_id: string;
+          action_type: string;
+          operation_mode: "direct" | "assisted";
+          details: Json;
+          created_at: string;
+        };
+        Insert: {
+          id?: string;
+          journey_id: string;
+          driver_id?: string | null;
+          recorded_by_user_id: string;
+          action_type: string;
+          operation_mode: "direct" | "assisted";
+          details?: Json;
+          created_at?: string;
+        };
+        Update: {
+          id?: string;
+          journey_id?: string;
+          driver_id?: string | null;
+          recorded_by_user_id?: string;
+          action_type?: string;
+          operation_mode?: "direct" | "assisted";
+          details?: Json;
+          created_at?: string;
+        };
+        Relationships: [
+          {
+            foreignKeyName: "journey_operational_logs_journey_id_fkey";
+            columns: ["journey_id"];
+            isOneToOne: false;
+            referencedRelation: "journeys";
+            referencedColumns: ["id"];
+          },
+          {
+            foreignKeyName: "journey_operational_logs_driver_id_fkey";
+            columns: ["driver_id"];
+            isOneToOne: false;
+            referencedRelation: "drivers";
+            referencedColumns: ["id"];
+          },
+          {
+            foreignKeyName: "journey_operational_logs_recorded_by_user_id_fkey";
+            columns: ["recorded_by_user_id"];
+            isOneToOne: false;
+            referencedRelation: "profiles";
+            referencedColumns: ["id"];
+          }
+        ];
+      };
     };
     Views: {
       [_ in never]: never;
@@ -992,6 +1275,62 @@ export type Database = {
           p_officer_id: string;
           p_mark_unboarded_as_noshow?: boolean;
           p_closure_notes?: string | null;
+        };
+        Returns: Json;
+      };
+      record_vehicle_readiness: {
+        Args: {
+          p_journey_id: string;
+          p_user_id: string;
+          p_vehicle_available: boolean;
+          p_vehicle_safe: boolean;
+          p_mechanical_fault: boolean;
+          p_fault_description: string | null;
+          p_journey_reviewed: boolean;
+          p_battery_level: number;
+          p_tires_and_lights: boolean;
+          p_notes: string | null;
+          p_is_assisted?: boolean;
+        };
+        Returns: Json;
+      };
+      record_journey_stop_update: {
+        Args: {
+          p_journey_id: string;
+          p_stop_id: string;
+          p_user_id: string;
+          p_event_type: string;
+          p_notes?: string | null;
+          p_is_assisted?: boolean;
+        };
+        Returns: Json;
+      };
+      record_journey_delay_with_notifications: {
+        Args: {
+          p_journey_id: string;
+          p_user_id: string;
+          p_delay_minutes: number;
+          p_delay_reason: string;
+          p_notes?: string | null;
+          p_is_assisted?: boolean;
+        };
+        Returns: Json;
+      };
+      record_journey_departure_safe: {
+        Args: {
+          p_journey_id: string;
+          p_user_id: string;
+          p_is_assisted?: boolean;
+          p_closure_notes?: string | null;
+        };
+        Returns: Json;
+      };
+      record_journey_arrival_safe: {
+        Args: {
+          p_journey_id: string;
+          p_user_id: string;
+          p_is_assisted?: boolean;
+          p_notes?: string | null;
         };
         Returns: Json;
       };

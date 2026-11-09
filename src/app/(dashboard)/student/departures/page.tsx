@@ -116,6 +116,22 @@ export default async function StudentDeparturesPage() {
       const origin = stopsList[0]?.name || "Main Terminal";
       const destination = stopsList[stopsList.length - 1]?.name || "Destination";
 
+      // Fetch latest stop milestone update if any
+      const { data: latestUpdates } = await supabase
+        .from("journey_stop_updates")
+        .select(`
+          event_type,
+          created_at,
+          is_assisted,
+          stops:stops!journey_stop_updates_stop_id_fkey ( name )
+        `)
+        .eq("journey_id", jd.id)
+        .order("created_at", { ascending: false })
+        .limit(1);
+
+      const latestUpdateRec = latestUpdates && latestUpdates.length > 0 ? latestUpdates[0] : null;
+      const stopObj = Array.isArray(latestUpdateRec?.stops) ? latestUpdateRec?.stops[0] : latestUpdateRec?.stops;
+
       departures.push({
         id: jd.id,
         journeyDate: jd.journey_date,
@@ -139,6 +155,14 @@ export default async function StudentDeparturesPage() {
         stops: stopsList,
         userBookingId: userBooking?.id ?? null,
         userWaitlistPosition: userWaitlist?.position ?? null,
+        latestStopUpdate: latestUpdateRec
+          ? {
+              eventType: latestUpdateRec.event_type,
+              stopName: stopObj?.name || "Bus Stop",
+              timestamp: latestUpdateRec.created_at,
+              isAssisted: latestUpdateRec.is_assisted,
+            }
+          : null,
       });
     }
   }

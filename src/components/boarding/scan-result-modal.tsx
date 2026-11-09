@@ -270,3 +270,4 @@ function getStatusConfig(code: BoardingStatusCode | "INVALID") {
       };
   }
 }
+
