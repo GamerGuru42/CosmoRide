@@ -334,6 +334,10 @@ export type Database = {
           safe_capacity: number;
           vehicle_type: string;
           is_active: boolean;
+          status: string;
+          ownership_type: string;
+          vehicle_reference: string | null;
+          maintenance_notes: string | null;
           created_at: string;
         };
         Insert: {
@@ -343,6 +347,10 @@ export type Database = {
           safe_capacity: number;
           vehicle_type?: string;
           is_active?: boolean;
+          status?: string;
+          ownership_type?: string;
+          vehicle_reference?: string | null;
+          maintenance_notes?: string | null;
           created_at?: string;
         };
         Update: {
@@ -352,6 +360,10 @@ export type Database = {
           safe_capacity?: number;
           vehicle_type?: string;
           is_active?: boolean;
+          status?: string;
+          ownership_type?: string;
+          vehicle_reference?: string | null;
+          maintenance_notes?: string | null;
           created_at?: string;
         };
         Relationships: [];
@@ -364,6 +376,7 @@ export type Database = {
           phone: string | null;
           driver_reference: string;
           license_number: string | null;
+          license_expiry: string | null;
           assigned_vehicle_id: string | null;
           status: DriverStatus;
           has_app_access: boolean;
@@ -379,6 +392,7 @@ export type Database = {
           phone?: string | null;
           driver_reference: string;
           license_number?: string | null;
+          license_expiry?: string | null;
           assigned_vehicle_id?: string | null;
           status?: DriverStatus;
           has_app_access?: boolean;
@@ -394,6 +408,7 @@ export type Database = {
           phone?: string | null;
           driver_reference?: string;
           license_number?: string | null;
+          license_expiry?: string | null;
           assigned_vehicle_id?: string | null;
           status?: DriverStatus;
           has_app_access?: boolean;
@@ -796,6 +811,7 @@ export type Database = {
           target_role: UserRole | null;
           route_id: string | null;
           transport_group_id: string | null;
+          campus_id: string | null;
           is_active: boolean;
           created_by: string;
           created_at: string;
@@ -808,6 +824,7 @@ export type Database = {
           target_role?: UserRole | null;
           route_id?: string | null;
           transport_group_id?: string | null;
+          campus_id?: string | null;
           is_active?: boolean;
           created_by: string;
           created_at?: string;
@@ -820,6 +837,7 @@ export type Database = {
           target_role?: UserRole | null;
           route_id?: string | null;
           transport_group_id?: string | null;
+          campus_id?: string | null;
           is_active?: boolean;
           created_by?: string;
           created_at?: string;
@@ -1331,6 +1349,40 @@ export type Database = {
           p_user_id: string;
           p_is_assisted?: boolean;
           p_notes?: string | null;
+        };
+        Returns: Json;
+      };
+      admin_generate_journeys_from_schedules: {
+        Args: {
+          p_admin_id: string;
+          p_target_date: string;
+          p_route_id?: string | null;
+        };
+        Returns: Json;
+      };
+      admin_cancel_journey: {
+        Args: {
+          p_admin_id: string;
+          p_journey_id: string;
+          p_cancellation_reason: string;
+        };
+        Returns: Json;
+      };
+      admin_update_system_setting: {
+        Args: {
+          p_admin_id: string;
+          p_key: string;
+          p_value: Json;
+          p_description?: string | null;
+        };
+        Returns: Json;
+      };
+      admin_update_incident_status: {
+        Args: {
+          p_admin_id: string;
+          p_incident_id: string;
+          p_status: IncidentStatus;
+          p_resolution_notes: string;
         };
         Returns: Json;
       };

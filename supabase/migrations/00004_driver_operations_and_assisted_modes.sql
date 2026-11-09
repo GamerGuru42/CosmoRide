@@ -776,3 +776,4 @@ CREATE POLICY "Staff can insert operational logs"
   WITH CHECK (
     EXISTS (SELECT 1 FROM public.profiles WHERE id = (SELECT auth.uid()) AND role IN ('driver', 'boarding_officer', 'admin'))
   );
+

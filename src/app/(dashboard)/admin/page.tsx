@@ -1,141 +1,199 @@
 import type { Metadata } from "next";
+import { redirect } from "next/navigation";
+import { createClient } from "@/lib/supabase/server";
 import { PageHeader } from "@/components/ui/page-header";
-import { EmptyState } from "@/components/ui/empty-state";
+import {
+  AdminOverview,
+  type AdminJourneyOverview,
+  type AdminFleetSummary,
+  type AdminIncidentSummary,
+} from "@/components/admin/admin-overview";
 
 export const metadata: Metadata = {
-  title: "Transport Administration",
+  title: "Operational Control Centre — CosmoRide Admin",
+  description: "Cosmopolitan University transportation operations control centre and fleet monitoring.",
 };
 
-/**
- * Admin Dashboard — overview of fleet, routes, journeys and system status.
- * All data shown is real. Empty states display when database has no data.
- */
-export default function AdminDashboardPage() {
+export const dynamic = "force-dynamic";
+
+export default async function AdminDashboardPage() {
+  const supabase = await createClient();
+
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+
+  if (!user) {
+    redirect("/login");
+  }
+
+  // Authorize admin caller
+  const { data: profile } = await supabase
+    .from("profiles")
+    .select("role, full_name")
+    .eq("id", user.id)
+    .single();
+
+  if (!profile || profile.role !== "admin") {
+    redirect("/student");
+  }
+
+  const todayStr = new Date().toISOString().split("T")[0];
+
+  // 1. Fetch today's journeys
+  const { data: journeysData } = await supabase
+    .from("journeys")
+    .select(`
+      id,
+      journey_date,
+      scheduled_departure,
+      actual_departure,
+      actual_arrival,
+      status,
+      proposed_allocation,
+      delay_minutes,
+      delay_reason,
+      route:routes(
+        code,
+        name,
+        transport_group:transport_groups(name)
+      ),
+      vehicle:vehicles(
+        registration_number,
+        name,
+        safe_capacity
+      ),
+      driver_record:drivers(
+        full_name,
+        has_app_access
+      ),
+      bookings(id, status),
+      boarding_records(id)
+    `)
+    .eq("journey_date", todayStr)
+    .order("scheduled_departure", { ascending: true });
+
+  const journeys: AdminJourneyOverview[] = (journeysData ?? []).map((j) => {
+    const route = Array.isArray(j.route) ? j.route[0] : j.route;
+    const vehicle = Array.isArray(j.vehicle) ? j.vehicle[0] : j.vehicle;
+    const driver = Array.isArray(j.driver_record) ? j.driver_record[0] : j.driver_record;
+    const transportGroup = route?.transport_group;
+    const tgName = Array.isArray(transportGroup)
+      ? transportGroup[0]?.name
+      : transportGroup?.name;
+
+    const confirmedBookings = (j.bookings ?? []).filter(
+      (b: { id: string; status: string }) =>
+        b.status === "confirmed" || b.status === "boarded"
+    ).length;
+
+    const boardedCount = (j.boarding_records ?? []).length;
+
+    const isDelayed = (j.delay_minutes || 0) > 0;
+
+    let driverMode: "app" | "assisted" | "unassigned" = "unassigned";
+    if (driver) {
+      driverMode = driver.has_app_access ? "app" : "assisted";
+    }
+
+    return {
+      id: j.id,
+      journeyDate: j.journey_date,
+      scheduledDeparture: j.scheduled_departure,
+      actualDeparture: j.actual_departure,
+      actualArrival: j.actual_arrival,
+      status: j.status as AdminJourneyOverview["status"],
+      routeCode: route?.code || "CU-RT",
+      routeName: route?.name || "Route",
+      transportGroupName: tgName || "General Fleet",
+      vehicleRegistration: vehicle?.registration_number || null,
+      vehicleName: vehicle?.name || null,
+      safeCapacity: vehicle?.safe_capacity || j.proposed_allocation || 30,
+      driverName: driver?.full_name || null,
+      driverMode,
+      bookedCount: confirmedBookings,
+      boardedCount,
+      isDelayed,
+      delayMinutes: j.delay_minutes || 0,
+    };
+  });
+
+  // 2. Fetch fleet summary
+  const { data: fleetData } = await supabase
+    .from("vehicles")
+    .select("id, status, is_active");
+
+  const allVehicles = fleetData ?? [];
+  const assignedVehicleIds = new Set(
+    journeys.map((j) => j.vehicleRegistration).filter(Boolean)
+  );
+
+  const fleetSummary: AdminFleetSummary = {
+    totalVehicles: allVehicles.length,
+    availableVehicles: allVehicles.filter(
+      (v) => v.is_active && v.status !== "maintenance" && v.status !== "retired"
+    ).length,
+    maintenanceVehicles: allVehicles.filter((v) => v.status === "maintenance").length,
+    assignedToday: assignedVehicleIds.size,
+  };
+
+  // 3. Fetch open incidents
+  const { data: incidentData } = await supabase
+    .from("incident_reports")
+    .select(`
+      id,
+      category,
+      severity,
+      status,
+      description,
+      created_at,
+      journey:journeys(
+        route:routes(code)
+      )
+    `)
+    .in("status", ["reported", "investigating"])
+    .order("created_at", { ascending: false })
+    .limit(5);
+
+  const openIncidents: AdminIncidentSummary[] = (incidentData ?? []).map((inc) => {
+    const journey = Array.isArray(inc.journey) ? inc.journey[0] : inc.journey;
+    const route = Array.isArray(journey?.route) ? journey?.route[0] : journey?.route;
+    return {
+      id: inc.id,
+      category: inc.category,
+      severity: inc.severity as AdminIncidentSummary["severity"],
+      status: inc.status as AdminIncidentSummary["status"],
+      description: inc.description,
+      createdAt: inc.created_at,
+      routeCode: route?.code || null,
+    };
+  });
+
+  // 4. Fetch registered students and total drivers count
+  const { count: studentCount } = await supabase
+    .from("profiles")
+    .select("id", { count: "exact", head: true })
+    .eq("role", "student");
+
+  const { count: driverCount } = await supabase
+    .from("drivers")
+    .select("id", { count: "exact", head: true });
+
   return (
     <div>
       <PageHeader
-        title="Transport Administration"
-        description="Manage fleet, routes, schedules, and university transportation."
+        title="Transport Operational Control Centre"
+        description="Comprehensive real-time monitoring and administrative oversight for Cosmopolitan University bus operations."
       />
 
-      {/* Stats overview */}
-      <div className="mb-8 grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
-        <div className="rounded-xl border border-gray-200 bg-white p-5">
-          <p className="text-sm font-medium text-gray-500">Active Routes</p>
-          <p className="mt-1 text-2xl font-bold text-gray-900">0</p>
-          <p className="mt-1 text-xs text-gray-400">
-            Configure routes to get started
-          </p>
-        </div>
-        <div className="rounded-xl border border-gray-200 bg-white p-5">
-          <p className="text-sm font-medium text-gray-500">Fleet Vehicles</p>
-          <p className="mt-1 text-2xl font-bold text-gray-900">0</p>
-          <p className="mt-1 text-xs text-gray-400">
-            Add vehicles to the fleet
-          </p>
-        </div>
-        <div className="rounded-xl border border-gray-200 bg-white p-5">
-          <p className="text-sm font-medium text-gray-500">
-            Today&apos;s Journeys
-          </p>
-          <p className="mt-1 text-2xl font-bold text-gray-900">0</p>
-          <p className="mt-1 text-xs text-gray-400">
-            Create schedules and journeys
-          </p>
-        </div>
-        <div className="rounded-xl border border-gray-200 bg-white p-5">
-          <p className="text-sm font-medium text-gray-500">
-            Registered Students
-          </p>
-          <p className="mt-1 text-2xl font-bold text-gray-900">0</p>
-          <p className="mt-1 text-xs text-gray-400">
-            Students register via the app
-          </p>
-        </div>
-      </div>
-
-      {/* Quick Actions */}
-      <h2 className="mb-4 text-lg font-semibold text-gray-900">
-        Getting Started
-      </h2>
-
-      <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
-        <SetupCard
-          step={1}
-          title="Configure Campuses & Hostels"
-          description="Set up Main Campus, Kado Campus, and all student hostels."
-          href="/admin/routes"
-        />
-        <SetupCard
-          step={2}
-          title="Add Routes & Stops"
-          description="Define transportation routes with pickup and drop-off stops."
-          href="/admin/routes"
-        />
-        <SetupCard
-          step={3}
-          title="Register Fleet Vehicles"
-          description="Add buses with their registration numbers and safe capacity limits."
-          href="/admin/vehicles"
-        />
-        <SetupCard
-          step={4}
-          title="Create Schedules"
-          description="Set up recurring journey schedules for each route and day of week."
-          href="/admin/schedules"
-        />
-        <SetupCard
-          step={5}
-          title="Assign Drivers"
-          description="Assign registered drivers to vehicles and journeys."
-          href="/admin/users"
-        />
-        <SetupCard
-          step={6}
-          title="Generate Journeys"
-          description="Create journey instances from schedules for students to book."
-          href="/admin/journeys"
-        />
-      </div>
-
-      {/* Recent Activity */}
-      <h2 className="mb-4 mt-8 text-lg font-semibold text-gray-900">
-        Recent Activity
-      </h2>
-
-      <EmptyState
-        icon="📊"
-        title="No activity yet"
-        description="Activity will appear here once journeys are created and students start booking rides."
+      <AdminOverview
+        date={todayStr}
+        journeys={journeys}
+        fleetSummary={fleetSummary}
+        openIncidents={openIncidents}
+        registeredStudentsCount={studentCount || 0}
+        totalDriversCount={driverCount || 0}
       />
     </div>
   );
 }
-
-function SetupCard({
-  step,
-  title,
-  description,
-  href,
-}: {
-  step: number;
-  title: string;
-  description: string;
-  href: string;
-}) {
-  return (
-    <a
-      href={href}
-      className="group rounded-xl border border-gray-200 bg-white p-5 transition-shadow hover:shadow-md"
-    >
-      <div className="mb-3 flex h-8 w-8 items-center justify-center rounded-full bg-[var(--color-primary)]/10 text-sm font-bold text-[var(--color-primary)]">
-        {step}
-      </div>
-      <h3 className="mb-1 font-semibold text-gray-900 group-hover:text-[var(--color-primary)]">
-        {title}
-      </h3>
-      <p className="text-sm text-gray-500">{description}</p>
-    </a>
-  );
-}
-
