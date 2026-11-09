@@ -1,90 +1,99 @@
 # CosmoRide — Architecture Document
 
-## Technology Stack
+## 1. System Overview & Technology Stack
+
+CosmoRide is the official university-owned transportation and electric bus management platform for Cosmopolitan University, Nigeria. It is built as a production-grade, multi-role progressive web application with zero client-side privilege exposure.
 
 ```
-┌─────────────────────────────────────────────┐
-│                  Vercel CDN                  │
-├─────────────────────────────────────────────┤
-│          Next.js 16 (App Router)            │
-│    ┌──────────────┬──────────────────┐      │
-│    │  React RSC   │  Server Actions  │      │
-│    │  (Pages)     │  (Mutations)     │      │
-│    └──────┬───────┴────────┬─────────┘      │
-│           │                │                │
-│    ┌──────▼───────┐ ┌──────▼─────────┐      │
-│    │ Supabase SSR │ │ Supabase Admin │      │
-│    │ (anon key)   │ │ (service role) │      │
-│    └──────┬───────┘ └──────┬─────────┘      │
-├───────────┼────────────────┼────────────────┤
-│           └────────┬───────┘                │
-│              Supabase Platform              │
-│    ┌───────────────────────────────────┐    │
-│    │  PostgreSQL  │  Auth  │  Storage  │    │
-│    │              │        │           │    │
-│    │  RLS Policies│  JWT   │  Avatars  │    │
-│    └───────────────────────────────────┘    │
-└─────────────────────────────────────────────┘
+┌───────────────────────────────────────────────────────────┐
+│                        Vercel CDN                         │
+├───────────────────────────────────────────────────────────┤
+│                 Next.js 16 (App Router)                   │
+│   ┌─────────────────────────────┬─────────────────────┐   │
+│   │     React Server Components │    Server Actions   │   │
+│   │     (Role Dashboards)       │    (RPC & Mutations)│   │
+│   └──────────────┬──────────────┴──────────┬──────────┘   │
+│                  │                         │              │
+│   ┌──────────────▼──────────────┐ ┌────────▼──────────┐   │
+│   │  Supabase SSR (Anon/Cookie) │ │ Supabase Admin    │   │
+│   │  RLS-Enforced Session       │ │ (Service Role Key)│   │
+│   └──────────────┬──────────────┘ └────────┬──────────┘   │
+├──────────────────┼─────────────────────────┼──────────────┤
+│                  └─────────────┬───────────┘              │
+│                   Supabase Hosted Platform                │
+│   ┌───────────────────────────────────────────────────┐   │
+│   │ PostgreSQL Database                               │   │
+│   │  • 18 Normalized Tables                           │   │
+│   │  • Row-Level Security (RLS) on all exposed tables │   │
+│   │  • Atomic Stored Procedures with Row Locks        │   │
+│   │  • Privilege Escalation Prevention Trigger        │   │
+│   │  • Audit Logging & Manual Exception Trail         │   │
+│   ├───────────────────────────────────────────────────┤   │
+│   │ Auth (JWT + Secure HTTP-only Cookie Sessions)     │   │
+│   │ Storage (Avatars, Documents — Access Controlled)  │   │
+│   └───────────────────────────────────────────────────┘   │
+└───────────────────────────────────────────────────────────┘
 ```
 
 ---
 
-## Project Structure
+## 2. Directory Structure
 
 ```
-cosmoride/
+CosmoRide/
 ├── public/
-│   ├── manifest.json          # PWA manifest
-│   ├── sw.js                  # Service worker (shell caching)
-│   └── icons/                 # App icons
+│   ├── manifest.json              # PWA manifest
+│   ├── sw.js                      # Service worker (app shell caching)
+│   └── icons/                     # Application icons
 │
 ├── src/
-│   ├── app/                   # Next.js App Router
-│   │   ├── (auth)/            # Auth route group (login, register)
-│   │   │   ├── login/
-│   │   │   └── register/
-│   │   │
-│   │   ├── (dashboard)/       # Protected route group
-│   │   │   ├── student/       # Student interface
-│   │   │   ├── boarding/      # Hostel rep interface
-│   │   │   ├── driver/        # Driver interface
-│   │   │   └── admin/         # Transport admin interface
-│   │   │
-│   │   ├── api/               # API routes (if needed)
-│   │   ├── layout.tsx         # Root layout
-│   │   ├── page.tsx           # Landing page
-│   │   └── globals.css
+│   ├── app/
+│   │   ├── (auth)/                # Public authentication routes
+│   │   │   ├── layout.tsx         # Centered card layout
+│   │   │   ├── login/             # Email/password authentication
+│   │   │   └── register/          # Student account creation
+│   │   ├── (dashboard)/           # Protected role-based workspaces
+│   │   │   ├── layout.tsx         # User profile session loader & guard
+│   │   │   ├── student/           # Student interface (rides & booking)
+│   │   │   ├── boarding/          # Hostel representative & boarding officer
+│   │   │   ├── driver/            # Driver interface (journey updates & manifest)
+│   │   │   └── admin/             # Transport administrator interface
+│   │   ├── auth/callback/route.ts # Supabase OAuth & email confirmation
+│   │   ├── layout.tsx             # Root layout with university branding
+│   │   ├── page.tsx               # Public landing page
+│   │   └── globals.css            # University color tokens & styles
+│   │
+│   ├── actions/                   # Server Actions (Mutations & Atomic Procedures)
+│   │   ├── bookings.ts            # bookSeat, cancelBooking, verifyAndBoardPass
+│   │   └── journeys.ts            # createJourney, updateJourneyStatus, reportJourneyDelay
 │   │
 │   ├── components/
-│   │   ├── ui/                # Reusable UI primitives
-│   │   ├── forms/             # Form components
-│   │   ├── layout/            # Layout components (nav, sidebar)
-│   │   └── shared/            # Cross-role shared components
+│   │   ├── layout/dashboard-shell.tsx # Role-aware navigation & header
+│   │   └── ui/                    # Reusable components (EmptyState, StatusBadge, PageHeader)
 │   │
 │   ├── lib/
-│   │   ├── supabase/
-│   │   │   ├── client.ts      # Browser Supabase client
-│   │   │   ├── server.ts      # Server Supabase client (cookies)
-│   │   │   ├── admin.ts       # Service-role client (server only)
-│   │   │   ├── middleware.ts   # Auth middleware helper
-│   │   │   └── types.ts       # Generated database types
-│   │   │
-│   │   ├── validators/        # Zod schemas
-│   │   ├── constants.ts       # App constants
-│   │   └── utils.ts           # Utility functions
+│   │   ├── constants.ts           # University identity, role labels & UI mappings
+│   │   ├── utils.ts               # Date/time formatters, safe seat calculator
+│   │   ├── validators/index.ts    # Zod schemas for forms & mutations
+│   │   └── supabase/
+│   │       ├── client.ts          # Browser client (Anon key)
+│   │       ├── server.ts          # Server client (HTTP-only cookies)
+│   │       ├── admin.ts           # Service-role admin client (Server only)
+│   │       ├── middleware.ts      # Edge session refresher
+│   │       └── types.ts           # Database types & RPC signatures
 │   │
-│   ├── hooks/                 # Custom React hooks
-│   ├── types/                 # TypeScript type definitions
-│   └── middleware.ts          # Next.js middleware (auth guard)
+│   └── middleware.ts              # Route protection middleware
 │
 ├── supabase/
-│   ├── migrations/            # SQL migration files
-│   ├── seed.sql               # Development seed data (dev only)
-│   └── config.toml            # Supabase local config
+│   └── migrations/
+│       ├── 00001_initial_schema.sql         # Base entities & initial RLS policies
+│       └── 00002_security_and_operations.sql # Atomic procedures, waitlists, boarding records, settings
 │
-├── .env.local.example         # Environment variable template
+├── tests/
+│   └── security_and_integrity.test.ts # Security, capacity & token validation test suite
+│
+├── .env.local.example
 ├── next.config.ts
-├── tailwind.config.ts         # (if custom config needed beyond CSS)
 ├── tsconfig.json
 ├── package.json
 ├── PROJECT_REQUIREMENTS.md
@@ -94,197 +103,71 @@ cosmoride/
 
 ---
 
-## Database Schema
+## 3. Database Schema Specification
 
-### Core Tables
+### 3.1 Entities
 
-#### `profiles`
-Extended user profile linked to Supabase Auth.
-| Column | Type | Notes |
-|--------|------|-------|
-| id | uuid (PK, FK → auth.users) | |
-| full_name | text | |
-| role | enum | student, boarding_officer, driver, admin |
-| hostel_id | uuid (FK) | nullable, for students/boarding officers |
-| student_id | text | university student ID, nullable |
-| phone | text | |
-| avatar_url | text | |
-| is_active | boolean | default true |
-| created_at | timestamptz | |
-| updated_at | timestamptz | |
-
-#### `campuses`
-| Column | Type | Notes |
-|--------|------|-------|
-| id | uuid (PK) | |
-| name | text | e.g., "Main Campus", "Kado Campus" |
-| code | text (unique) | e.g., "MAIN", "KADO" |
-| address | text | |
-| is_active | boolean | |
-
-#### `hostels`
-| Column | Type | Notes |
-|--------|------|-------|
-| id | uuid (PK) | |
-| name | text | e.g., "Girls' Hostel", "Main Boys' Hostel" |
-| campus_id | uuid (FK) | |
-| gender | enum | male, female, mixed |
-| is_active | boolean | |
-
-#### `routes`
-| Column | Type | Notes |
-|--------|------|-------|
-| id | uuid (PK) | |
-| name | text | e.g., "Girls Morning Route" |
-| code | text (unique) | |
-| description | text | |
-| gender_group | enum | male, female, all |
-| is_active | boolean | |
-
-#### `stops`
-| Column | Type | Notes |
-|--------|------|-------|
-| id | uuid (PK) | |
-| name | text | e.g., "Girls' Hostel", "Wuye Hostel" |
-| campus_id | uuid (FK) | nullable |
-| address | text | |
-| latitude | numeric | nullable (future use) |
-| longitude | numeric | nullable (future use) |
-
-#### `route_stops`
-Ordered stops within a route.
-| Column | Type | Notes |
-|--------|------|-------|
-| id | uuid (PK) | |
-| route_id | uuid (FK) | |
-| stop_id | uuid (FK) | |
-| stop_order | integer | |
-| estimated_minutes_from_start | integer | |
-| unique(route_id, stop_order) | | |
-
-#### `vehicles`
-| Column | Type | Notes |
-|--------|------|-------|
-| id | uuid (PK) | |
-| registration_number | text (unique) | |
-| name | text | nickname/label |
-| safe_capacity | integer | actual approved safe limit |
-| vehicle_type | text | e.g., "electric_bus" |
-| is_active | boolean | |
-
-#### `schedules`
-Template for recurring journey patterns.
-| Column | Type | Notes |
-|--------|------|-------|
-| id | uuid (PK) | |
-| route_id | uuid (FK) | |
-| day_of_week | integer | 0=Sun, 1=Mon, ... 6=Sat |
-| departure_time | time | |
-| direction | enum | outbound, inbound |
-| proposed_allocation | integer | ≤ vehicle safe_capacity |
-| is_active | boolean | |
-| notes | text | |
-
-#### `journeys`
-Concrete instances of a scheduled trip.
-| Column | Type | Notes |
-|--------|------|-------|
-| id | uuid (PK) | |
-| schedule_id | uuid (FK) | nullable (ad-hoc journeys) |
-| route_id | uuid (FK) | |
-| vehicle_id | uuid (FK) | |
-| driver_id | uuid (FK → profiles) | |
-| journey_date | date | |
-| scheduled_departure | timestamptz | |
-| actual_departure | timestamptz | nullable |
-| estimated_arrival | timestamptz | nullable |
-| proposed_allocation | integer | |
-| status | enum | scheduled, boarding, in_transit, completed, cancelled |
-| delay_minutes | integer | default 0, manual update |
-| delay_reason | text | |
-| created_by | uuid (FK → profiles) | |
-| created_at | timestamptz | |
-| updated_at | timestamptz | |
-
-#### `bookings`
-| Column | Type | Notes |
-|--------|------|-------|
-| id | uuid (PK) | |
-| journey_id | uuid (FK) | |
-| student_id | uuid (FK → profiles) | |
-| boarding_stop_id | uuid (FK → stops) | |
-| status | enum | confirmed, checked_in, no_show, cancelled |
-| booked_at | timestamptz | |
-| cancelled_at | timestamptz | nullable |
-| checked_in_at | timestamptz | nullable |
-| checked_in_by | uuid (FK → profiles) | boarding officer |
+| Table | Purpose | Primary Constraints & Protections |
+|---|---|---|
+| `profiles` | Extended user account linked to `auth.users` | Trigger prevents self-escalation of `role` or `is_active` |
+| `campuses` | University campuses (Main Campus, Kado Campus) | Unique `code`, managed by administrators |
+| `transport_groups` | Operational units (Girls' Fleet, Main Boys', Wuye Boys', Inter-Campus) | Unique `code`, configurable groups |
+| `hostels` | Student residential hostels linked to campuses & transport groups | Foreign keys to `campuses` & `transport_groups` |
+| `routes` | Transport corridors | Unique `code`, linked to transport groups & gender classification |
+| `stops` | Specific pickup and drop-off points | Geocoding ready (lat/long), optional campus linkage |
+| `route_stops` | Ordered sequence of stops on a route | `UNIQUE(route_id, stop_order)` |
+| `vehicles` | Fleet inventory (electric buses & shuttles) | Unique `registration_number`, mandatory `safe_capacity > 0` |
+| `schedules` | Recurring timetable templates per day of week | `day_of_week BETWEEN 0 AND 6`, `direction` ('outbound'/'inbound') |
+| `journeys` | Concrete trip instances for a specific date and time | Linked to vehicle, route & driver; manual delay tracking |
+| `bookings` | Student trip reservations | `UNIQUE(journey_id, student_id)`, unique opaque `ticket_token` |
+| `waitlists` | Queue for full journeys | Ordered `position > 0`, `UNIQUE(journey_id, student_id)` |
+| `boarding_records` | Immutable log of verified boardings | `booking_id UNIQUE`, captures scanner identity & manual exception reason |
+| `announcements` | Role- and route-targeted broadcasts | Role, route or transport group scoping |
+| `notifications` | Direct alerts to students/staff | Read status tracking, linked to journeys |
+| `incident_reports` | Driver/officer incident logging | Severity levels, categories, resolution tracking |
+| `system_settings` | Operational configurations | Key-value store (booking windows, default allocations) |
+| `audit_logs` | Security and operational audit trail | Immutable ledger of administrative actions and overrides |
 
 ---
 
-## Authentication Flow
+## 4. Security Architecture
 
-```
-Browser                    Next.js Server              Supabase Auth
-  │                              │                          │
-  │  POST /login                 │                          │
-  │─────────────────────────────>│                          │
-  │                              │  signInWithPassword()    │
-  │                              │─────────────────────────>│
-  │                              │     JWT + refresh token  │
-  │                              │<─────────────────────────│
-  │                              │                          │
-  │  Set-Cookie (httpOnly)       │                          │
-  │<─────────────────────────────│                          │
-  │                              │                          │
-  │  GET /dashboard/student      │                          │
-  │─────────────────────────────>│                          │
-  │                              │  Verify JWT from cookie  │
-  │                              │  Check profile.role      │
-  │                              │  → Render or redirect    │
-  │  HTML (role-specific page)   │                          │
-  │<─────────────────────────────│                          │
-```
+### 4.1 Privilege Escalation Prevention
+- **Trigger `protect_profile_privileges`**: Attached to `public.profiles`.
+- Any `UPDATE` attempting to change `role`, `is_active`, or `assigned_transport_group_id` will be immediately aborted with an exception unless the calling session possesses `role = 'admin'` or is the Supabase internal service role.
+- Public registration (`signUp`) sets `role = 'student'` unconditionally via a `SECURITY DEFINER` function with clean `search_path`.
 
-## Middleware Strategy
+### 4.2 Booking & Safe Capacity Integrity
+- **Capacity Formula**:
+  $$\text{Effective Capacity} = \min(\text{journey.proposed\_allocation}, \text{vehicle.safe\_capacity})$$
+- The proposed allocation of 30 passengers never overrides the approved vehicle safe limit.
+- **Race Condition Prevention**: The stored procedure `book_journey_seat` issues a `SELECT ... FOR UPDATE OF j` row-level lock on the `journeys` table. Concurrent booking attempts are serialized; the final seat can never be double-booked.
+- When full, attempts are safely placed on the `waitlists` table with an incremented queue `position`.
+- When a booking is cancelled via `cancel_booking_and_promote`, the top-ranked waitlisted student is automatically issued a confirmed booking and notified.
 
-Next.js middleware intercepts all requests to `/(dashboard)/*`:
-1. Read Supabase session from cookies
-2. If no session → redirect to `/login`
-3. If session exists → extract user role from profile
-4. If role doesn't match route prefix → redirect to correct dashboard
-5. Pass through to page
+### 4.3 QR Boarding Security & Privacy
+- **Opaque Tokens**: Each booking is assigned a 48-character cryptographically secure token (`ticket_token`).
+- **Zero Sensitive Data in QR**: QR payloads contain only `{ token: ticket_token, booking_id: id }`. Student names, IDs, phones, and emails are never encoded into the visual barcode.
+- **Duplicate Scan Prevention**: `verify_and_board_passenger` checks `bookings.status`. If already `checked_in`, the scan is rejected.
+- **Cross-Journey Validation**: The procedure verifies `booking.journey_id = p_journey_id`. Boarding passes presented on the wrong bus or wrong time are rejected.
+- **Auditable Manual Overrides**: If a student is without their device, boarding officers can perform a manual override with an auditable reason recorded in `boarding_records` and `audit_logs`.
+
+### 4.4 Service-Role Key Isolation
+- `createAdminClient()` strictly uses `process.env.SUPABASE_SERVICE_ROLE_KEY`.
+- The key is never exposed via `NEXT_PUBLIC_` and is inaccessible to client bundles.
 
 ---
 
-## Row Level Security Strategy
+## 5. Operational Configurability
 
-Every table in the `public` schema has RLS enabled. Policies follow this pattern:
-
-| Role | Can Read | Can Write |
-|------|----------|-----------|
-| Student | Own profile, own bookings, active routes/schedules/journeys | Own bookings (insert/cancel) |
-| Boarding Officer | Own hostel students, journey passengers | Check-in bookings |
-| Driver | Own profile, assigned journeys, journey passengers | Update journey status/delays |
-| Admin | Everything | Everything |
-
-All policies use `(select auth.uid())` wrapped in a subquery for performance per Supabase best practices.
-
----
-
-## PWA Configuration
-
-- `manifest.json` with app name, theme color, icons
-- Service worker for app shell caching (offline landing page)
-- `<meta>` tags for iOS/Android install prompts
-- No background sync in v1
-
----
-
-## Deployment
-
-- **Platform**: Vercel
-- **Environment variables**: Set via Vercel dashboard (never committed)
-- **Build**: `next build` (static + server components)
-- **Database**: Supabase hosted PostgreSQL
-- **Domain**: To be configured by university IT
-
+The platform enforces that no fleet counts or journey counts are hardcoded:
+- **Fleet Size**: Configured dynamically in `vehicles`.
+- **Driver Assignments**: Assigned per concrete journey instance.
+- **Timetables & Departures**: Defined via `schedules` and instantiated into `journeys`.
+- **Operational Variables**: Stored in `system_settings`:
+  - `default_proposed_allocation`: 30
+  - `booking_window_hours_ahead`: 48
+  - `booking_cutoff_minutes`: 15
+  - `cancellation_cutoff_minutes`: 30
+  - `allow_manual_boarding_override`: true
+  - `girls_operation_simultaneous_buses`: 3

@@ -35,7 +35,7 @@ export const registerSchema = z.object({
 });
 
 // ============================================================
-// Campus & Hostel
+// Campus, Hostel & Transport Groups
 // ============================================================
 
 export const campusSchema = z.object({
@@ -51,7 +51,15 @@ export const campusSchema = z.object({
 export const hostelSchema = z.object({
   name: z.string().min(2, "Hostel name is required"),
   campusId: z.string().uuid("Invalid campus"),
+  transportGroupId: z.string().uuid().optional().nullable(),
   gender: z.enum(["male", "female", "mixed"]),
+});
+
+export const transportGroupSchema = z.object({
+  name: z.string().min(2, "Transport group name is required"),
+  code: z.string().min(2, "Transport group code is required").max(20).toUpperCase(),
+  description: z.string().optional(),
+  genderGroup: z.enum(["male", "female", "mixed"]),
 });
 
 // ============================================================
@@ -63,6 +71,7 @@ export const routeSchema = z.object({
   code: z.string().min(2, "Route code is required").max(20).toUpperCase(),
   description: z.string().optional(),
   genderGroup: z.enum(["male", "female", "all"]),
+  transportGroupId: z.string().uuid().optional().nullable(),
 });
 
 export const stopSchema = z.object({
@@ -126,7 +135,7 @@ export const updateJourneyStatusSchema = z.object({
 });
 
 // ============================================================
-// Bookings
+// Bookings & QR Boarding
 // ============================================================
 
 export const createBookingSchema = z.object({
@@ -138,8 +147,32 @@ export const cancelBookingSchema = z.object({
   bookingId: z.string().uuid(),
 });
 
-export const checkInBookingSchema = z.object({
-  bookingId: z.string().uuid(),
+export const verifyBoardingPassSchema = z.object({
+  ticketToken: z.string().min(16, "Invalid boarding token length"),
+  journeyId: z.string().uuid(),
+  boardingMethod: z.enum(["qr_scan", "manual_override", "nfc_tap"]).default("qr_scan"),
+  exceptionReason: z.string().optional(),
+});
+
+// ============================================================
+// Announcements & Incidents
+// ============================================================
+
+export const announcementSchema = z.object({
+  title: z.string().min(3, "Title must be at least 3 characters"),
+  content: z.string().min(5, "Content is required"),
+  targetRole: z.enum(["student", "boarding_officer", "driver", "admin"]).optional().nullable(),
+  routeId: z.string().uuid().optional().nullable(),
+  transportGroupId: z.string().uuid().optional().nullable(),
+  expiresAt: z.string().datetime().optional().nullable(),
+});
+
+export const incidentReportSchema = z.object({
+  journeyId: z.string().uuid().optional().nullable(),
+  vehicleId: z.string().uuid().optional().nullable(),
+  category: z.string().min(2, "Category is required"),
+  severity: z.enum(["low", "medium", "high", "critical"]),
+  description: z.string().min(10, "Please provide more details on the incident"),
 });
 
 // ============================================================
@@ -150,6 +183,7 @@ export type LoginInput = z.infer<typeof loginSchema>;
 export type RegisterInput = z.infer<typeof registerSchema>;
 export type CampusInput = z.infer<typeof campusSchema>;
 export type HostelInput = z.infer<typeof hostelSchema>;
+export type TransportGroupInput = z.infer<typeof transportGroupSchema>;
 export type RouteInput = z.infer<typeof routeSchema>;
 export type StopInput = z.infer<typeof stopSchema>;
 export type VehicleInput = z.infer<typeof vehicleSchema>;
@@ -157,4 +191,6 @@ export type ScheduleInput = z.infer<typeof scheduleSchema>;
 export type CreateJourneyInput = z.infer<typeof createJourneySchema>;
 export type UpdateJourneyStatusInput = z.infer<typeof updateJourneyStatusSchema>;
 export type CreateBookingInput = z.infer<typeof createBookingSchema>;
-
+export type VerifyBoardingPassInput = z.infer<typeof verifyBoardingPassSchema>;
+export type AnnouncementInput = z.infer<typeof announcementSchema>;
+export type IncidentReportInput = z.infer<typeof incidentReportSchema>;

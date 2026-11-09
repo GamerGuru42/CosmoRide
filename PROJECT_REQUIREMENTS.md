@@ -3,7 +3,7 @@
 ## Product Identity
 
 | Field | Value |
-|-------|-------|
+|---|---|
 | **Name** | CosmoRide |
 | **Owner** | Cosmopolitan University, Nigeria |
 | **Description** | University Bus Booking and Mobility Platform |
@@ -14,155 +14,118 @@
 
 ## 1. Overview
 
-CosmoRide is the official university-owned transportation and electric bus management platform for Cosmopolitan University. It provides booking, scheduling, fleet management, and transport operations across multiple campuses with role-based access for students, hostel representatives, drivers, and transport administrators.
+CosmoRide is the official university-owned transportation and electric bus management platform for Cosmopolitan University. It provides booking, scheduling, fleet management, boarding verification, and transport operations across multiple campuses with role-based access for students, hostel representatives, drivers, and transport administrators.
 
 ---
 
-## 2. User Roles
+## 2. User Roles & Access Boundaries
 
 ### 2.1 Student
-- View available routes and schedules
-- Book seats on upcoming journeys
-- View booking history and status
-- Receive journey notifications (departure, delays)
-- Cancel bookings within allowed window
+- View available routes, schedules, and remaining seat counts.
+- Book seats on upcoming journeys (with atomic race-condition protection).
+- Automatically join waiting lists when a journey is at full safe capacity.
+- Receive secure, private QR boarding passes.
+- View booking history, status, and cancellation options within the allowed window.
+- Receive journey notifications (departure delays, schedule changes, waitlist promotions).
 
 ### 2.2 Hostel Representative / Boarding Officer
-- View student bookings for their hostel
-- Manage student boarding (check-in passengers)
-- Report boarding counts and no-shows
-- Communicate with transport admin about capacity needs
+- View student bookings and manifests for their assigned transport group/hostel.
+- Scan and verify student QR boarding passes atomically.
+- Prevent duplicate boarding scans and wrong-bus boarding attempts.
+- Log auditable manual boarding exceptions (e.g. phone depleted, verified university ID).
+- Report boarding counts, no-shows, and capacity bottlenecks.
 
 ### 2.3 Driver
-- View assigned journeys and routes
-- Mark journey status (started, arrived at stop, departed, completed)
-- Report delays with manual time updates
-- View passenger manifest for current journey
+- View assigned journeys and routes.
+- Mark journey lifecycle states (`boarding`, `in_transit`, `completed`).
+- Report manual delay updates with minutes and reason (no GPS requirement).
+- View passenger manifest for their assigned vehicle and trip.
+- File incident and safety reports.
 
 ### 2.4 Transport Administrator / University Administrator
-- Full CRUD on routes, stops, schedules, and fleet
-- Assign drivers and vehicles to journeys
-- Configure bus capacities (respecting safe limits)
-- View dashboards with real data only
-- Manage user roles and permissions
-- Generate reports (bookings, utilisation, delays)
+- Full CRUD management over routes, pickup stops, vehicles, schedules, and journeys.
+- Manage user roles (promoting students to drivers, officers, or admins).
+- Assign drivers and vehicles to journeys with physical capacity enforcement.
+- Configure operational variables (`system_settings`) including booking windows and cutoffs.
+- View dashboards and reports populated with real data only.
 
 ---
 
-## 3. Campus & Route Information
+## 3. Campus & Route Operations
 
 ### 3.1 Campuses
-- **Main Campus** — primary academic campus
-- **Kado Campus** — secondary campus
+- **Main Campus** — primary academic campus.
+- **Kado Campus** — secondary academic campus.
 
-### 3.2 Hostels
-- Girls' Hostel (Main Campus)
-- Main Boys' Hostel (Main Campus)
-- Wuye Boys' Hostel (off-campus)
+### 3.2 Hostels & Transport Groups
+- **Girls' Hostel** (Main Campus) — served by Girls' Transport Group.
+- **Main Boys' Hostel** (Main Campus) — served by Boys' Transport Group.
+- **Wuye Boys' Hostel** (off-campus) — served by Boys' Transport Group.
+- **Inter-Campus Transfer** — serving students moving between Main and Kado Campuses.
 
-### 3.3 Current Operations
-
-#### Girls' Operation
-- 3 buses, 3 drivers operating simultaneously on the same route
-- Proposed allocation: 30 students per bus per journey
-- Morning journeys: ~4 on Mondays, ~5 on regular weekdays
-- Evening journeys: ~5 normally, sometimes 6
-- **Note**: Whether journey counts are per-bus or fleet-total is unconfirmed — system must not hardcode this assumption
-
-#### Boys' Operation
-- Main Boys' Hostel pickup → Wuye Boys' Hostel pickup → Main Campus
-- Proposed allocation: 30 students per bus per journey
-- Number of buses and drivers: **to be confirmed**
-
-#### Inter-Campus
-- Some students require Main Campus ↔ Kado Campus transportation
-
-### 3.4 Configurability Requirements
-All of the following must be configurable (not hardcoded):
-- Routes and stops
-- Departure times
-- Fleet assignments (which buses on which routes)
-- Schedule patterns (per day-of-week)
-- Bus capacity (proposed allocation ≤ safe vehicle capacity)
-- Number of journeys per route/day
-- Driver assignments
+### 3.3 Current Operations & Baseline Assumptions
+1. **Girls' Operation**:
+   - 3 buses and 3 drivers operating simultaneously on the route.
+   - Proposed allocation: 30 students per bus per journey.
+   - Morning journeys: ~4 on Mondays, ~5 on regular weekdays.
+   - Evening journeys: ~5 normally, sometimes 6.
+2. **Boys' Operation**:
+   - Morning route: Main Boys' Hostel pickup → Wuye Boys' Hostel pickup → Main Campus.
+   - Proposed allocation: 30 students per bus per journey.
+3. **Inter-Campus Shuttle**:
+   - Scheduled shuttle runs between Main Campus and Kado Campus.
 
 ---
 
-## 4. Journey & Booking Rules
+## 4. Unresolved Operational Assumptions (Non-Hardcoded)
 
-### 4.1 Journey Model
-- A journey is a single trip by a vehicle on a route at a scheduled time
-- The same vehicle and driver can make repeated journeys
-- Journeys have states: `scheduled` → `boarding` → `in_transit` → `completed` / `cancelled`
+To ensure operational viability, the platform strictly avoids hardcoding the following pending parameters:
 
-### 4.2 Capacity Rules
-- Each journey has a `proposed_allocation` (e.g., 30)
-- Each vehicle has a `safe_capacity` (actual approved limit)
-- Bookable seats = min(proposed_allocation, safe_capacity)
-- Overbooking is not permitted
-
-### 4.3 Timing Display
-- Scheduled departure time
-- Expected pickup time per stop
-- Manual delay updates from drivers (no live GPS)
-
-### 4.4 Booking Rules
-- Students book specific journeys
-- One booking per student per journey
-- Booking confirmed only if capacity available
-- Cancellation allowed within configurable window
-- No waitlist in initial release
+| Parameter | Unresolved State | Platform Implementation |
+|---|---|---|
+| **Girls' Journey Count Meaning** | Unconfirmed whether Monday's 4 journeys and weekday 5 journeys refer to **total fleet trips** or **individual bus trips**. | **Configurable**: Journeys are instantiated individually from schedules. Admin can schedule either model freely. |
+| **Boys' Fleet Size** | Total number of buses and drivers assigned to Boys' operations is unconfirmed. | **Configurable**: Fleet size and driver pool are fully dynamic in `vehicles` and `profiles`. |
+| **Kado Inter-Campus Frequency** | Specific trip frequencies and times between Main and Kado campuses are unconfirmed. | **Configurable**: Routes and schedules support arbitrary inter-campus timetables. |
+| **Allocation vs. Safe Capacity** | Proposed allocation is 30 students, but vehicles may vary in physical safe passenger limits. | **Strict Rule**: Bookable capacity is $\min(\text{proposed\_allocation}, \text{safe\_capacity})$. Safety threshold can never be overridden. |
 
 ---
 
-## 5. Non-Functional Requirements
+## 5. Booking, Capacity & Boarding Integrity
 
-### 5.1 Technology Stack
-- **Framework**: Next.js 16+ with App Router
-- **Language**: TypeScript (strict mode)
-- **Styling**: Tailwind CSS v4
-- **Backend**: Supabase (PostgreSQL, Auth, Storage, RLS)
-- **PWA**: Service worker, manifest, offline-capable shell
-- **Deployment**: Vercel-compatible
+### 5.1 Atomic Seat Reservation
+- Atomic stored procedure `book_journey_seat` serializes bookings using PostgreSQL row-level locks (`SELECT ... FOR UPDATE`).
+- Eliminates race conditions for final available seats.
+- One active booking per student per journey (`UNIQUE(journey_id, student_id)`).
 
-### 5.2 Data Integrity
-- No fake/seed data in production views
-- Empty databases show honest empty states
-- All controls must be functional — no decorative UI
-- Server-side validation for all mutations
+### 5.2 Waiting List & Automatic Promotion
+- When a journey reaches capacity, students are safely queued in `waitlists` with explicit position ordering.
+- When an existing booking is cancelled via `cancel_booking_and_promote`, the top-ranked waitlisted student is automatically issued a confirmed ticket, re-indexing remaining waitlist positions and sending a notification.
 
-### 5.3 Security
-- Supabase service-role key: server-side only, never exposed to browser
-- Row Level Security (RLS) on all public tables
-- Role-based access control enforced at database level
-- Input validation with Zod schemas
-- CSRF protection via Next.js defaults
-
-### 5.4 Accessibility & Responsiveness
-- WCAG 2.1 AA compliance target
-- Mobile-first responsive design
-- Works on low-bandwidth connections (common in Nigeria)
+### 5.3 QR Boarding Security & Privacy
+- **Opaque Token**: Tickets use a 48-character cryptographically random token (`ticket_token`).
+- **Zero Sensitive Data**: Student names, contact details, and student IDs are not encoded in the QR barcode.
+- **Validation**:
+  - Rejects cancelled tickets.
+  - Rejects duplicate scans (already checked in).
+  - Rejects wrong journey / wrong vehicle scans.
+  - Rejects scans exceeding authorized capacity.
+- **Manual Overrides**: Allowed with mandatory audit justification recorded in `boarding_records` and `audit_logs`.
 
 ---
 
-## 6. Environment Variables Required
+## 6. Authentication & Privilege Escalation Defenses
 
-| Variable | Purpose | Side |
-|----------|---------|------|
-| `NEXT_PUBLIC_SUPABASE_URL` | Supabase project URL | Client |
-| `NEXT_PUBLIC_SUPABASE_ANON_KEY` | Supabase anonymous/public key | Client |
-| `SUPABASE_SERVICE_ROLE_KEY` | Supabase service role key | Server only |
+- **Roles**: `student`, `boarding_officer`, `driver`, `admin`.
+- **Privilege Escalation Defense**: PostgreSQL trigger `protect_profile_privileges` intercepts all updates to `profiles.role`, `is_active`, and transport group assignments, raising an exception if attempted by non-admin sessions.
+- **Service Role Key**: Confined to server-side executions (`createAdminClient`); never exposed in `NEXT_PUBLIC_` variables or client bundles.
+- **Row-Level Security**: Comprehensive RLS policies on all 18 tables using `(SELECT auth.uid())` subqueries for performance and security invoker isolation.
 
 ---
 
-## 7. Out of Scope (Initial Release)
+## 7. Environment Variables Required
 
-- Live GPS tracking
-- Payment processing
-- Push notifications (email/SMS only later)
-- Student ID card integration
-- Automated schedule generation
-- Multi-language support
-- Real-time bus location map
-
+| Variable | Scope | Description |
+|---|---|---|
+| `NEXT_PUBLIC_SUPABASE_URL` | Client & Server | Supabase project URL |
+| `NEXT_PUBLIC_SUPABASE_ANON_KEY` | Client & Server | Supabase anon/public key |
+| `SUPABASE_SERVICE_ROLE_KEY` | Server Only | Supabase service-role key (bypasses RLS) |

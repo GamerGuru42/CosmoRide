@@ -8,17 +8,18 @@
     "build": "next build",
     "start": "next start",
     "lint": "eslint .",
-    "type-check": "tsc --noEmit"
+    "type-check": "tsc --noEmit",
+    "test": "tsx --test tests/**/*.test.ts"
   },
   "dependencies": {
+    "@supabase/ssr": "^0",
+    "@supabase/supabase-js": "^2",
+    "date-fns": "^4",
+    "lucide-react": "^0",
     "next": "16.4.5",
     "react": "19.3.0",
     "react-dom": "19.3.0",
-    "@supabase/supabase-js": "^2",
-    "@supabase/ssr": "^0",
-    "zod": "^3",
-    "lucide-react": "^0",
-    "date-fns": "^4"
+    "zod": "^3"
   },
   "devDependencies": {
     "@tailwindcss/turbopack": "^4",
@@ -28,6 +29,7 @@
     "eslint": "^9",
     "eslint-config-next": "16.4.5",
     "tailwindcss": "^4",
+    "tsx": "^4.23.15",
     "typescript": "^5"
   }
 }
