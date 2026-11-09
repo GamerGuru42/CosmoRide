@@ -37,24 +37,24 @@ describe("Phase 6.1: Integration, Timezone & Security Hardening Audit", () => {
       const migration6Path = path.resolve(process.cwd(), "supabase/migrations/00006_security_hardening_and_integrity.sql");
       assert.ok(fs.existsSync(migration6Path), "Migration 00006 must exist");
       const content = fs.readFileSync(migration6Path, "utf-8");
-      assert.ok(content.includes('CREATE POLICY "Authenticated users and staff can insert audit logs"'));
+      assert.ok(content.includes('CREATE POLICY "Only authenticated admins can insert audit logs for themselves"'));
       assert.ok(content.includes("ON public.audit_logs FOR INSERT"));
     });
 
     it("ensures 00006 migration revokes anonymous execution on public procedures", () => {
       const migration6Path = path.resolve(process.cwd(), "supabase/migrations/00006_security_hardening_and_integrity.sql");
       const content = fs.readFileSync(migration6Path, "utf-8");
-      assert.ok(content.includes("REVOKE EXECUTE ON ALL FUNCTIONS IN SCHEMA public FROM anon;"));
-      assert.ok(content.includes("GRANT EXECUTE ON ALL FUNCTIONS IN SCHEMA public TO authenticated, service_role;"));
+      assert.ok(content.includes("REVOKE ALL ON ALL FUNCTIONS IN SCHEMA public FROM anon;"));
+      assert.ok(content.includes("GRANT EXECUTE ON ALL FUNCTIONS IN SCHEMA public TO service_role;"));
     });
 
     it("ensures anti-spoofing caller verification is implemented across security definer RPCs", () => {
       const migration6Path = path.resolve(process.cwd(), "supabase/migrations/00006_security_hardening_and_integrity.sql");
       const content = fs.readFileSync(migration6Path, "utf-8");
-      assert.ok(content.includes("Anti-spoofing check"));
-      assert.ok(content.includes("auth.uid() IS NOT NULL AND auth.uid() <> p_student_id"));
-      assert.ok(content.includes("auth.uid() IS NOT NULL AND auth.uid() <> p_officer_id"));
-      assert.ok(content.includes("auth.uid() IS NOT NULL AND auth.uid() <> p_admin_id"));
+      assert.ok(content.includes("Identity anti-spoofing"));
+      assert.ok(content.includes("p_student_id IS NOT NULL AND p_student_id <> auth.uid()"));
+      assert.ok(content.includes("p_officer_id IS NOT NULL AND p_officer_id <> auth.uid()"));
+      assert.ok(content.includes("p_admin_id IS NOT NULL AND p_admin_id <> auth.uid()"));
     });
   });
 

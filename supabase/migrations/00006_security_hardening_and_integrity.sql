@@ -1,61 +1,245 @@
--- CosmoRide Migration 00006: Security Hardening, Caller Spoofing Defense & RLS Integrity
+-- CosmoRide Migration 00006: Database Security Hardening, Identity Enforcement & RLS Isolation
 -- Cosmopolitan University Bus Booking and Mobility Platform
 --
--- This migration hardens the security architecture by:
--- 1. Adding missing RLS INSERT policy on public.audit_logs
--- 2. Hardening all SECURITY DEFINER RPCs against caller identity spoofing (verifying auth.uid())
--- 3. Expanding staff profile visibility for passenger manifest and check-in integrity
--- 4. Linking driver journey booking visibility to both driver_id and driver_record_id
--- 5. Revoking unauthenticated anon execution on sensitive operational procedures
+-- This migration hardens the system against:
+-- 1. Identity impersonation in SECURITY DEFINER RPCs (strict auth.uid() enforcement, zero admin impersonation)
+-- 2. Permissive RLS OR combinations (eliminating global true leaks across corridors on journeys, manifests, waitlists)
+-- 3. Audit log tampering (enforcing immutability triggers and strict admin-only self-attributed inserts)
+-- 4. Overly broad RPC execution grants (explicit function-by-function permissions, revoking anon and internal triggers)
+-- 5. Migration safety & schema consistency (idempotent reconciliation of route gender defaults and explicit signature cleanup)
 
 -- ============================================================
--- 1. AUDIT LOGS RLS POLICIES
+-- 1. SCHEMA SAFETY & RECONCILIATION
 -- ============================================================
 
+DO $$
+BEGIN
+  -- Safely reconcile routes gender_group default if migration 00001 was applied earlier
+  IF EXISTS (
+    SELECT 1 FROM information_schema.columns
+    WHERE table_schema = 'public' AND table_name = 'routes' AND column_name = 'gender_group'
+  ) THEN
+    ALTER TABLE public.routes ALTER COLUMN gender_group SET DEFAULT 'mixed';
+  END IF;
+END $$;
+
+-- ============================================================
+-- 2. AUDIT LOG IMMUTABILITY & TAMPER-RESISTANT INSERTION
+-- ============================================================
+
+-- A. Immutable trigger: audit records cannot be altered or deleted under any circumstances
+CREATE OR REPLACE FUNCTION public.prevent_audit_log_modification()
+RETURNS TRIGGER
+LANGUAGE plpgsql
+SECURITY DEFINER
+SET search_path = ''
+AS $$
+BEGIN
+  RAISE EXCEPTION 'Audit logs are immutable and cannot be updated or deleted.';
+END;
+$$;
+
+DROP TRIGGER IF EXISTS trg_audit_logs_immutable ON public.audit_logs;
+CREATE TRIGGER trg_audit_logs_immutable
+  BEFORE UPDATE OR DELETE ON public.audit_logs
+  FOR EACH ROW
+  EXECUTE FUNCTION public.prevent_audit_log_modification();
+
+-- B. Audit log RLS: drop any legacy broad insert policies
 DROP POLICY IF EXISTS "Authenticated users and staff can insert audit logs" ON public.audit_logs;
+DROP POLICY IF EXISTS "Only authenticated admins can insert audit logs for themselves" ON public.audit_logs;
 
-CREATE POLICY "Authenticated users and staff can insert audit logs"
+-- Ordinary students and staff CANNOT insert arbitrary audit logs directly.
+-- Direct client inserts are strictly restricted to authenticated administrators logging their own verified actions.
+-- Privileged procedures record audit logs internally via SECURITY DEFINER.
+CREATE POLICY "Only authenticated admins can insert audit logs for themselves"
   ON public.audit_logs FOR INSERT
   TO authenticated
   WITH CHECK (
     user_id = (SELECT auth.uid())
-    OR EXISTS (
+    AND EXISTS (
       SELECT 1 FROM public.profiles p
-      WHERE p.id = (SELECT auth.uid()) AND p.role IN ('admin', 'boarding_officer', 'driver')
+      WHERE p.id = (SELECT auth.uid()) AND p.role = 'admin'
     )
   );
 
 -- ============================================================
--- 2. STAFF PROFILE VISIBILITY FOR MANIFEST & CHECK-IN
+-- 3. RLS HARDENING & CORRIDOR ISOLATION (ELIMINATE PERMISSIVE OR LEAKS)
 -- ============================================================
 
-DROP POLICY IF EXISTS "Staff can view passenger profiles" ON public.profiles;
+-- ---- A. JOURNEYS TABLE ----
+-- Drop any broad or legacy journey policies
+DROP POLICY IF EXISTS "Authenticated users can view active journeys" ON public.journeys;
+DROP POLICY IF EXISTS "Boarding officers can view assigned journeys" ON public.journeys;
+DROP POLICY IF EXISTS "Scoped journey access policy" ON public.journeys;
 
-CREATE POLICY "Staff can view passenger profiles"
+-- Strictly scoped journey visibility:
+-- - Admins can view all journeys
+-- - Students can view all non-cancelled scheduled/boarding/active departures for booking
+-- - Drivers can view journeys assigned to them (via driver_id or driver_record_id)
+-- - Boarding officers can ONLY view journeys whose route belongs to their assigned transport corridor (or all if unassigned)
+CREATE POLICY "Scoped journey access policy"
+  ON public.journeys FOR SELECT
+  TO authenticated
+  USING (
+    EXISTS (
+      SELECT 1 FROM public.profiles p
+      JOIN public.routes r ON r.id = journeys.route_id
+      WHERE p.id = (SELECT auth.uid())
+        AND (
+          p.role = 'admin'
+          OR (p.role = 'student' AND journeys.status != 'cancelled')
+          OR (
+            p.role = 'driver'
+            AND (
+              journeys.driver_id = (SELECT auth.uid())
+              OR EXISTS (
+                SELECT 1 FROM public.drivers d
+                WHERE d.id = journeys.driver_record_id AND d.profile_id = (SELECT auth.uid())
+              )
+            )
+          )
+          OR (
+            p.role = 'boarding_officer'
+            AND (
+              p.assigned_transport_group_id IS NULL
+              OR r.transport_group_id = p.assigned_transport_group_id
+            )
+          )
+        )
+    )
+  );
+
+-- ---- B. BOARDING RECORDS TABLE ----
+DROP POLICY IF EXISTS "Staff can view journey boarding records" ON public.boarding_records;
+DROP POLICY IF EXISTS "Scoped staff boarding records access" ON public.boarding_records;
+
+-- Strictly scope boarding records:
+-- - Students can view own records
+-- - Boarding officers can view records ONLY for journeys in their assigned corridor
+-- - Drivers can view records ONLY for their assigned journeys
+-- - Admins can view all records
+CREATE POLICY "Scoped staff boarding records access"
+  ON public.boarding_records FOR SELECT
+  TO authenticated
+  USING (
+    student_id = (SELECT auth.uid())
+    OR EXISTS (
+      SELECT 1 FROM public.profiles p
+      JOIN public.journeys j ON j.id = boarding_records.journey_id
+      JOIN public.routes r ON r.id = j.route_id
+      WHERE p.id = (SELECT auth.uid())
+        AND (
+          p.role = 'admin'
+          OR (
+            p.role = 'boarding_officer'
+            AND (
+              p.assigned_transport_group_id IS NULL
+              OR r.transport_group_id = p.assigned_transport_group_id
+            )
+          )
+          OR (
+            p.role = 'driver'
+            AND (
+              j.driver_id = (SELECT auth.uid())
+              OR EXISTS (
+                SELECT 1 FROM public.drivers d
+                WHERE d.id = j.driver_record_id AND d.profile_id = (SELECT auth.uid())
+              )
+            )
+          )
+        )
+    )
+  );
+
+-- ---- C. WAITLISTS TABLE ----
+DROP POLICY IF EXISTS "Admins and officers can view waitlists" ON public.waitlists;
+DROP POLICY IF EXISTS "Staff can view corridor waitlists" ON public.waitlists;
+
+-- Strictly scope waitlists:
+CREATE POLICY "Staff can view corridor waitlists"
+  ON public.waitlists FOR SELECT
+  TO authenticated
+  USING (
+    student_id = (SELECT auth.uid())
+    OR EXISTS (
+      SELECT 1 FROM public.profiles p
+      JOIN public.journeys j ON j.id = waitlists.journey_id
+      JOIN public.routes r ON r.id = j.route_id
+      WHERE p.id = (SELECT auth.uid())
+        AND (
+          p.role = 'admin'
+          OR (
+            p.role = 'boarding_officer'
+            AND (
+              p.assigned_transport_group_id IS NULL
+              OR r.transport_group_id = p.assigned_transport_group_id
+            )
+          )
+          OR (
+            p.role = 'driver'
+            AND (
+              j.driver_id = (SELECT auth.uid())
+              OR EXISTS (
+                SELECT 1 FROM public.drivers d
+                WHERE d.id = j.driver_record_id AND d.profile_id = (SELECT auth.uid())
+              )
+            )
+          )
+        )
+    )
+  );
+
+-- ---- D. PROFILES TABLE ----
+DROP POLICY IF EXISTS "Staff can view passenger profiles" ON public.profiles;
+DROP POLICY IF EXISTS "Boarding officers and staff can view passenger profiles" ON public.profiles;
+DROP POLICY IF EXISTS "Boarding officers can view hostel students" ON public.profiles;
+
+-- Boarding officers can only view student profiles belonging to their corridor/hostel;
+-- Drivers can only view passengers booked on their assigned journeys;
+-- Admins can view all profiles;
+-- Students can only view their own profile.
+CREATE POLICY "Scoped profile visibility policy"
   ON public.profiles FOR SELECT
   TO authenticated
   USING (
+    -- Own profile
+    id = (SELECT auth.uid())
+    OR
+    -- Admins
     EXISTS (
-      SELECT 1 FROM public.profiles p
-      WHERE p.id = (SELECT auth.uid())
-        AND p.role IN ('admin', 'boarding_officer', 'driver')
+      SELECT 1 FROM public.profiles me
+      WHERE me.id = (SELECT auth.uid()) AND me.role = 'admin'
     )
-  );
-
--- ============================================================
--- 3. DRIVER JOURNEY BOOKINGS VISIBILITY
--- ============================================================
-
-DROP POLICY IF EXISTS "Drivers can view their journey bookings" ON public.bookings;
-
-CREATE POLICY "Drivers can view their journey bookings"
-  ON public.bookings FOR SELECT
-  TO authenticated
-  USING (
+    OR
+    -- Boarding officers: strictly within assigned corridor
     EXISTS (
-      SELECT 1 FROM public.journeys j
+      SELECT 1 FROM public.profiles me
+      WHERE me.id = (SELECT auth.uid())
+        AND me.role = 'boarding_officer'
+        AND (
+          me.assigned_transport_group_id IS NULL
+          OR EXISTS (
+            SELECT 1 FROM public.hostels h
+            WHERE h.id = profiles.hostel_id
+              AND h.transport_group_id = me.assigned_transport_group_id
+          )
+          OR EXISTS (
+            SELECT 1 FROM public.bookings b
+            JOIN public.journeys j ON j.id = b.journey_id
+            JOIN public.routes r ON r.id = j.route_id
+            WHERE b.student_id = profiles.id
+              AND r.transport_group_id = me.assigned_transport_group_id
+          )
+        )
+    )
+    OR
+    -- Drivers: strictly passengers on driver's assigned journeys
+    EXISTS (
+      SELECT 1 FROM public.bookings b
+      JOIN public.journeys j ON j.id = b.journey_id
       LEFT JOIN public.drivers d ON d.id = j.driver_record_id
-      WHERE j.id = bookings.journey_id
+      WHERE b.student_id = profiles.id
         AND (
           j.driver_id = (SELECT auth.uid())
           OR d.profile_id = (SELECT auth.uid())
@@ -63,9 +247,61 @@ CREATE POLICY "Drivers can view their journey bookings"
     )
   );
 
+-- ---- E. DRIVER OPERATIONS ATTRIBUTION CHECK ----
+DROP POLICY IF EXISTS "Staff can insert readiness checks" ON public.vehicle_readiness_checks;
+CREATE POLICY "Staff can insert readiness checks"
+  ON public.vehicle_readiness_checks FOR INSERT
+  TO authenticated
+  WITH CHECK (
+    checked_by_user_id = (SELECT auth.uid())
+    AND EXISTS (
+      SELECT 1 FROM public.profiles p
+      WHERE p.id = (SELECT auth.uid()) AND p.role IN ('driver', 'boarding_officer', 'admin')
+    )
+  );
+
+DROP POLICY IF EXISTS "Staff can insert stop updates" ON public.journey_stop_updates;
+CREATE POLICY "Staff can insert stop updates"
+  ON public.journey_stop_updates FOR INSERT
+  TO authenticated
+  WITH CHECK (
+    recorded_by_user_id = (SELECT auth.uid())
+    AND EXISTS (
+      SELECT 1 FROM public.profiles p
+      WHERE p.id = (SELECT auth.uid()) AND p.role IN ('driver', 'boarding_officer', 'admin')
+    )
+  );
+
+DROP POLICY IF EXISTS "Staff can insert operational logs" ON public.journey_operational_logs;
+CREATE POLICY "Staff can insert operational logs"
+  ON public.journey_operational_logs FOR INSERT
+  TO authenticated
+  WITH CHECK (
+    recorded_by_user_id = (SELECT auth.uid())
+    AND EXISTS (
+      SELECT 1 FROM public.profiles p
+      WHERE p.id = (SELECT auth.uid()) AND p.role IN ('driver', 'boarding_officer', 'admin')
+    )
+  );
+
 -- ============================================================
--- 4. HARDENED SECURITY DEFINER PROCEDURES (CALLER SPOOFING DEFENSE)
+-- 4. ATOMIC PROCEDURES: STRICT CALLER IDENTITY ENFORCEMENT
 -- ============================================================
+
+-- Drop functions first to prevent ambiguous signature overloads
+DROP FUNCTION IF EXISTS public.book_journey_seat(UUID, UUID, UUID);
+DROP FUNCTION IF EXISTS public.cancel_booking_and_promote(UUID, UUID, TEXT);
+DROP FUNCTION IF EXISTS public.verify_and_board_passenger(TEXT, UUID, UUID, public.boarding_method, TEXT);
+DROP FUNCTION IF EXISTS public.close_and_depart_journey(UUID, UUID, TEXT);
+DROP FUNCTION IF EXISTS public.record_vehicle_readiness(UUID, UUID, BOOLEAN, BOOLEAN, BOOLEAN, TEXT, BOOLEAN, INTEGER, BOOLEAN, TEXT, BOOLEAN);
+DROP FUNCTION IF EXISTS public.record_journey_stop_update(UUID, UUID, UUID, TEXT, BOOLEAN, TEXT);
+DROP FUNCTION IF EXISTS public.record_journey_delay_with_notifications(UUID, UUID, INTEGER, TEXT, BOOLEAN);
+DROP FUNCTION IF EXISTS public.record_journey_departure_safe(UUID, UUID, BOOLEAN, TEXT);
+DROP FUNCTION IF EXISTS public.record_journey_arrival_safe(UUID, UUID, BOOLEAN, TEXT);
+DROP FUNCTION IF EXISTS public.admin_generate_journeys_from_schedules(UUID, DATE, UUID);
+DROP FUNCTION IF EXISTS public.admin_cancel_journey(UUID, UUID, TEXT);
+DROP FUNCTION IF EXISTS public.admin_update_system_setting(UUID, TEXT, JSONB, TEXT);
+DROP FUNCTION IF EXISTS public.admin_update_incident_status(UUID, UUID, public.incident_status, TEXT);
 
 -- A. book_journey_seat
 CREATE OR REPLACE FUNCTION public.book_journey_seat(
@@ -79,6 +315,8 @@ SECURITY DEFINER
 SET search_path = ''
 AS $$
 DECLARE
+  v_caller_id UUID;
+  v_jwt_role TEXT;
   v_journey RECORD;
   v_effective_capacity INTEGER;
   v_active_bookings_count INTEGER;
@@ -87,17 +325,26 @@ DECLARE
   v_waitlist_pos INTEGER;
   v_booking_cutoff_mins INTEGER := 15;
 BEGIN
-  -- Anti-spoofing check: If auth.uid() is set, caller must be the student or an admin/officer
-  IF auth.uid() IS NOT NULL AND auth.uid() <> p_student_id THEN
-    IF NOT EXISTS (
-      SELECT 1 FROM public.profiles
-      WHERE id = auth.uid() AND role IN ('admin', 'boarding_officer')
-    ) THEN
-      RETURN jsonb_build_object('success', false, 'error', 'Permission denied: Cannot reserve seat on behalf of another student.');
+  -- Strict caller verification: derive identity from authenticated session
+  v_jwt_role := current_setting('request.jwt.claim.role', true);
+
+  IF v_jwt_role = 'anon' THEN
+    RETURN jsonb_build_object('success', false, 'error', 'Permission denied: Anonymous execution not permitted.');
+  ELSIF v_jwt_role = 'authenticated' THEN
+    IF auth.uid() IS NULL THEN
+      RETURN jsonb_build_object('success', false, 'error', 'Permission denied: Unauthenticated session.');
     END IF;
+    -- Identity anti-spoofing: even administrators cannot book pretending to be a student
+    IF p_student_id IS NOT NULL AND p_student_id <> auth.uid() THEN
+      RETURN jsonb_build_object('success', false, 'error', 'Identity mismatch: Authenticated user cannot reserve a seat on behalf of another student.');
+    END IF;
+    v_caller_id := auth.uid();
+  ELSE
+    -- Service role / trusted server-side execution path
+    v_caller_id := p_student_id;
   END IF;
 
-  -- 1. Lock the journey row FOR UPDATE to serialize concurrent booking attempts
+  -- 1. Lock journey row FOR UPDATE
   SELECT j.*, v.safe_capacity, v.is_active AS vehicle_active
   INTO v_journey
   FROM public.journeys j
@@ -117,31 +364,29 @@ BEGIN
     RETURN jsonb_build_object('success', false, 'error', 'Journey is not open for bookings (Status: ' || v_journey.status || ').');
   END IF;
 
-  -- Check if journey departure is within cutoff
+  -- Departure cutoff check
   IF v_journey.scheduled_departure <= (now() + (v_booking_cutoff_mins || ' minutes')::interval) THEN
     RETURN jsonb_build_object('success', false, 'error', 'Bookings closed: Departure is in less than ' || v_booking_cutoff_mins || ' minutes.');
   END IF;
 
-  -- 2. Prevent duplicate booking for the same student on the same journey
+  -- 2. Prevent duplicate booking
   IF EXISTS (
     SELECT 1 FROM public.bookings
     WHERE journey_id = p_journey_id
-      AND student_id = p_student_id
+      AND student_id = v_caller_id
       AND status = 'confirmed'
   ) THEN
     RETURN jsonb_build_object('success', false, 'error', 'You already have a confirmed seat on this departure.');
   END IF;
 
-  -- 3. Determine effective capacity: LEAST(safe_capacity, proposed_allocation)
+  -- 3. Calculate safe capacity limit
   v_effective_capacity := LEAST(v_journey.safe_capacity, v_journey.proposed_allocation);
 
-  -- 4. Count currently confirmed bookings with exclusive table lock check
   SELECT COUNT(*) INTO v_active_bookings_count
   FROM public.bookings
   WHERE journey_id = p_journey_id
     AND status = 'confirmed';
 
-  -- 5. CAPACITY CHECK: If space is available, confirm seat immediately
   IF v_active_bookings_count < v_effective_capacity THEN
     v_ticket_token := encode(gen_random_bytes(24), 'hex');
 
@@ -156,7 +401,7 @@ BEGIN
     )
     VALUES (
       p_journey_id,
-      p_student_id,
+      v_caller_id,
       p_boarding_stop_id,
       'confirmed',
       v_ticket_token,
@@ -165,17 +410,15 @@ BEGIN
     )
     RETURNING id INTO v_booking_id;
 
-    -- Clean up any prior waiting list entry for this student on this journey
     UPDATE public.waitlists
     SET status = 'promoted', promoted_at = now()
     WHERE journey_id = p_journey_id
-      AND student_id = p_student_id
+      AND student_id = v_caller_id
       AND status = 'waiting';
 
-    -- Create in-app notification
     INSERT INTO public.notifications (user_id, title, message, type, related_journey_id)
     VALUES (
-      p_student_id,
+      v_caller_id,
       'Booking Confirmed',
       'Your seat is reserved for departure at ' || to_char(v_journey.scheduled_departure, 'HH24:MI') || '. Boarding pass ready.',
       'booking_confirmed',
@@ -190,17 +433,17 @@ BEGIN
       'message', 'Seat confirmed successfully. Boarding pass issued.'
     );
   ELSE
-    -- 6. CAPACITY EXCEEDED: Join Waiting List atomically
+    -- Capacity reached: Join waitlist
     IF EXISTS (
       SELECT 1 FROM public.waitlists
       WHERE journey_id = p_journey_id
-        AND student_id = p_student_id
+        AND student_id = v_caller_id
         AND status = 'waiting'
     ) THEN
       SELECT position INTO v_waitlist_pos
       FROM public.waitlists
       WHERE journey_id = p_journey_id
-        AND student_id = p_student_id
+        AND student_id = v_caller_id
         AND status = 'waiting';
 
       RETURN jsonb_build_object(
@@ -211,7 +454,6 @@ BEGIN
       );
     END IF;
 
-    -- Calculate next waiting position atomically
     SELECT COALESCE(MAX(position), 0) + 1 INTO v_waitlist_pos
     FROM public.waitlists
     WHERE journey_id = p_journey_id
@@ -227,7 +469,7 @@ BEGIN
     )
     VALUES (
       p_journey_id,
-      p_student_id,
+      v_caller_id,
       p_boarding_stop_id,
       v_waitlist_pos,
       'waiting',
@@ -256,27 +498,36 @@ SECURITY DEFINER
 SET search_path = ''
 AS $$
 DECLARE
+  v_caller_id UUID;
+  v_jwt_role TEXT;
   v_booking RECORD;
   v_journey RECORD;
   v_top_waitlist RECORD;
   v_new_booking_id UUID;
   v_new_ticket_token TEXT;
 BEGIN
-  -- Anti-spoofing check
-  IF auth.uid() IS NOT NULL AND auth.uid() <> p_student_id THEN
-    IF NOT EXISTS (
-      SELECT 1 FROM public.profiles
-      WHERE id = auth.uid() AND role = 'admin'
-    ) THEN
-      RETURN jsonb_build_object('success', false, 'error', 'Permission denied: Cannot cancel another student booking.');
+  v_jwt_role := current_setting('request.jwt.claim.role', true);
+
+  IF v_jwt_role = 'anon' THEN
+    RETURN jsonb_build_object('success', false, 'error', 'Permission denied: Anonymous execution not permitted.');
+  ELSIF v_jwt_role = 'authenticated' THEN
+    IF auth.uid() IS NULL THEN
+      RETURN jsonb_build_object('success', false, 'error', 'Permission denied: Unauthenticated session.');
     END IF;
+    -- Identity anti-spoofing: user can only cancel their own booking
+    IF p_student_id IS NOT NULL AND p_student_id <> auth.uid() THEN
+      RETURN jsonb_build_object('success', false, 'error', 'Identity mismatch: Authenticated user cannot cancel another student booking.');
+    END IF;
+    v_caller_id := auth.uid();
+  ELSE
+    v_caller_id := p_student_id;
   END IF;
 
-  -- 1. Lock and find the booking
+  -- 1. Lock and find booking belonging to caller
   SELECT b.* INTO v_booking
   FROM public.bookings b
   WHERE b.id = p_booking_id
-    AND b.student_id = p_student_id
+    AND b.student_id = v_caller_id
   FOR UPDATE;
 
   IF NOT FOUND THEN
@@ -303,10 +554,9 @@ BEGIN
       updated_at = now()
   WHERE id = p_booking_id;
 
-  -- Audit log
   INSERT INTO public.audit_logs (user_id, action, entity_type, entity_id, details)
   VALUES (
-    p_student_id,
+    v_caller_id,
     'BOOKING_CANCELLED',
     'booking',
     p_booking_id,
@@ -387,6 +637,8 @@ SECURITY DEFINER
 SET search_path = ''
 AS $$
 DECLARE
+  v_effective_officer_id UUID;
+  v_jwt_role TEXT;
   v_booking RECORD;
   v_journey RECORD;
   v_officer RECORD;
@@ -395,24 +647,27 @@ DECLARE
   v_boarded_count INTEGER;
   v_previous_scan RECORD;
 BEGIN
-  -- Anti-spoofing check
-  IF auth.uid() IS NOT NULL AND auth.uid() <> p_officer_id THEN
-    IF NOT EXISTS (
-      SELECT 1 FROM public.profiles
-      WHERE id = auth.uid() AND role = 'admin'
-    ) THEN
-      RETURN jsonb_build_object(
-        'success', false,
-        'code', 'UNAUTHORIZED',
-        'error', 'Permission denied: Caller identity mismatch.'
-      );
+  v_jwt_role := current_setting('request.jwt.claim.role', true);
+
+  IF v_jwt_role = 'anon' THEN
+    RETURN jsonb_build_object('success', false, 'code', 'UNAUTHORIZED', 'error', 'Permission denied: Anonymous execution not permitted.');
+  ELSIF v_jwt_role = 'authenticated' THEN
+    IF auth.uid() IS NULL THEN
+      RETURN jsonb_build_object('success', false, 'code', 'UNAUTHORIZED', 'error', 'Permission denied: Unauthenticated session.');
     END IF;
+    -- Identity anti-spoofing: officer identity is derived from auth.uid()
+    IF p_officer_id IS NOT NULL AND p_officer_id <> auth.uid() THEN
+      RETURN jsonb_build_object('success', false, 'code', 'IDENTITY_MISMATCH', 'error', 'Identity mismatch: Authenticated user cannot board passengers under another officer identity.');
+    END IF;
+    v_effective_officer_id := auth.uid();
+  ELSE
+    v_effective_officer_id := p_officer_id;
   END IF;
 
-  -- 1. Verify officer credentials and role
+  -- 1. Verify officer credentials and role from trusted profile record
   SELECT * INTO v_officer
   FROM public.profiles
-  WHERE id = p_officer_id;
+  WHERE id = v_effective_officer_id;
 
   IF NOT FOUND OR v_officer.role NOT IN ('boarding_officer', 'admin', 'driver') THEN
     RETURN jsonb_build_object(
@@ -473,12 +728,11 @@ BEGIN
     );
   END IF;
 
-  -- Fetch student profile for display
   SELECT full_name, student_id, phone INTO v_student
   FROM public.profiles
   WHERE id = v_booking.student_id;
 
-  -- 5. DUPLICATE BOARDING CHECK
+  -- 5. Duplicate boarding check
   IF v_booking.status = 'boarded' THEN
     SELECT br.scanned_at, br.boarding_method, p.full_name AS officer_name
     INTO v_previous_scan
@@ -497,7 +751,7 @@ BEGIN
     );
   END IF;
 
-  -- 6. CANCELLED / VOID TICKET CHECK
+  -- 6. Cancelled ticket check
   IF v_booking.status = 'cancelled' THEN
     RETURN jsonb_build_object(
       'success', false,
@@ -508,7 +762,7 @@ BEGIN
     );
   END IF;
 
-  -- 7. WRONG JOURNEY CHECK
+  -- 7. Wrong journey check
   IF v_booking.journey_id <> p_journey_id THEN
     RETURN jsonb_build_object(
       'success', false,
@@ -519,7 +773,7 @@ BEGIN
     );
   END IF;
 
-  -- 8. PHYSICAL CAPACITY OVERFLOW CHECK
+  -- 8. Safe physical capacity overflow check
   v_effective_capacity := LEAST(v_journey.safe_capacity, v_journey.proposed_allocation);
 
   SELECT COUNT(*) INTO v_boarded_count
@@ -536,7 +790,7 @@ BEGIN
     );
   END IF;
 
-  -- 9. VALIDATION PASSED: RECORD BOARDING
+  -- 9. Validation passed: record boarding
   INSERT INTO public.boarding_records (
     booking_id,
     journey_id,
@@ -554,7 +808,7 @@ BEGIN
     p_journey_id,
     v_booking.student_id,
     v_journey.vehicle_id,
-    p_officer_id,
+    v_effective_officer_id,
     now(),
     p_boarding_method,
     p_exception_reason,
@@ -562,13 +816,11 @@ BEGIN
     now()
   );
 
-  -- 10. Update booking status
   UPDATE public.bookings
   SET status = 'boarded',
       updated_at = now()
   WHERE id = v_booking.id;
 
-  -- 11. If journey status was 'scheduled', advance it to 'boarding'
   IF v_journey.status = 'scheduled' THEN
     UPDATE public.journeys
     SET status = 'boarding',
@@ -576,7 +828,6 @@ BEGIN
     WHERE id = p_journey_id;
   END IF;
 
-  -- 12. Recalculate remaining seats
   v_boarded_count := v_boarded_count + 1;
 
   RETURN jsonb_build_object(
@@ -606,25 +857,33 @@ SECURITY DEFINER
 SET search_path = ''
 AS $$
 DECLARE
+  v_effective_officer_id UUID;
+  v_jwt_role TEXT;
   v_journey RECORD;
   v_officer RECORD;
   v_boarded_count INTEGER;
   v_noshow_updated INTEGER := 0;
   v_cancelled_count INTEGER := 0;
 BEGIN
-  -- Anti-spoofing check
-  IF auth.uid() IS NOT NULL AND auth.uid() <> p_officer_id THEN
-    IF NOT EXISTS (
-      SELECT 1 FROM public.profiles
-      WHERE id = auth.uid() AND role = 'admin'
-    ) THEN
-      RETURN jsonb_build_object('success', false, 'error', 'Permission denied: Caller identity mismatch.');
+  v_jwt_role := current_setting('request.jwt.claim.role', true);
+
+  IF v_jwt_role = 'anon' THEN
+    RETURN jsonb_build_object('success', false, 'error', 'Permission denied: Anonymous execution not permitted.');
+  ELSIF v_jwt_role = 'authenticated' THEN
+    IF auth.uid() IS NULL THEN
+      RETURN jsonb_build_object('success', false, 'error', 'Permission denied: Unauthenticated session.');
     END IF;
+    IF p_officer_id IS NOT NULL AND p_officer_id <> auth.uid() THEN
+      RETURN jsonb_build_object('success', false, 'error', 'Identity mismatch: Caller cannot close journey under another officer identity.');
+    END IF;
+    v_effective_officer_id := auth.uid();
+  ELSE
+    v_effective_officer_id := p_officer_id;
   END IF;
 
   SELECT * INTO v_officer
   FROM public.profiles
-  WHERE id = p_officer_id;
+  WHERE id = v_effective_officer_id;
 
   IF NOT FOUND OR v_officer.role NOT IN ('boarding_officer', 'admin') THEN
     RETURN jsonb_build_object('success', false, 'error', 'Permission denied: Caller is not authorised.');
@@ -651,7 +910,7 @@ BEGIN
     RETURN jsonb_build_object('success', false, 'error', 'Journey is already ' || v_journey.status || '.');
   END IF;
 
-  -- Update confirmed but unboarded bookings to cancelled (no-show)
+  -- Mark unboarded passengers as no-show (cancelled)
   WITH updated_rows AS (
     UPDATE public.bookings
     SET status = 'cancelled', updated_at = now()
@@ -660,7 +919,7 @@ BEGIN
   )
   SELECT count(*) INTO v_noshow_updated FROM updated_rows;
 
-  -- Expire remaining waitlist entries
+  -- Expire remaining waitlists
   UPDATE public.waitlists
   SET status = 'expired'
   WHERE journey_id = p_journey_id AND status = 'waiting';
@@ -669,17 +928,15 @@ BEGIN
   FROM public.boarding_records
   WHERE journey_id = p_journey_id;
 
-  -- Mark journey in_transit
   UPDATE public.journeys
   SET status = 'in_transit',
       actual_departure = now(),
       updated_at = now()
   WHERE id = p_journey_id;
 
-  -- Audit log
   INSERT INTO public.audit_logs (user_id, action, entity_type, entity_id, details)
   VALUES (
-    p_officer_id,
+    v_effective_officer_id,
     'JOURNEY_CLOSED_AND_DEPARTED',
     'journey',
     p_journey_id,
@@ -713,6 +970,8 @@ SECURITY DEFINER
 SET search_path = ''
 AS $$
 DECLARE
+  v_effective_admin_id UUID;
+  v_jwt_role TEXT;
   v_admin RECORD;
   v_dow INTEGER;
   v_sched RECORD;
@@ -722,17 +981,30 @@ DECLARE
   v_skipped_count INTEGER := 0;
   v_effective_alloc INTEGER;
 BEGIN
-  -- Anti-spoofing check
-  IF auth.uid() IS NOT NULL AND auth.uid() <> p_admin_id THEN
-    RETURN jsonb_build_object('success', false, 'error', 'Permission denied: Caller identity does not match admin credentials.');
+  v_jwt_role := current_setting('request.jwt.claim.role', true);
+
+  IF v_jwt_role = 'anon' THEN
+    RETURN jsonb_build_object('success', false, 'error', 'Permission denied: Anonymous execution not permitted.');
+  ELSIF v_jwt_role = 'authenticated' THEN
+    IF auth.uid() IS NULL THEN
+      RETURN jsonb_build_object('success', false, 'error', 'Permission denied: Unauthenticated session.');
+    END IF;
+    -- Identity anti-spoofing: administrator cannot impersonate another admin
+    IF p_admin_id IS NOT NULL AND p_admin_id <> auth.uid() THEN
+      RETURN jsonb_build_object('success', false, 'error', 'Identity mismatch: Administrator cannot impersonate another administrative actor.');
+    END IF;
+    v_effective_admin_id := auth.uid();
+  ELSE
+    v_effective_admin_id := p_admin_id;
   END IF;
 
+  -- Verify administrative role from trusted profiles table
   SELECT * INTO v_admin
   FROM public.profiles
-  WHERE id = p_admin_id;
+  WHERE id = v_effective_admin_id;
 
   IF NOT FOUND OR v_admin.role != 'admin' THEN
-    RETURN jsonb_build_object('success', false, 'error', 'Permission denied: Caller must be an administrator.');
+    RETURN jsonb_build_object('success', false, 'error', 'Permission denied: Caller must possess administrator role.');
   END IF;
 
   v_dow := EXTRACT(DOW FROM p_target_date);
@@ -806,7 +1078,7 @@ BEGIN
 
   INSERT INTO public.audit_logs (user_id, action, entity_type, details)
   VALUES (
-    p_admin_id,
+    v_effective_admin_id,
     'GENERATE_JOURNEYS',
     'schedule',
     jsonb_build_object(
@@ -838,19 +1110,32 @@ SECURITY DEFINER
 SET search_path = ''
 AS $$
 DECLARE
+  v_effective_admin_id UUID;
+  v_jwt_role TEXT;
   v_admin RECORD;
   v_journey RECORD;
   v_booking RECORD;
   v_cancelled_bookings INTEGER := 0;
 BEGIN
-  -- Anti-spoofing check
-  IF auth.uid() IS NOT NULL AND auth.uid() <> p_admin_id THEN
-    RETURN jsonb_build_object('success', false, 'error', 'Permission denied: Caller identity mismatch.');
+  v_jwt_role := current_setting('request.jwt.claim.role', true);
+
+  IF v_jwt_role = 'anon' THEN
+    RETURN jsonb_build_object('success', false, 'error', 'Permission denied: Anonymous execution not permitted.');
+  ELSIF v_jwt_role = 'authenticated' THEN
+    IF auth.uid() IS NULL THEN
+      RETURN jsonb_build_object('success', false, 'error', 'Permission denied: Unauthenticated session.');
+    END IF;
+    IF p_admin_id IS NOT NULL AND p_admin_id <> auth.uid() THEN
+      RETURN jsonb_build_object('success', false, 'error', 'Identity mismatch: Administrator cannot impersonate another administrative actor.');
+    END IF;
+    v_effective_admin_id := auth.uid();
+  ELSE
+    v_effective_admin_id := p_admin_id;
   END IF;
 
   SELECT * INTO v_admin
   FROM public.profiles
-  WHERE id = p_admin_id;
+  WHERE id = v_effective_admin_id;
 
   IF NOT FOUND OR v_admin.role != 'admin' THEN
     RETURN jsonb_build_object('success', false, 'error', 'Permission denied: Only administrators can cancel scheduled journeys.');
@@ -908,7 +1193,7 @@ BEGIN
 
   INSERT INTO public.audit_logs (user_id, action, entity_type, entity_id, details)
   VALUES (
-    p_admin_id,
+    v_effective_admin_id,
     'JOURNEY_CANCELLED_BY_ADMIN',
     'journey',
     p_journey_id,
@@ -940,17 +1225,30 @@ SECURITY DEFINER
 SET search_path = ''
 AS $$
 DECLARE
+  v_effective_admin_id UUID;
+  v_jwt_role TEXT;
   v_admin RECORD;
   v_old_value JSONB;
 BEGIN
-  -- Anti-spoofing check
-  IF auth.uid() IS NOT NULL AND auth.uid() <> p_admin_id THEN
-    RETURN jsonb_build_object('success', false, 'error', 'Permission denied: Caller identity mismatch.');
+  v_jwt_role := current_setting('request.jwt.claim.role', true);
+
+  IF v_jwt_role = 'anon' THEN
+    RETURN jsonb_build_object('success', false, 'error', 'Permission denied: Anonymous execution not permitted.');
+  ELSIF v_jwt_role = 'authenticated' THEN
+    IF auth.uid() IS NULL THEN
+      RETURN jsonb_build_object('success', false, 'error', 'Permission denied: Unauthenticated session.');
+    END IF;
+    IF p_admin_id IS NOT NULL AND p_admin_id <> auth.uid() THEN
+      RETURN jsonb_build_object('success', false, 'error', 'Identity mismatch: Administrator cannot impersonate another administrative actor.');
+    END IF;
+    v_effective_admin_id := auth.uid();
+  ELSE
+    v_effective_admin_id := p_admin_id;
   END IF;
 
   SELECT * INTO v_admin
   FROM public.profiles
-  WHERE id = p_admin_id;
+  WHERE id = v_effective_admin_id;
 
   IF NOT FOUND OR v_admin.role != 'admin' THEN
     RETURN jsonb_build_object('success', false, 'error', 'Permission denied: Only administrators can update system settings.');
@@ -961,16 +1259,16 @@ BEGIN
   WHERE key = p_key;
 
   INSERT INTO public.system_settings (key, value, description, updated_by, updated_at)
-  VALUES (p_key, p_value, p_description, p_admin_id, now())
+  VALUES (p_key, p_value, p_description, v_effective_admin_id, now())
   ON CONFLICT (key) DO UPDATE
   SET value = EXCLUDED.value,
       description = COALESCE(EXCLUDED.description, public.system_settings.description),
-      updated_by = p_admin_id,
+      updated_by = v_effective_admin_id,
       updated_at = now();
 
   INSERT INTO public.audit_logs (user_id, action, entity_type, details)
   VALUES (
-    p_admin_id,
+    v_effective_admin_id,
     'SYSTEM_SETTING_UPDATED',
     'system_setting',
     jsonb_build_object(
@@ -997,16 +1295,29 @@ SECURITY DEFINER
 SET search_path = ''
 AS $$
 DECLARE
+  v_effective_admin_id UUID;
+  v_jwt_role TEXT;
   v_admin RECORD;
 BEGIN
-  -- Anti-spoofing check
-  IF auth.uid() IS NOT NULL AND auth.uid() <> p_admin_id THEN
-    RETURN jsonb_build_object('success', false, 'error', 'Permission denied: Caller identity mismatch.');
+  v_jwt_role := current_setting('request.jwt.claim.role', true);
+
+  IF v_jwt_role = 'anon' THEN
+    RETURN jsonb_build_object('success', false, 'error', 'Permission denied: Anonymous execution not permitted.');
+  ELSIF v_jwt_role = 'authenticated' THEN
+    IF auth.uid() IS NULL THEN
+      RETURN jsonb_build_object('success', false, 'error', 'Permission denied: Unauthenticated session.');
+    END IF;
+    IF p_admin_id IS NOT NULL AND p_admin_id <> auth.uid() THEN
+      RETURN jsonb_build_object('success', false, 'error', 'Identity mismatch: Administrator cannot impersonate another administrative actor.');
+    END IF;
+    v_effective_admin_id := auth.uid();
+  ELSE
+    v_effective_admin_id := p_admin_id;
   END IF;
 
   SELECT * INTO v_admin
   FROM public.profiles
-  WHERE id = p_admin_id;
+  WHERE id = v_effective_admin_id;
 
   IF NOT FOUND OR v_admin.role != 'admin' THEN
     RETURN jsonb_build_object('success', false, 'error', 'Permission denied: Only administrators can update incidents.');
@@ -1015,14 +1326,14 @@ BEGIN
   UPDATE public.incident_reports
   SET status = p_status,
       resolution_notes = p_resolution_notes,
-      resolved_by = p_admin_id,
+      resolved_by = v_effective_admin_id,
       resolved_at = CASE WHEN p_status IN ('resolved', 'dismissed') THEN now() ELSE NULL END,
       updated_at = now()
   WHERE id = p_incident_id;
 
   INSERT INTO public.audit_logs (user_id, action, entity_type, entity_id, details)
   VALUES (
-    p_admin_id,
+    v_effective_admin_id,
     'INCIDENT_STATUS_UPDATED',
     'incident_report',
     p_incident_id,
@@ -1036,11 +1347,643 @@ BEGIN
 END;
 $$;
 
+-- I. record_vehicle_readiness
+CREATE OR REPLACE FUNCTION public.record_vehicle_readiness(
+  p_journey_id UUID,
+  p_user_id UUID,
+  p_vehicle_available BOOLEAN,
+  p_vehicle_safe BOOLEAN,
+  p_mechanical_fault BOOLEAN,
+  p_fault_description TEXT,
+  p_journey_reviewed BOOLEAN,
+  p_battery_level INTEGER,
+  p_tires_and_lights BOOLEAN,
+  p_notes TEXT,
+  p_is_assisted BOOLEAN DEFAULT FALSE
+)
+RETURNS JSONB
+LANGUAGE plpgsql
+SECURITY DEFINER
+SET search_path = ''
+AS $$
+DECLARE
+  v_effective_user_id UUID;
+  v_jwt_role TEXT;
+  v_journey RECORD;
+  v_user RECORD;
+  v_readiness_status TEXT;
+BEGIN
+  v_jwt_role := current_setting('request.jwt.claim.role', true);
+
+  IF v_jwt_role = 'anon' THEN
+    RETURN jsonb_build_object('success', false, 'error', 'Permission denied: Anonymous execution not permitted.');
+  ELSIF v_jwt_role = 'authenticated' THEN
+    IF auth.uid() IS NULL THEN
+      RETURN jsonb_build_object('success', false, 'error', 'Permission denied: Unauthenticated session.');
+    END IF;
+    IF p_user_id IS NOT NULL AND p_user_id <> auth.uid() THEN
+      RETURN jsonb_build_object('success', false, 'error', 'Identity mismatch: Caller cannot impersonate another operational user.');
+    END IF;
+    v_effective_user_id := auth.uid();
+  ELSE
+    v_effective_user_id := p_user_id;
+  END IF;
+
+  SELECT * INTO v_user
+  FROM public.profiles
+  WHERE id = v_effective_user_id;
+
+  IF NOT FOUND OR v_user.role NOT IN ('driver', 'boarding_officer', 'admin') THEN
+    RETURN jsonb_build_object('success', false, 'error', 'Permission denied: Caller cannot record readiness checks.');
+  END IF;
+
+  SELECT j.*, r.transport_group_id
+  INTO v_journey
+  FROM public.journeys j
+  JOIN public.routes r ON r.id = j.route_id
+  WHERE j.id = p_journey_id
+  FOR UPDATE OF j;
+
+  IF NOT FOUND THEN
+    RETURN jsonb_build_object('success', false, 'error', 'Target journey not found.');
+  END IF;
+
+  IF v_user.role = 'boarding_officer' AND v_user.assigned_transport_group_id IS NOT NULL THEN
+    IF v_journey.transport_group_id IS DISTINCT FROM v_user.assigned_transport_group_id THEN
+      RETURN jsonb_build_object('success', false, 'error', 'Cross-group restriction: You cannot record readiness for this corridor.');
+    END IF;
+  END IF;
+
+  IF v_user.role = 'driver' AND v_journey.driver_id != v_effective_user_id AND NOT EXISTS (
+    SELECT 1 FROM public.drivers d WHERE d.id = v_journey.driver_record_id AND d.profile_id = v_effective_user_id
+  ) THEN
+    RETURN jsonb_build_object('success', false, 'error', 'Permission denied: You are not the driver assigned to this journey.');
+  END IF;
+
+  IF NOT p_vehicle_safe OR NOT p_vehicle_available THEN
+    v_readiness_status := 'failed_unsafe';
+  ELSE
+    v_readiness_status := 'passed';
+  END IF;
+
+  INSERT INTO public.vehicle_readiness_checks (
+    journey_id,
+    vehicle_id,
+    checked_by_user_id,
+    is_assisted,
+    assisted_by_role,
+    vehicle_available,
+    vehicle_safe,
+    mechanical_fault_reported,
+    fault_description,
+    journey_reviewed,
+    battery_level_percent,
+    tires_and_lights_checked,
+    status,
+    notes,
+    created_at
+  )
+  VALUES (
+    p_journey_id,
+    v_journey.vehicle_id,
+    v_effective_user_id,
+    p_is_assisted,
+    CASE WHEN p_is_assisted THEN v_user.role::text ELSE NULL END,
+    p_vehicle_available,
+    p_vehicle_safe,
+    p_mechanical_fault,
+    p_fault_description,
+    p_journey_reviewed,
+    p_battery_level,
+    p_tires_and_lights,
+    v_readiness_status,
+    p_notes,
+    now()
+  );
+
+  UPDATE public.journeys
+  SET readiness_status = v_readiness_status,
+      readiness_checked_at = now(),
+      readiness_checked_by = v_effective_user_id,
+      is_assisted_operation = (is_assisted_operation OR p_is_assisted),
+      updated_at = now()
+  WHERE id = p_journey_id;
+
+  INSERT INTO public.journey_operational_logs (
+    journey_id,
+    driver_id,
+    recorded_by_user_id,
+    action_type,
+    operation_mode,
+    details
+  )
+  VALUES (
+    p_journey_id,
+    v_journey.driver_record_id,
+    v_effective_user_id,
+    'READINESS_CHECK',
+    CASE WHEN p_is_assisted THEN 'assisted' ELSE 'direct' END,
+    jsonb_build_object(
+      'status', v_readiness_status,
+      'is_safe', p_vehicle_safe,
+      'battery', p_battery_level
+    )
+  );
+
+  RETURN jsonb_build_object(
+    'success', true,
+    'readiness_status', v_readiness_status,
+    'message', CASE WHEN v_readiness_status = 'passed' THEN 'Vehicle cleared for safe departure.' ELSE 'Vehicle flagged as unsafe. Departure blocked.' END
+  );
+END;
+$$;
+
+-- J. record_journey_stop_update
+CREATE OR REPLACE FUNCTION public.record_journey_stop_update(
+  p_journey_id UUID,
+  p_stop_id UUID,
+  p_user_id UUID,
+  p_event_type TEXT,
+  p_notes TEXT DEFAULT NULL,
+  p_is_assisted BOOLEAN DEFAULT FALSE
+)
+RETURNS JSONB
+LANGUAGE plpgsql
+SECURITY DEFINER
+SET search_path = ''
+AS $$
+DECLARE
+  v_effective_user_id UUID;
+  v_jwt_role TEXT;
+  v_journey RECORD;
+  v_user RECORD;
+  v_stop RECORD;
+BEGIN
+  v_jwt_role := current_setting('request.jwt.claim.role', true);
+
+  IF v_jwt_role = 'anon' THEN
+    RETURN jsonb_build_object('success', false, 'error', 'Permission denied: Anonymous execution not permitted.');
+  ELSIF v_jwt_role = 'authenticated' THEN
+    IF auth.uid() IS NULL THEN
+      RETURN jsonb_build_object('success', false, 'error', 'Permission denied: Unauthenticated session.');
+    END IF;
+    IF p_user_id IS NOT NULL AND p_user_id <> auth.uid() THEN
+      RETURN jsonb_build_object('success', false, 'error', 'Identity mismatch: Caller cannot record stop updates for another user.');
+    END IF;
+    v_effective_user_id := auth.uid();
+  ELSE
+    v_effective_user_id := p_user_id;
+  END IF;
+
+  SELECT * INTO v_user
+  FROM public.profiles
+  WHERE id = v_effective_user_id;
+
+  IF NOT FOUND OR v_user.role NOT IN ('driver', 'boarding_officer', 'admin') THEN
+    RETURN jsonb_build_object('success', false, 'error', 'Permission denied.');
+  END IF;
+
+  SELECT j.*, r.transport_group_id
+  INTO v_journey
+  FROM public.journeys j
+  JOIN public.routes r ON r.id = j.route_id
+  WHERE j.id = p_journey_id;
+
+  IF NOT FOUND THEN
+    RETURN jsonb_build_object('success', false, 'error', 'Journey not found.');
+  END IF;
+
+  IF v_user.role = 'boarding_officer' AND v_user.assigned_transport_group_id IS NOT NULL THEN
+    IF v_journey.transport_group_id IS DISTINCT FROM v_user.assigned_transport_group_id THEN
+      RETURN jsonb_build_object('success', false, 'error', 'Cross-group restriction: Not authorised for this corridor.');
+    END IF;
+  END IF;
+
+  IF v_user.role = 'driver' AND v_journey.driver_id != v_effective_user_id AND NOT EXISTS (
+    SELECT 1 FROM public.drivers d WHERE d.id = v_journey.driver_record_id AND d.profile_id = v_effective_user_id
+  ) THEN
+    RETURN jsonb_build_object('success', false, 'error', 'You are not the driver assigned to this journey.');
+  END IF;
+
+  SELECT * INTO v_stop
+  FROM public.stops
+  WHERE id = p_stop_id;
+
+  IF NOT FOUND THEN
+    RETURN jsonb_build_object('success', false, 'error', 'Stop not found.');
+  END IF;
+
+  INSERT INTO public.journey_stop_updates (
+    journey_id,
+    stop_id,
+    recorded_by_user_id,
+    event_type,
+    is_assisted,
+    notes,
+    created_at
+  )
+  VALUES (
+    p_journey_id,
+    p_stop_id,
+    v_effective_user_id,
+    p_event_type,
+    p_is_assisted,
+    p_notes,
+    now()
+  );
+
+  INSERT INTO public.journey_operational_logs (
+    journey_id,
+    driver_id,
+    recorded_by_user_id,
+    action_type,
+    operation_mode,
+    details
+  )
+  VALUES (
+    p_journey_id,
+    v_journey.driver_record_id,
+    v_effective_user_id,
+    'STOP_UPDATE',
+    CASE WHEN p_is_assisted THEN 'assisted' ELSE 'direct' END,
+    jsonb_build_object('stop_name', v_stop.name, 'event_type', p_event_type)
+  );
+
+  RETURN jsonb_build_object('success', true, 'message', 'Milestone update recorded: ' || v_stop.name || ' (' || p_event_type || ').');
+END;
+$$;
+
+-- K. record_journey_delay_with_notifications
+CREATE OR REPLACE FUNCTION public.record_journey_delay_with_notifications(
+  p_journey_id UUID,
+  p_user_id UUID,
+  p_delay_minutes INTEGER,
+  p_delay_reason TEXT,
+  p_is_assisted BOOLEAN DEFAULT FALSE
+)
+RETURNS JSONB
+LANGUAGE plpgsql
+SECURITY DEFINER
+SET search_path = ''
+AS $$
+DECLARE
+  v_effective_user_id UUID;
+  v_jwt_role TEXT;
+  v_journey RECORD;
+  v_user RECORD;
+  v_passenger RECORD;
+  v_notified_count INTEGER := 0;
+BEGIN
+  v_jwt_role := current_setting('request.jwt.claim.role', true);
+
+  IF v_jwt_role = 'anon' THEN
+    RETURN jsonb_build_object('success', false, 'error', 'Permission denied: Anonymous execution not permitted.');
+  ELSIF v_jwt_role = 'authenticated' THEN
+    IF auth.uid() IS NULL THEN
+      RETURN jsonb_build_object('success', false, 'error', 'Permission denied: Unauthenticated session.');
+    END IF;
+    IF p_user_id IS NOT NULL AND p_user_id <> auth.uid() THEN
+      RETURN jsonb_build_object('success', false, 'error', 'Identity mismatch: Caller cannot report delays for another user.');
+    END IF;
+    v_effective_user_id := auth.uid();
+  ELSE
+    v_effective_user_id := p_user_id;
+  END IF;
+
+  SELECT * INTO v_user
+  FROM public.profiles
+  WHERE id = v_effective_user_id;
+
+  IF NOT FOUND OR v_user.role NOT IN ('driver', 'boarding_officer', 'admin') THEN
+    RETURN jsonb_build_object('success', false, 'error', 'Permission denied.');
+  END IF;
+
+  SELECT j.*, r.name AS route_name, r.transport_group_id
+  INTO v_journey
+  FROM public.journeys j
+  JOIN public.routes r ON r.id = j.route_id
+  WHERE j.id = p_journey_id
+  FOR UPDATE OF j;
+
+  IF NOT FOUND THEN
+    RETURN jsonb_build_object('success', false, 'error', 'Journey not found.');
+  END IF;
+
+  IF v_user.role = 'boarding_officer' AND v_user.assigned_transport_group_id IS NOT NULL THEN
+    IF v_journey.transport_group_id IS DISTINCT FROM v_user.assigned_transport_group_id THEN
+      RETURN jsonb_build_object('success', false, 'error', 'Cross-group restriction: Not authorised for this corridor.');
+    END IF;
+  END IF;
+
+  IF v_user.role = 'driver' AND v_journey.driver_id != v_effective_user_id AND NOT EXISTS (
+    SELECT 1 FROM public.drivers d WHERE d.id = v_journey.driver_record_id AND d.profile_id = v_effective_user_id
+  ) THEN
+    RETURN jsonb_build_object('success', false, 'error', 'You are not the driver assigned to this journey.');
+  END IF;
+
+  UPDATE public.journeys
+  SET delay_minutes = p_delay_minutes,
+      delay_reason = p_delay_reason,
+      updated_at = now()
+  WHERE id = p_journey_id;
+
+  FOR v_passenger IN
+    SELECT b.student_id
+    FROM public.bookings b
+    WHERE b.journey_id = p_journey_id AND b.status IN ('confirmed', 'boarded')
+  LOOP
+    INSERT INTO public.notifications (
+      user_id,
+      title,
+      message,
+      type,
+      related_journey_id
+    )
+    VALUES (
+      v_passenger.student_id,
+      'Trip Delay: ' || p_delay_minutes || ' Mins',
+      'Departure on ' || v_journey.route_name || ' delayed by ' || p_delay_minutes || ' mins. Reason: ' || p_delay_reason,
+      'delay_alert',
+      p_journey_id
+    );
+    v_notified_count := v_notified_count + 1;
+  END LOOP;
+
+  INSERT INTO public.journey_operational_logs (
+    journey_id,
+    driver_id,
+    recorded_by_user_id,
+    action_type,
+    operation_mode,
+    details
+  )
+  VALUES (
+    p_journey_id,
+    v_journey.driver_record_id,
+    v_effective_user_id,
+    'DELAY_REPORTED',
+    CASE WHEN p_is_assisted THEN 'assisted' ELSE 'direct' END,
+    jsonb_build_object(
+      'delay_minutes', p_delay_minutes,
+      'reason', p_delay_reason,
+      'passengers_notified', v_notified_count
+    )
+  );
+
+  RETURN jsonb_build_object(
+    'success', true,
+    'message', 'Delay of ' || p_delay_minutes || ' mins broadcast to ' || v_notified_count || ' passenger(s).'
+  );
+END;
+$$;
+
+-- L. record_journey_departure_safe
+CREATE OR REPLACE FUNCTION public.record_journey_departure_safe(
+  p_journey_id UUID,
+  p_actor_id UUID,
+  p_is_assisted BOOLEAN DEFAULT FALSE,
+  p_notes TEXT DEFAULT NULL
+)
+RETURNS JSONB
+LANGUAGE plpgsql
+SECURITY DEFINER
+SET search_path = ''
+AS $$
+DECLARE
+  v_effective_actor_id UUID;
+  v_jwt_role TEXT;
+  v_journey RECORD;
+  v_user RECORD;
+BEGIN
+  v_jwt_role := current_setting('request.jwt.claim.role', true);
+
+  IF v_jwt_role = 'anon' THEN
+    RETURN jsonb_build_object('success', false, 'error', 'Permission denied: Anonymous execution not permitted.');
+  ELSIF v_jwt_role = 'authenticated' THEN
+    IF auth.uid() IS NULL THEN
+      RETURN jsonb_build_object('success', false, 'error', 'Permission denied: Unauthenticated session.');
+    END IF;
+    IF p_actor_id IS NOT NULL AND p_actor_id <> auth.uid() THEN
+      RETURN jsonb_build_object('success', false, 'error', 'Identity mismatch: Caller cannot record departure for another user.');
+    END IF;
+    v_effective_actor_id := auth.uid();
+  ELSE
+    v_effective_actor_id := p_actor_id;
+  END IF;
+
+  SELECT * INTO v_user
+  FROM public.profiles
+  WHERE id = v_effective_actor_id;
+
+  IF NOT FOUND OR v_user.role NOT IN ('driver', 'boarding_officer', 'admin') THEN
+    RETURN jsonb_build_object('success', false, 'error', 'Permission denied: Caller cannot record departure.');
+  END IF;
+
+  SELECT j.*, r.transport_group_id, v.registration_number AS bus_reg
+  INTO v_journey
+  FROM public.journeys j
+  JOIN public.routes r ON r.id = j.route_id
+  JOIN public.vehicles v ON v.id = j.vehicle_id
+  WHERE j.id = p_journey_id
+  FOR UPDATE OF j;
+
+  IF NOT FOUND THEN
+    RETURN jsonb_build_object('success', false, 'error', 'Journey not found.');
+  END IF;
+
+  IF v_user.role = 'boarding_officer' AND v_user.assigned_transport_group_id IS NOT NULL THEN
+    IF v_journey.transport_group_id IS DISTINCT FROM v_user.assigned_transport_group_id THEN
+      RETURN jsonb_build_object('success', false, 'error', 'Cross-group restriction: Not authorised for this corridor.');
+    END IF;
+  END IF;
+
+  IF v_user.role = 'driver' AND v_journey.driver_id != v_effective_actor_id AND NOT EXISTS (
+    SELECT 1 FROM public.drivers d WHERE d.id = v_journey.driver_record_id AND d.profile_id = v_effective_actor_id
+  ) THEN
+    RETURN jsonb_build_object('success', false, 'error', 'You are not the driver assigned to this journey.');
+  END IF;
+
+  IF v_journey.readiness_status = 'failed_unsafe' THEN
+    RETURN jsonb_build_object('success', false, 'error', 'Safety violation: Pre-departure check flagged vehicle as unsafe. Departure blocked.');
+  END IF;
+
+  IF v_journey.status = 'in_transit' THEN
+    RETURN jsonb_build_object('success', false, 'error', 'Bus is already in transit.');
+  END IF;
+
+  IF v_journey.status IN ('completed', 'cancelled') THEN
+    RETURN jsonb_build_object('success', false, 'error', 'Cannot depart a ' || v_journey.status || ' trip.');
+  END IF;
+
+  UPDATE public.journeys
+  SET status = 'in_transit',
+      actual_departure = now(),
+      is_assisted_operation = (is_assisted_operation OR p_is_assisted),
+      updated_at = now()
+  WHERE id = p_journey_id;
+
+  INSERT INTO public.journey_operational_logs (
+    journey_id,
+    driver_id,
+    recorded_by_user_id,
+    action_type,
+    operation_mode,
+    details
+  )
+  VALUES (
+    p_journey_id,
+    v_journey.driver_record_id,
+    v_effective_actor_id,
+    'DEPARTURE',
+    CASE WHEN p_is_assisted THEN 'assisted' ELSE 'direct' END,
+    jsonb_build_object('actual_departure', now(), 'notes', p_notes)
+  );
+
+  RETURN jsonb_build_object(
+    'success', true,
+    'message', 'Bus ' || v_journey.bus_reg || ' departed. Status changed to in_transit.',
+    'actual_departure', now()
+  );
+END;
+$$;
+
+-- M. record_journey_arrival_safe
+CREATE OR REPLACE FUNCTION public.record_journey_arrival_safe(
+  p_journey_id UUID,
+  p_actor_id UUID,
+  p_is_assisted BOOLEAN DEFAULT FALSE,
+  p_notes TEXT DEFAULT NULL
+)
+RETURNS JSONB
+LANGUAGE plpgsql
+SECURITY DEFINER
+SET search_path = ''
+AS $$
+DECLARE
+  v_effective_actor_id UUID;
+  v_jwt_role TEXT;
+  v_journey RECORD;
+  v_user RECORD;
+BEGIN
+  v_jwt_role := current_setting('request.jwt.claim.role', true);
+
+  IF v_jwt_role = 'anon' THEN
+    RETURN jsonb_build_object('success', false, 'error', 'Permission denied: Anonymous execution not permitted.');
+  ELSIF v_jwt_role = 'authenticated' THEN
+    IF auth.uid() IS NULL THEN
+      RETURN jsonb_build_object('success', false, 'error', 'Permission denied: Unauthenticated session.');
+    END IF;
+    IF p_actor_id IS NOT NULL AND p_actor_id <> auth.uid() THEN
+      RETURN jsonb_build_object('success', false, 'error', 'Identity mismatch: Caller cannot record arrival for another user.');
+    END IF;
+    v_effective_actor_id := auth.uid();
+  ELSE
+    v_effective_actor_id := p_actor_id;
+  END IF;
+
+  SELECT * INTO v_user
+  FROM public.profiles
+  WHERE id = v_effective_actor_id;
+
+  IF NOT FOUND OR v_user.role NOT IN ('driver', 'boarding_officer', 'admin') THEN
+    RETURN jsonb_build_object('success', false, 'error', 'Permission denied: Caller cannot record arrival.');
+  END IF;
+
+  SELECT j.*, r.transport_group_id, v.registration_number AS bus_reg
+  INTO v_journey
+  FROM public.journeys j
+  JOIN public.routes r ON r.id = j.route_id
+  JOIN public.vehicles v ON v.id = j.vehicle_id
+  WHERE j.id = p_journey_id
+  FOR UPDATE OF j;
+
+  IF NOT FOUND THEN
+    RETURN jsonb_build_object('success', false, 'error', 'Journey not found.');
+  END IF;
+
+  IF v_user.role = 'boarding_officer' AND v_user.assigned_transport_group_id IS NOT NULL THEN
+    IF v_journey.transport_group_id IS DISTINCT FROM v_user.assigned_transport_group_id THEN
+      RETURN jsonb_build_object('success', false, 'error', 'Cross-group restriction: Not authorised for this corridor.');
+    END IF;
+  END IF;
+
+  IF v_user.role = 'driver' AND v_journey.driver_id != v_effective_actor_id AND NOT EXISTS (
+    SELECT 1 FROM public.drivers d WHERE d.id = v_journey.driver_record_id AND d.profile_id = v_effective_actor_id
+  ) THEN
+    RETURN jsonb_build_object('success', false, 'error', 'You are not the driver assigned to this journey.');
+  END IF;
+
+  IF v_journey.status != 'in_transit' THEN
+    RETURN jsonb_build_object('success', false, 'error', 'Cannot record arrival: Trip must be in transit (Current status: ' || v_journey.status || ').');
+  END IF;
+
+  UPDATE public.journeys
+  SET status = 'completed',
+      actual_arrival = now(),
+      is_assisted_operation = (is_assisted_operation OR p_is_assisted),
+      updated_at = now()
+  WHERE id = p_journey_id;
+
+  INSERT INTO public.journey_operational_logs (
+    journey_id,
+    driver_id,
+    recorded_by_user_id,
+    action_type,
+    operation_mode,
+    details
+  )
+  VALUES (
+    p_journey_id,
+    v_journey.driver_record_id,
+    v_effective_actor_id,
+    'ARRIVAL',
+    CASE WHEN p_is_assisted THEN 'assisted' ELSE 'direct' END,
+    jsonb_build_object('actual_arrival', now(), 'notes', p_notes)
+  );
+
+  RETURN jsonb_build_object(
+    'success', true,
+    'message', 'Bus ' || v_journey.bus_reg || ' arrived at destination. Journey completed.',
+    'actual_arrival', now()
+  );
+END;
+$$;
+
 -- ============================================================
--- 5. REVOKE ANONYMOUS EXECUTION PERMISSIONS
+-- 5. FUNCTION EXECUTION PRIVILEGES (FUNCTION-BY-FUNCTION)
 -- ============================================================
 
--- Defense in depth: Ensure unauthenticated anon callers cannot invoke public RPCs
-REVOKE EXECUTE ON ALL FUNCTIONS IN SCHEMA public FROM anon;
-GRANT EXECUTE ON ALL FUNCTIONS IN SCHEMA public TO authenticated, service_role;
+-- 1. Revoke ALL permissions on all public functions from public and anonymous roles
+REVOKE ALL ON ALL FUNCTIONS IN SCHEMA public FROM PUBLIC;
+REVOKE ALL ON ALL FUNCTIONS IN SCHEMA public FROM anon;
 
+-- 2. Revoke execution on internal trigger functions from authenticated
+REVOKE EXECUTE ON FUNCTION public.handle_updated_at() FROM PUBLIC, anon, authenticated;
+REVOKE EXECUTE ON FUNCTION public.handle_new_user() FROM PUBLIC, anon, authenticated;
+REVOKE EXECUTE ON FUNCTION public.protect_profile_privileges() FROM PUBLIC, anon, authenticated;
+REVOKE EXECUTE ON FUNCTION public.prevent_audit_log_modification() FROM PUBLIC, anon, authenticated;
+
+-- 3. Grant service_role full execution for server-side trusted execution
+GRANT EXECUTE ON ALL FUNCTIONS IN SCHEMA public TO service_role;
+
+-- 4. Explicit function-by-function execution grants to authenticated:
+-- Student workflows:
+GRANT EXECUTE ON FUNCTION public.book_journey_seat(UUID, UUID, UUID) TO authenticated;
+GRANT EXECUTE ON FUNCTION public.cancel_booking_and_promote(UUID, UUID, TEXT) TO authenticated;
+
+-- Boarding officer workflows:
+GRANT EXECUTE ON FUNCTION public.verify_and_board_passenger(TEXT, UUID, UUID, public.boarding_method, TEXT) TO authenticated;
+GRANT EXECUTE ON FUNCTION public.close_and_depart_journey(UUID, UUID, TEXT) TO authenticated;
+
+-- Driver & assisted operational workflows:
+GRANT EXECUTE ON FUNCTION public.record_vehicle_readiness(UUID, UUID, BOOLEAN, BOOLEAN, BOOLEAN, TEXT, BOOLEAN, INTEGER, BOOLEAN, TEXT, BOOLEAN) TO authenticated;
+GRANT EXECUTE ON FUNCTION public.record_journey_stop_update(UUID, UUID, UUID, TEXT, BOOLEAN, TEXT) TO authenticated;
+GRANT EXECUTE ON FUNCTION public.record_journey_delay_with_notifications(UUID, UUID, INTEGER, TEXT, BOOLEAN) TO authenticated;
+GRANT EXECUTE ON FUNCTION public.record_journey_departure_safe(UUID, UUID, BOOLEAN, TEXT) TO authenticated;
+GRANT EXECUTE ON FUNCTION public.record_journey_arrival_safe(UUID, UUID, BOOLEAN, TEXT) TO authenticated;
+
+-- Transport Administrator workflows:
+GRANT EXECUTE ON FUNCTION public.admin_generate_journeys_from_schedules(UUID, DATE, UUID) TO authenticated;
+GRANT EXECUTE ON FUNCTION public.admin_cancel_journey(UUID, UUID, TEXT) TO authenticated;
+GRANT EXECUTE ON FUNCTION public.admin_update_system_setting(UUID, TEXT, JSONB, TEXT) TO authenticated;
+GRANT EXECUTE ON FUNCTION public.admin_update_incident_status(UUID, UUID, public.incident_status, TEXT) TO authenticated;
