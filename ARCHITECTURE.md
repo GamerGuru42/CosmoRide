@@ -93,7 +93,8 @@ CosmoRide/
 │       ├── 00005_transport_administration.sql # Schedule generators, journey cancellations & incident desk
 │       ├── 00006_security_hardening_and_integrity.sql # Audit log immutability triggers & anti-spoofing
 │       ├── 00007_fail_closed_security_and_strict_jwt.sql # Fail-closed policies, strict JWT role checks & explicit grants
-│       └── 00008_service_role_boundaries_and_booking_eligibility.sql # Service-role least privilege & booking eligibility hardening
+│       ├── 00008_service_role_boundaries_and_booking_eligibility.sql # Service-role least privilege & booking eligibility hardening
+│       └── 00009_honest_system_actor_and_booking_policy.sql # Honest system actor attribution, dynamic booking cutoff & safe seat counting
 │
 ├── tests/
 │   └── security_and_integrity.test.ts # Security, capacity & token validation test suite
