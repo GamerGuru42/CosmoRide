@@ -445,7 +445,7 @@ BEGIN
 
   IF v_active_bookings_count < v_effective_capacity THEN
     -- Issue confirmed seat
-    v_ticket_token := encode(gen_random_bytes(24), 'hex');
+    v_ticket_token := encode(extensions.gen_random_bytes(24), 'hex');
 
     -- Re-activate historical record or insert fresh row
     SELECT id INTO v_booking_id

@@ -117,6 +117,19 @@ ON CONFLICT (key) DO NOTHING;
 -- 3. ENHANCE BOOKINGS WITH SECURE QR TICKETS
 -- ============================================================
 
+-- Ensure pgcrypto extension is active in extensions schema
+CREATE EXTENSION IF NOT EXISTS pgcrypto WITH SCHEMA extensions;
+
+-- Provide public alias for gen_random_bytes
+CREATE OR REPLACE FUNCTION public.gen_random_bytes(integer)
+RETURNS bytea
+LANGUAGE sql
+PARALLEL SAFE
+IMMUTABLE
+AS $$
+  SELECT extensions.gen_random_bytes($1);
+$$;
+
 -- Add ticket_token and pass issue timestamp to bookings
 ALTER TABLE public.bookings
   ADD COLUMN IF NOT EXISTS ticket_token TEXT UNIQUE,
@@ -124,12 +137,12 @@ ALTER TABLE public.bookings
 
 -- Backfill any existing bookings with a secure random token
 UPDATE public.bookings
-SET ticket_token = encode(gen_random_bytes(24), 'hex')
+SET ticket_token = encode(extensions.gen_random_bytes(24), 'hex')
 WHERE ticket_token IS NULL;
 
 -- Ensure ticket_token is not nullable going forward
 ALTER TABLE public.bookings
-  ALTER COLUMN ticket_token SET DEFAULT encode(gen_random_bytes(24), 'hex');
+  ALTER COLUMN ticket_token SET DEFAULT encode(extensions.gen_random_bytes(24), 'hex');
 
 CREATE INDEX IF NOT EXISTS idx_bookings_ticket_token ON public.bookings(ticket_token);
 
@@ -388,7 +401,7 @@ BEGIN
 
   -- 5. If capacity available -> issue confirmed booking
   IF v_active_bookings_count < v_effective_capacity THEN
-    v_ticket_token := encode(gen_random_bytes(24), 'hex');
+    v_ticket_token := encode(extensions.gen_random_bytes(24), 'hex');
 
     INSERT INTO public.bookings (
       journey_id,
@@ -530,7 +543,7 @@ BEGIN
 
   IF FOUND THEN
     -- Generate ticket token for promoted student
-    v_new_ticket_token := encode(gen_random_bytes(24), 'hex');
+    v_new_ticket_token := encode(extensions.gen_random_bytes(24), 'hex');
 
     -- Insert new confirmed booking for the promoted student
     INSERT INTO public.bookings (

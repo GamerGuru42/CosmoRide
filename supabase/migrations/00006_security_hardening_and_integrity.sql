@@ -294,6 +294,7 @@ DROP FUNCTION IF EXISTS public.cancel_booking_and_promote(UUID, UUID, TEXT);
 DROP FUNCTION IF EXISTS public.verify_and_board_passenger(TEXT, UUID, UUID, public.boarding_method, TEXT);
 DROP FUNCTION IF EXISTS public.close_and_depart_journey(UUID, UUID, TEXT);
 DROP FUNCTION IF EXISTS public.record_vehicle_readiness(UUID, UUID, BOOLEAN, BOOLEAN, BOOLEAN, TEXT, BOOLEAN, INTEGER, BOOLEAN, TEXT, BOOLEAN);
+DROP FUNCTION IF EXISTS public.record_journey_stop_update(UUID, UUID, UUID, TEXT, TEXT, BOOLEAN);
 DROP FUNCTION IF EXISTS public.record_journey_stop_update(UUID, UUID, UUID, TEXT, BOOLEAN, TEXT);
 DROP FUNCTION IF EXISTS public.record_journey_delay_with_notifications(UUID, UUID, INTEGER, TEXT, BOOLEAN);
 DROP FUNCTION IF EXISTS public.record_journey_departure_safe(UUID, UUID, BOOLEAN, TEXT);
@@ -388,7 +389,7 @@ BEGIN
     AND status = 'confirmed';
 
   IF v_active_bookings_count < v_effective_capacity THEN
-    v_ticket_token := encode(gen_random_bytes(24), 'hex');
+    v_ticket_token := encode(extensions.gen_random_bytes(24), 'hex');
 
     INSERT INTO public.bookings (
       journey_id,
@@ -573,7 +574,7 @@ BEGIN
   FOR UPDATE;
 
   IF FOUND THEN
-    v_new_ticket_token := encode(gen_random_bytes(24), 'hex');
+    v_new_ticket_token := encode(extensions.gen_random_bytes(24), 'hex');
 
     INSERT INTO public.bookings (
       journey_id,
@@ -1977,7 +1978,7 @@ GRANT EXECUTE ON FUNCTION public.close_and_depart_journey(UUID, UUID, TEXT) TO a
 
 -- Driver & assisted operational workflows:
 GRANT EXECUTE ON FUNCTION public.record_vehicle_readiness(UUID, UUID, BOOLEAN, BOOLEAN, BOOLEAN, TEXT, BOOLEAN, INTEGER, BOOLEAN, TEXT, BOOLEAN) TO authenticated;
-GRANT EXECUTE ON FUNCTION public.record_journey_stop_update(UUID, UUID, UUID, TEXT, BOOLEAN, TEXT) TO authenticated;
+GRANT EXECUTE ON FUNCTION public.record_journey_stop_update(UUID, UUID, UUID, TEXT, TEXT, BOOLEAN) TO authenticated;
 GRANT EXECUTE ON FUNCTION public.record_journey_delay_with_notifications(UUID, UUID, INTEGER, TEXT, BOOLEAN) TO authenticated;
 GRANT EXECUTE ON FUNCTION public.record_journey_departure_safe(UUID, UUID, BOOLEAN, TEXT) TO authenticated;
 GRANT EXECUTE ON FUNCTION public.record_journey_arrival_safe(UUID, UUID, BOOLEAN, TEXT) TO authenticated;

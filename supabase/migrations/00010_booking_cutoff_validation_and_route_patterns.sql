@@ -409,7 +409,7 @@ BEGIN
 
   IF v_active_bookings_count < v_effective_capacity THEN
     -- Issue confirmed seat
-    v_ticket_token := encode(gen_random_bytes(24), 'hex');
+    v_ticket_token := encode(extensions.gen_random_bytes(24), 'hex');
 
     -- Re-activate historical record or insert fresh row
     SELECT id INTO v_booking_id
@@ -546,38 +546,61 @@ GRANT EXECUTE ON FUNCTION public.book_journey_seat(UUID, UUID, UUID) TO authenti
 -- ============================================================
 
 -- Register Direct Route Corridors (bypassing Wuye stop for express runs)
-INSERT INTO public.routes (id, name, code, description, gender_group, transport_group_id, is_active)
-VALUES
-  (
-    'r1000000-0000-0000-0000-000000000005',
-    'Boys'' Morning Direct (Main Boys'' Hostel to Main Campus)',
-    'BOYS_AM_DIRECT',
-    'Pattern 2: Morning express 08:30 directly from Main Boys'' Hostel to Main Campus (no Wuye stop)',
-    'male',
-    'g1000000-0000-0000-0000-000000000002',
-    TRUE
-  ),
-  (
-    'r1000000-0000-0000-0000-000000000006',
-    'Boys'' Evening Direct (Main Campus to Main Boys'' Hostel)',
-    'BOYS_PM_DIRECT',
-    'Pattern 3: Evening express 16:00 directly from Main Campus to Main Boys'' Hostel (no Wuye stop)',
-    'male',
-    'g1000000-0000-0000-0000-000000000002',
-    TRUE
-  )
-ON CONFLICT (code) DO NOTHING;
+-- Dynamic registration anchored to transport groups when present
+DO $$
+DECLARE
+  v_boys_group_id UUID;
+  v_main_boys_stop_id UUID;
+  v_main_campus_stop_id UUID;
+  v_am_direct_id UUID;
+  v_pm_direct_id UUID;
+BEGIN
+  -- Lookup boys transport group if seeded
+  SELECT id INTO v_boys_group_id FROM public.transport_groups WHERE code = 'MAIN_BOYS_HOSTEL' LIMIT 1;
+  SELECT id INTO v_main_boys_stop_id FROM public.stops WHERE name ILIKE '%Main Boys%' LIMIT 1;
+  SELECT id INTO v_main_campus_stop_id FROM public.stops WHERE name ILIKE '%Central Bus Park%' OR name ILIKE '%Main Campus%' LIMIT 1;
 
--- Ordered Stops for Pattern 2: Main Boys' Hostel Stop -> Main Campus Central Bus Park
-INSERT INTO public.route_stops (route_id, stop_id, stop_order, estimated_minutes_from_start)
-VALUES
-  ('r1000000-0000-0000-0000-000000000005', 's1000000-0000-0000-0000-000000000002', 1, 0),
-  ('r1000000-0000-0000-0000-000000000005', 's1000000-0000-0000-0000-000000000004', 2, 25)
-ON CONFLICT (route_id, stop_order) DO NOTHING;
+  -- Only seed route rows if referenced stops/groups exist, avoiding premature FK constraint violations on unseeded databases
+  IF v_boys_group_id IS NOT NULL THEN
+    INSERT INTO public.routes (name, code, description, gender_group, transport_group_id, is_active)
+    VALUES
+      (
+        'Boys'' Morning Direct (Main Boys'' Hostel to Main Campus)',
+        'BOYS_AM_DIRECT',
+        'Pattern 2: Morning express 08:30 directly from Main Boys'' Hostel to Main Campus (no Wuye stop)',
+        'male',
+        v_boys_group_id,
+        TRUE
+      ),
+      (
+        'Boys'' Evening Direct (Main Campus to Main Boys'' Hostel)',
+        'BOYS_PM_DIRECT',
+        'Pattern 3: Evening express 16:00 directly from Main Campus to Main Boys'' Hostel (no Wuye stop)',
+        'male',
+        v_boys_group_id,
+        TRUE
+      )
+    ON CONFLICT (code) DO NOTHING;
 
--- Ordered Stops for Pattern 3: Main Campus Central Bus Park -> Main Boys' Hostel Stop
-INSERT INTO public.route_stops (route_id, stop_id, stop_order, estimated_minutes_from_start)
-VALUES
-  ('r1000000-0000-0000-0000-000000000006', 's1000000-0000-0000-0000-000000000004', 1, 0),
-  ('r1000000-0000-0000-0000-000000000006', 's1000000-0000-0000-0000-000000000002', 2, 25)
-ON CONFLICT (route_id, stop_order) DO NOTHING;
+    IF v_main_boys_stop_id IS NOT NULL AND v_main_campus_stop_id IS NOT NULL THEN
+      SELECT id INTO v_am_direct_id FROM public.routes WHERE code = 'BOYS_AM_DIRECT';
+      SELECT id INTO v_pm_direct_id FROM public.routes WHERE code = 'BOYS_PM_DIRECT';
+
+      IF v_am_direct_id IS NOT NULL THEN
+        INSERT INTO public.route_stops (route_id, stop_id, stop_order, estimated_minutes_from_start)
+        VALUES
+          (v_am_direct_id, v_main_boys_stop_id, 1, 0),
+          (v_am_direct_id, v_main_campus_stop_id, 2, 25)
+        ON CONFLICT (route_id, stop_order) DO NOTHING;
+      END IF;
+
+      IF v_pm_direct_id IS NOT NULL THEN
+        INSERT INTO public.route_stops (route_id, stop_id, stop_order, estimated_minutes_from_start)
+        VALUES
+          (v_pm_direct_id, v_main_campus_stop_id, 1, 0),
+          (v_pm_direct_id, v_main_boys_stop_id, 2, 25)
+        ON CONFLICT (route_id, stop_order) DO NOTHING;
+      END IF;
+    END IF;
+  END IF;
+END $$;

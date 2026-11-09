@@ -247,7 +247,7 @@ BEGIN
 
   IF v_active_bookings_count < v_effective_capacity THEN
     -- Issue confirmed seat
-    v_ticket_token := encode(gen_random_bytes(24), 'hex');
+    v_ticket_token := encode(extensions.gen_random_bytes(24), 'hex');
 
     -- Re-activate historical record or insert fresh row
     SELECT id INTO v_booking_id
@@ -458,7 +458,7 @@ BEGIN
   FOR UPDATE;
 
   IF FOUND THEN
-    v_new_ticket_token := encode(gen_random_bytes(24), 'hex');
+    v_new_ticket_token := encode(extensions.gen_random_bytes(24), 'hex');
 
     -- Check if an inactive booking record already exists for the promoted student
     SELECT id INTO v_new_booking_id
