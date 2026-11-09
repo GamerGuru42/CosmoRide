@@ -105,3 +105,4 @@ export default async function AdminAnnouncementsPage() {
     </div>
   );
 }
+

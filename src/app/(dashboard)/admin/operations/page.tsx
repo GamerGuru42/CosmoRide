@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import { redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
+import { getTodayDateString } from "@/lib/utils";
 import { PageHeader } from "@/components/ui/page-header";
 import {
   LiveOperationsView,
@@ -25,7 +26,7 @@ export default async function AdminOperationsPage({
 }: AdminOperationsPageProps) {
   const resolvedParams = await searchParams;
   const targetJourneyId = resolvedParams.journey;
-  const todayStr = new Date().toISOString().split("T")[0];
+  const todayStr = getTodayDateString();
 
   const supabase = await createClient();
 

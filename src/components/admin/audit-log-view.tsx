@@ -188,3 +188,4 @@ export function AuditLogView({ logs }: AuditLogViewProps) {
     </div>
   );
 }
+

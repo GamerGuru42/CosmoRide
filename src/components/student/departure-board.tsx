@@ -1,7 +1,7 @@
 "use client";
 
 import React, { useState, useMemo, useTransition } from "react";
-import { formatTime, formatDate, calculateAvailableSeats } from "@/lib/utils";
+import { formatTime, formatDate, calculateAvailableSeats, getTodayDateString } from "@/lib/utils";
 import { DEPARTURE_STATUS_CONFIG } from "@/lib/constants";
 import { bookSeat } from "@/actions/bookings";
 import { BusIcon, ClockIcon, AlertTriangleIcon, CheckCircleIcon } from "@/components/ui/icons";
@@ -60,11 +60,11 @@ export function DepartureBoard({ journeys, currentUserId, onBookingSuccess }: De
   const [bookingSuccessMessage, setBookingSuccessMessage] = useState<string | null>(null);
   const [isPending, startTransition] = useTransition();
 
-  const todayStr = useMemo(() => new Date().toISOString().split("T")[0], []);
+  const todayStr = useMemo(() => getTodayDateString(), []);
   const tomorrowStr = useMemo(() => {
     const d = new Date();
     d.setDate(d.getDate() + 1);
-    return d.toISOString().split("T")[0];
+    return getTodayDateString(d);
   }, []);
 
   // Filtered journeys

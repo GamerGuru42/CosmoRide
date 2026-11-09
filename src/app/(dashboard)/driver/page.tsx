@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import { redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
+import { getTodayDateString } from "@/lib/utils";
 import {
   DriverDashboardView,
   type DriverJourneyData,
@@ -46,7 +47,7 @@ export default async function DriverDashboardPage() {
   const driverReference = driverRecord?.driver_reference || "DRV-CU-APP";
   const driverPhone = driverRecord?.phone || profile.phone || null;
 
-  const todayStr = new Date().toISOString().split("T")[0];
+  const todayStr = getTodayDateString();
 
   // Fetch assigned journeys for today
   let journeysQuery = supabase

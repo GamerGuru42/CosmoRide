@@ -516,3 +516,4 @@ export function VehiclesManagement({ initialVehicles }: VehiclesManagementProps)
     </div>
   );
 }
+

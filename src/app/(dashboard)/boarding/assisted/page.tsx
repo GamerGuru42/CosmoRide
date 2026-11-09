@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import { redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
+import { getTodayDateString } from "@/lib/utils";
 import {
   AssistedDriverOperations,
   type AssistedJourneyData,
@@ -47,7 +48,7 @@ export default async function AssistedDriverOperationsPage() {
     if (tg) corridorName = tg.name;
   }
 
-  const todayStr = new Date().toISOString().split("T")[0];
+  const todayStr = getTodayDateString();
 
   // Fetch today's journeys in corridor
   let journeysQuery = supabase

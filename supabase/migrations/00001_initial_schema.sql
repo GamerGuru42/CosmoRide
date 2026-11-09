@@ -92,7 +92,7 @@ CREATE TABLE public.routes (
   name TEXT NOT NULL,
   code TEXT NOT NULL UNIQUE,
   description TEXT,
-  gender_group public.gender NOT NULL DEFAULT 'all',
+  gender_group public.gender NOT NULL DEFAULT 'mixed',
   is_active BOOLEAN NOT NULL DEFAULT TRUE,
   created_at TIMESTAMPTZ NOT NULL DEFAULT now()
 );

@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import { redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
+import { getTodayDateString } from "@/lib/utils";
 import {
   PassengerManifestView,
   type ManifestJourney,
@@ -54,7 +55,7 @@ export default async function BoardingPassengersPage({ searchParams }: PageProps
     if (tg) transportGroupName = tg.name;
   }
 
-  const todayStr = new Date().toISOString().split("T")[0];
+  const todayStr = getTodayDateString();
 
   // Query journeys for today
   let journeysQuery = supabase

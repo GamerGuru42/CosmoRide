@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import { redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
+import { getTodayDateString } from "@/lib/utils";
 import { StudentHomeView, type AnnouncementItem } from "@/components/student/student-home-view";
 import type { DepartureJourney } from "@/components/student/departure-board";
 
@@ -115,7 +116,7 @@ export default async function StudentHomePage() {
     .eq("status", "waiting");
 
   // 4. Fetch upcoming journeys for departure board preview (today and tomorrow)
-  const today = new Date().toISOString().split("T")[0];
+  const today = getTodayDateString();
   const { data: journeysData } = await supabase
     .from("journeys")
     .select(`

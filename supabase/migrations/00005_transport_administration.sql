@@ -390,3 +390,4 @@ BEGIN
   RETURN jsonb_build_object('success', true, 'message', 'Incident updated to ' || p_status || '.');
 END;
 $$;
+

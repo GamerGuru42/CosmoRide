@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import { redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
+import { getTodayDateString } from "@/lib/utils";
 import { DepartureBoard, type DepartureJourney } from "@/components/student/departure-board";
 
 export const metadata: Metadata = {
@@ -20,7 +21,7 @@ export default async function StudentDeparturesPage() {
   }
 
   // Fetch all scheduled, boarding, or active journeys
-  const today = new Date().toISOString().split("T")[0];
+  const today = getTodayDateString();
   const { data: journeysData, error } = await supabase
     .from("journeys")
     .select(`

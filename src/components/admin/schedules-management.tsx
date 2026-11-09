@@ -2,7 +2,7 @@
 
 import React, { useState, useTransition } from "react";
 import Link from "next/link";
-import { formatTime } from "@/lib/utils";
+import { formatTime, getTodayDateString } from "@/lib/utils";
 import {
   createScheduleTemplateAction,
   generateJourneysFromSchedulesAction,
@@ -66,7 +66,7 @@ export function SchedulesManagement({
   const [notes, setNotes] = useState("");
 
   // Generator form state
-  const todayIso = new Date().toISOString().split("T")[0];
+  const todayIso = getTodayDateString();
   const [genTargetDate, setGenTargetDate] = useState(todayIso);
   const [genRouteId, setGenRouteId] = useState("");
   const [generatorResult, setGeneratorResult] = useState<Record<string, unknown> | null>(null);
@@ -526,3 +526,4 @@ export function SchedulesManagement({
     </div>
   );
 }
+

@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import { redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
+import { getTodayDateString } from "@/lib/utils";
 import { PageHeader } from "@/components/ui/page-header";
 import {
   AdminOverview,
@@ -38,7 +39,7 @@ export default async function AdminDashboardPage() {
     redirect("/student");
   }
 
-  const todayStr = new Date().toISOString().split("T")[0];
+  const todayStr = getTodayDateString();
 
   // 1. Fetch today's journeys
   const { data: journeysData } = await supabase

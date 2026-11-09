@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import { redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
+import { getTodayDateString } from "@/lib/utils";
 import {
   BoardingScannerView,
   type ActiveBoardingJourney,
@@ -36,7 +37,7 @@ export default async function BoardingScannerPage() {
     redirect("/student");
   }
 
-  const todayStr = new Date().toISOString().split("T")[0];
+  const todayStr = getTodayDateString();
 
   // Fetch active journeys (scheduled, boarding, in_transit) for today
   let journeysQuery = supabase

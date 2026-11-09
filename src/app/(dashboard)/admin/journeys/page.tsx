@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import { redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
+import { getTodayDateString } from "@/lib/utils";
 import { PageHeader } from "@/components/ui/page-header";
 import {
   JourneysManagement,
@@ -22,7 +23,7 @@ export default async function AdminJourneysPage({
   searchParams,
 }: AdminJourneysPageProps) {
   const resolvedParams = await searchParams;
-  const todayStr = new Date().toISOString().split("T")[0];
+  const todayStr = getTodayDateString();
   const targetDate = resolvedParams.date || todayStr;
 
   const supabase = await createClient();

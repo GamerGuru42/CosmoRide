@@ -2,7 +2,7 @@ import type { Metadata } from "next";
 import Link from "next/link";
 import { redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
-import { formatTime, formatDate } from "@/lib/utils";
+import { formatTime, formatDate, getTodayDateString } from "@/lib/utils";
 import { BusIcon, CheckCircleIcon, QrCodeIcon, UserIcon } from "@/components/ui/icons";
 
 export const metadata: Metadata = {
@@ -51,8 +51,8 @@ export default async function BoardingOfficerDashboardPage() {
     }
   }
 
-  // Today's date (local date YYYY-MM-DD)
-  const todayStr = new Date().toISOString().split("T")[0];
+  // Today's date (WAT Africa/Lagos date YYYY-MM-DD)
+  const todayStr = getTodayDateString();
 
   // Query today's journeys with route, vehicle, driver, and bookings
   let journeysQuery = supabase

@@ -1,7 +1,7 @@
 "use client";
 
 import React, { useState } from "react";
-import { formatDate, formatTime } from "@/lib/utils";
+import { formatDate, formatTime, getTodayDateString } from "@/lib/utils";
 
 export interface JourneyReportRow {
   id: string;
@@ -120,7 +120,7 @@ export function ReportsView({
     ]);
 
     const csvContent = [headers.join(","), ...rows.map((r) => r.join(","))].join("\n");
-    downloadCsv(`CosmoRide_Journeys_Utilization_${new Date().toISOString().split("T")[0]}.csv`, csvContent);
+    downloadCsv(`CosmoRide_Journeys_Utilization_${getTodayDateString()}.csv`, csvContent);
   };
 
   const exportPassengersCsv = () => {
@@ -145,7 +145,7 @@ export function ReportsView({
     ]);
 
     const csvContent = [headers.join(","), ...rows.map((r) => r.join(","))].join("\n");
-    downloadCsv(`CosmoRide_Passenger_Compliance_${new Date().toISOString().split("T")[0]}.csv`, csvContent);
+    downloadCsv(`CosmoRide_Passenger_Compliance_${getTodayDateString()}.csv`, csvContent);
   };
 
   const exportIncidentsCsv = () => {
@@ -172,7 +172,7 @@ export function ReportsView({
     ]);
 
     const csvContent = [headers.join(","), ...rows.map((r) => r.join(","))].join("\n");
-    downloadCsv(`CosmoRide_Incidents_Log_${new Date().toISOString().split("T")[0]}.csv`, csvContent);
+    downloadCsv(`CosmoRide_Incidents_Log_${getTodayDateString()}.csv`, csvContent);
   };
 
   return (
@@ -335,3 +335,4 @@ export function ReportsView({
     </div>
   );
 }
+
