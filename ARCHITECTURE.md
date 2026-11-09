@@ -87,7 +87,13 @@ CosmoRide/
 ├── supabase/
 │   └── migrations/
 │       ├── 00001_initial_schema.sql         # Base entities & initial RLS policies
-│       └── 00002_security_and_operations.sql # Atomic procedures, waitlists, boarding records, settings
+│       ├── 00002_security_and_operations.sql # Atomic procedures, waitlists, boarding records, settings
+│       ├── 00003_boarding_officer_isolation.sql # Transport group corridor isolation & boarding procedures
+│       ├── 00004_driver_operations_and_assisted_modes.sql # Mode A/B driver operations & vehicle safety
+│       ├── 00005_transport_administration.sql # Schedule generators, journey cancellations & incident desk
+│       ├── 00006_security_hardening_and_integrity.sql # Audit log immutability triggers & anti-spoofing
+│       ├── 00007_fail_closed_security_and_strict_jwt.sql # Fail-closed policies, strict JWT role checks & explicit grants
+│       └── 00008_service_role_boundaries_and_booking_eligibility.sql # Service-role least privilege & booking eligibility hardening
 │
 ├── tests/
 │   └── security_and_integrity.test.ts # Security, capacity & token validation test suite
