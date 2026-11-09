@@ -22,7 +22,7 @@ describe("Phase 6.5: System Actor Attribution, Booking Policy & Verification", (
     process.cwd(),
     "supabase/migrations/00009_honest_system_actor_and_booking_policy.sql"
   );
-  const migration9Content = fs.readFileSync(migration9Path, "utf-8");
+  const migration9Content = fs.readFileSync(migration9Path, "utf-8").replace(/\r\n/g, "\n");
 
   describe("1. Static Migration 00009 Review", () => {
     it("ensures journeys.created_by is made nullable for honest system generation", () => {

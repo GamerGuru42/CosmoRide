@@ -499,7 +499,7 @@ export type Database = {
           readiness_checked_at: string | null;
           readiness_checked_by: string | null;
           is_assisted_operation: boolean;
-          created_by: string;
+          created_by: string | null;
           created_at: string;
           updated_at: string;
         };
@@ -523,7 +523,7 @@ export type Database = {
           readiness_checked_at?: string | null;
           readiness_checked_by?: string | null;
           is_assisted_operation?: boolean;
-          created_by: string;
+          created_by?: string | null;
           created_at?: string;
           updated_at?: string;
         };
@@ -547,7 +547,7 @@ export type Database = {
           readiness_checked_at?: string | null;
           readiness_checked_by?: string | null;
           is_assisted_operation?: boolean;
-          created_by?: string;
+          created_by?: string | null;
           created_at?: string;
           updated_at?: string;
         };

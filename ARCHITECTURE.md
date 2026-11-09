@@ -173,8 +173,28 @@ The platform enforces that no fleet counts or journey counts are hardcoded:
 - **Timetables & Departures**: Defined via `schedules` and instantiated into `journeys`.
 - **Operational Variables**: Stored in `system_settings`:
   - `default_proposed_allocation`: 30
-  - `booking_window_hours_ahead`: 48
-  - `booking_cutoff_minutes`: 15
+  - `booking_window_hours_ahead`: 48 (advisory display window for student departures)
+  - `booking_cutoff_minutes`: 15 (validated integer within 0–120 minutes)
   - `cancellation_cutoff_minutes`: 30
   - `allow_manual_boarding_override`: true
   - `girls_operation_simultaneous_buses`: 3
+
+---
+
+## 6. Institutional Journey Patterns & Fleet Configuration
+
+### 6.1 Boys' Corridor Patterns (Monday–Friday)
+1. **Pattern 1 (Morning 07:30 via Wuye)**: `BOYS_AM_ROUTE` — Main Boys' Hostel (Kado) → Wuye Boys' Hostel → Main Campus Central Bus Park.
+2. **Pattern 2 (Morning 08:30 Direct)**: `BOYS_AM_DIRECT` — Main Boys' Hostel (Kado) → Main Campus Central Bus Park directly (express run, bypasses Wuye).
+3. **Pattern 3 (Evening 16:00 Direct)**: `BOYS_PM_DIRECT` — Main Campus Central Bus Park → Main Boys' Hostel (Kado) directly (express run, bypasses Wuye).
+4. **Pattern 4 (Evening 16:50 planned / 17:00 latest)**: `BOYS_PM_ROUTE` — Main Campus Central Bus Park → Wuye Boys' Hostel → Main Boys' Hostel (Kado). Single journey with operational departure window, not two separate trips.
+
+### 6.2 Girls' Fleet Configuration
+- 3 simultaneous operating electric buses (`CU-EB-01`, `CU-EB-02`, `CU-EB-03`) with certified 30-seat safe capacity each (configurable within safe limits: 1–100 seats).
+- 3 dedicated drivers (`DRV-CU-01`, `DRV-CU-02`, `DRV-CU-03`) assigned to respective fleet buses, supporting both smartphone-enabled (Mode A) and assisted (Mode B) operations.
+- Independent morning and evening departure dispatching configured through weekly timetable templates.
+
+### 6.3 System Attribution & Scheduled-Job Boundaries
+- Scheduled timetable generation via `admin_generate_journeys_from_schedules` honestly records `created_by = NULL` and `user_id = NULL` with `actor_type = 'scheduled_system_job'`.
+- Interactive administrator generation strictly derives actor identity from `auth.uid()`, preventing browser-supplied impersonation.
+- Anti-spoofing controls ensure that authenticated sessions cannot forge automated system job audit records.

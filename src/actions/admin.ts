@@ -674,18 +674,45 @@ export async function updateSystemSettingAction(
   try {
     const { supabase, user } = await verifyAdminCaller();
 
+    // Client/action-level validation for critical operational parameters
+    let validatedValue = value;
+    if (key === "booking_cutoff_minutes") {
+      const num = Number(value);
+      if (isNaN(num) || !Number.isInteger(num) || num < 0 || num > 120) {
+        return {
+          success: false,
+          error: "Booking cutoff must be an integer between 0 and 120 minutes.",
+        };
+      }
+      validatedValue = num;
+    } else if (key === "booking_window_hours_ahead") {
+      const num = Number(value);
+      if (isNaN(num) || !Number.isInteger(num) || num < 1 || num > 168) {
+        return {
+          success: false,
+          error: "Booking window must be an integer between 1 and 168 hours.",
+        };
+      }
+      validatedValue = num;
+    }
+
     const { data, error } = await supabase.rpc("admin_update_system_setting", {
       p_admin_id: user.id,
       p_key: key,
-      p_value: value,
+      p_value: validatedValue,
       p_description: description || null,
     });
 
     if (error) return { success: false, error: error.message };
 
+    const result = data as unknown as { success: boolean; error?: string; message?: string } | null;
+    if (result && !result.success) {
+      return { success: false, error: result.error || "Policy update rejected." };
+    }
+
     revalidatePath("/admin/settings");
     revalidatePath("/admin");
-    return { success: true, message: `Policy setting ${key} updated successfully.` };
+    return { success: true, message: result?.message || `Policy setting ${key} updated successfully.` };
   } catch (err: unknown) {
     const message = err instanceof Error ? err.message : "Failed to update setting.";
     return { success: false, error: message };

@@ -117,6 +117,24 @@ VALUES
     'mixed',
     'g1000000-0000-0000-0000-000000000003',
     TRUE
+  ),
+  (
+    'r1000000-0000-0000-0000-000000000005',
+    'Boys'' Morning Direct (Main Boys'' Hostel to Main Campus)',
+    'BOYS_AM_DIRECT',
+    'Pattern 2: Morning express 08:30 directly from Main Boys'' Hostel to Main Campus (no Wuye stop)',
+    'male',
+    'g1000000-0000-0000-0000-000000000002',
+    TRUE
+  ),
+  (
+    'r1000000-0000-0000-0000-000000000006',
+    'Boys'' Evening Direct (Main Campus to Main Boys'' Hostel)',
+    'BOYS_PM_DIRECT',
+    'Pattern 3: Evening express 16:00 directly from Main Campus to Main Boys'' Hostel (no Wuye stop)',
+    'male',
+    'g1000000-0000-0000-0000-000000000002',
+    TRUE
   )
 ON CONFLICT (code) DO NOTHING;
 
@@ -150,6 +168,20 @@ INSERT INTO public.route_stops (route_id, stop_id, stop_order, estimated_minutes
 VALUES
   ('r1000000-0000-0000-0000-000000000004', 's1000000-0000-0000-0000-000000000004', 1, 0),
   ('r1000000-0000-0000-0000-000000000004', 's1000000-0000-0000-0000-000000000005', 2, 25)
+ON CONFLICT (route_id, stop_order) DO NOTHING;
+
+-- 5. Boys' Morning Direct (Pattern 2): Main Boys' Hostel -> Main Campus Central Park (bypasses Wuye)
+INSERT INTO public.route_stops (route_id, stop_id, stop_order, estimated_minutes_from_start)
+VALUES
+  ('r1000000-0000-0000-0000-000000000005', 's1000000-0000-0000-0000-000000000002', 1, 0),
+  ('r1000000-0000-0000-0000-000000000005', 's1000000-0000-0000-0000-000000000004', 2, 25)
+ON CONFLICT (route_id, stop_order) DO NOTHING;
+
+-- 6. Boys' Evening Direct (Pattern 3): Main Campus Central Park -> Main Boys' Hostel (bypasses Wuye)
+INSERT INTO public.route_stops (route_id, stop_id, stop_order, estimated_minutes_from_start)
+VALUES
+  ('r1000000-0000-0000-0000-000000000006', 's1000000-0000-0000-0000-000000000004', 1, 0),
+  ('r1000000-0000-0000-0000-000000000006', 's1000000-0000-0000-0000-000000000002', 2, 25)
 ON CONFLICT (route_id, stop_order) DO NOTHING;
 
 -- ============================================================
