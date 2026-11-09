@@ -173,3 +173,4 @@ export function StudentNotificationsView({ notifications }: StudentNotifications
     </div>
   );
 }
+

@@ -986,6 +986,15 @@ export type Database = {
         };
         Returns: Json;
       };
+      close_and_depart_journey: {
+        Args: {
+          p_journey_id: string;
+          p_officer_id: string;
+          p_mark_unboarded_as_noshow?: boolean;
+          p_closure_notes?: string | null;
+        };
+        Returns: Json;
+      };
     };
     Enums: {
       user_role: UserRole;

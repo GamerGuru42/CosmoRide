@@ -217,3 +217,4 @@ export function BoardingPassModal({ pass, onClose }: BoardingPassModalProps) {
     </div>
   );
 }
+

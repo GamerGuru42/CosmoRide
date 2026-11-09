@@ -60,3 +60,4 @@ export async function markAllNotificationsAsRead() {
     return { success: false, error: message };
   }
 }
+

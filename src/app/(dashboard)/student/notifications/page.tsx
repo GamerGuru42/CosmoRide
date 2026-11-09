@@ -38,3 +38,4 @@ export default async function StudentNotificationsPage() {
 
   return <StudentNotificationsView notifications={notifications} />;
 }
+

@@ -483,3 +483,4 @@ export function StudentTripsView({
     </div>
   );
 }
+

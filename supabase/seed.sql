@@ -171,3 +171,4 @@ VALUES
   -- Inter-Campus Shuttle
   ('v1000000-0000-0000-0000-000000000005', 'CU-EB-05', 'Electric Bus 05 (Inter-Campus)', 30, 'electric_bus', TRUE)
 ON CONFLICT (registration_number) DO NOTHING;
+

@@ -188,3 +188,4 @@ export function StudentNav({ user, children }: StudentNavProps) {
     </div>
   );
 }
+

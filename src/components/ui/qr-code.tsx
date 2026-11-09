@@ -59,3 +59,4 @@ export function QrCode({ value, size = 180, className = "" }: QrCodeProps) {
     />
   );
 }
+

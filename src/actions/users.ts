@@ -39,3 +39,4 @@ export async function updateStudentContactPhone(phone: string) {
     return { success: false, error: message };
   }
 }
+

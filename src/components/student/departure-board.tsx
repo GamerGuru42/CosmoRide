@@ -497,3 +497,4 @@ export function DepartureBoard({ journeys, currentUserId, onBookingSuccess }: De
     </div>
   );
 }
+
