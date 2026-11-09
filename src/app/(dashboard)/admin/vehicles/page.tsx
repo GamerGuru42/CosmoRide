@@ -66,7 +66,7 @@ export default async function AdminVehiclesPage() {
     <div>
       <PageHeader
         title="Fleet & Vehicle Inventory"
-        description="Manage Cosmopolitan University bus assets, certified seating capacities, and maintenance schedules."
+        description="Manage Cosmopolitan University bus assets, approved safe seating capacities, and maintenance schedules."
       />
 
       <VehiclesManagement initialVehicles={vehicles} />

@@ -50,6 +50,7 @@ export default async function AdminOperationsPage({
     .select(`
       id,
       scheduled_departure,
+      latest_permitted_departure,
       actual_departure,
       actual_arrival,
       status,
@@ -173,18 +174,26 @@ export default async function AdminOperationsPage({
       driverMode = driver.has_app_access ? "app" : "assisted";
     }
 
+    const effectiveLatestDeparture = j.latest_permitted_departure || j.scheduled_departure;
+    const isOverdue =
+      (j.status === "scheduled" || j.status === "boarding") &&
+      !j.actual_departure &&
+      new Date() > new Date(effectiveLatestDeparture);
+
     return {
       id: j.id,
       scheduledDeparture: j.scheduled_departure,
+      latestPermittedDeparture: j.latest_permitted_departure || null,
       actualDeparture: j.actual_departure,
       actualArrival: j.actual_arrival,
       status: j.status as LiveJourneyOperation["status"],
+      isOverdue,
       routeCode: route?.code || "RT",
       routeName: route?.name || "Route",
       transportGroupName: tgName || "General Corridor",
       vehiclePlate: vehicle?.registration_number || null,
       vehicleName: vehicle?.name || null,
-      safeCapacity: vehicle?.safe_capacity || j.proposed_allocation || 30,
+      safeCapacity: vehicle?.safe_capacity ?? j.proposed_allocation ?? 0,
       driverName: driver?.full_name || null,
       driverMode,
       bookedCount: confirmedList.length,

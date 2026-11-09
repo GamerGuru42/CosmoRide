@@ -180,7 +180,7 @@ export default async function AssistedDriverOperationsPage() {
       driverReference: driverRef,
       driverPhone,
       driverHasAppAccess: driverHasApp,
-      safeCapacity: vehicle?.safe_capacity || 30,
+      safeCapacity: vehicle?.safe_capacity ?? j.proposed_allocation ?? 0,
       proposedAllocation: j.proposed_allocation,
       readinessStatus: (j.readiness_status as AssistedJourneyData["readinessStatus"]) || "pending",
       delayMinutes: j.delay_minutes || 0,

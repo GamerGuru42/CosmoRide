@@ -15,6 +15,7 @@ export interface ScheduleItem {
   routeName: string;
   dayOfWeek: number;
   departureTime: string;
+  latestDepartureTime?: string | null;
   direction: "outbound" | "inbound";
   proposedAllocation: number;
   isActive: boolean;
@@ -61,6 +62,7 @@ export function SchedulesManagement({
   const [routeId, setRouteId] = useState(availableRoutes[0]?.id || "");
   const [dayOfWeek, setDayOfWeek] = useState(1); // Monday
   const [departureTime, setDepartureTime] = useState("07:30");
+  const [latestDepartureTime, setLatestDepartureTime] = useState("");
   const [direction, setDirection] = useState<"outbound" | "inbound">("outbound");
   const [allocation, setAllocation] = useState(30);
   const [notes, setNotes] = useState("");
@@ -81,6 +83,7 @@ export function SchedulesManagement({
     setRouteId(availableRoutes[0]?.id || "");
     setDayOfWeek(1);
     setDepartureTime("07:30");
+    setLatestDepartureTime("");
     setDirection("outbound");
     setAllocation(30);
     setNotes("");
@@ -105,12 +108,17 @@ export function SchedulesManagement({
 
     // Format departure time as HH:MM:00
     const formattedTime = departureTime.length === 5 ? `${departureTime}:00` : departureTime;
+    const formattedLatestTime =
+      latestDepartureTime.trim().length === 5
+        ? `${latestDepartureTime.trim()}:00`
+        : latestDepartureTime.trim() || undefined;
 
     startTransition(async () => {
       const res = await createScheduleTemplateAction({
         routeId,
         dayOfWeek: Number(dayOfWeek),
         departureTime: formattedTime,
+        latestDepartureTime: formattedLatestTime,
         direction,
         proposedAllocation: Number(allocation),
         notes: notes || undefined,
@@ -251,6 +259,11 @@ export function SchedulesManagement({
                     </td>
                     <td className="px-4 py-3 whitespace-nowrap font-mono font-bold text-[#102D4A]">
                       {formatTime(s.departureTime)}
+                      {s.latestDepartureTime && s.latestDepartureTime !== s.departureTime && (
+                        <span className="block text-[10px] font-sans font-normal text-slate-500">
+                          (Window: {formatTime(s.departureTime)} – {formatTime(s.latestDepartureTime)})
+                        </span>
+                      )}
                     </td>
                     <td className="px-4 py-3">
                       <span className="font-mono font-bold text-[#102D4A]">{s.routeCode}</span>
@@ -448,9 +461,10 @@ export function SchedulesManagement({
                   </select>
                 </div>
 
+              <div className="grid grid-cols-2 gap-3">
                 <div>
                   <label className="block font-semibold text-[#102D4A] mb-1">
-                    Departure Time *
+                    Planned Departure *
                   </label>
                   <input
                     type="time"
@@ -460,6 +474,20 @@ export function SchedulesManagement({
                     className="w-full rounded-lg border border-slate-300 p-2 focus:border-[#102D4A] focus:outline-none"
                   />
                 </div>
+
+                <div>
+                  <label className="block font-semibold text-[#102D4A] mb-1">
+                    Latest Permitted (Optional)
+                  </label>
+                  <input
+                    type="time"
+                    value={latestDepartureTime}
+                    placeholder="e.g. 17:00"
+                    onChange={(e) => setLatestDepartureTime(e.target.value)}
+                    className="w-full rounded-lg border border-slate-300 p-2 focus:border-[#102D4A] focus:outline-none"
+                  />
+                </div>
+              </div>
               </div>
 
               <div className="grid grid-cols-2 gap-3">

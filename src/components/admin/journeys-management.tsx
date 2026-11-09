@@ -11,6 +11,7 @@ export interface JourneyListItem {
   id: string;
   journeyDate: string;
   scheduledDeparture: string;
+  latestPermittedDeparture?: string | null;
   actualDeparture: string | null;
   actualArrival: string | null;
   status: "scheduled" | "boarding" | "in_transit" | "completed" | "cancelled";

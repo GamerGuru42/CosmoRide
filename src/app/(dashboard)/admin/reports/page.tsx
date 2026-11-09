@@ -84,7 +84,7 @@ export default async function AdminReportsPage() {
       transportGroupName: tgName || "General Fleet",
       vehiclePlate: vehicle?.registration_number || "Unassigned",
       driverName: driver?.full_name || "Unassigned",
-      safeCapacity: vehicle?.safe_capacity || j.proposed_allocation || 30,
+      safeCapacity: vehicle?.safe_capacity ?? j.proposed_allocation ?? 0,
       bookedCount: confirmed,
       boardedCount: boarded,
       status: j.status,

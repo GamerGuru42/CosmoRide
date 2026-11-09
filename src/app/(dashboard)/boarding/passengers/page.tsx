@@ -179,7 +179,7 @@ export default async function BoardingPassengersPage({ searchParams }: PageProps
       vehicleRegistration: vehicle?.registration_number || "Unassigned",
       driverName: driver?.full_name || "Assigned Driver",
       proposedAllocation: j.proposed_allocation,
-      safeCapacity: vehicle?.safe_capacity || 30,
+      safeCapacity: vehicle?.safe_capacity ?? j.proposed_allocation ?? 0,
       passengers,
       waitlist,
     };

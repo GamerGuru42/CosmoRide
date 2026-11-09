@@ -160,7 +160,7 @@ export default async function DriverDashboardPage() {
       vehicleRegistration: vehicle?.registration_number || "UNASSIGNED",
       vehicleName: vehicle?.name || null,
       vehicleId: vehicle?.id || "",
-      safeCapacity: vehicle?.safe_capacity || 30,
+      safeCapacity: vehicle?.safe_capacity ?? j.proposed_allocation ?? 0,
       proposedAllocation: j.proposed_allocation,
       readinessStatus: (j.readiness_status as DriverJourneyData["readinessStatus"]) || "pending",
       delayMinutes: j.delay_minutes || 0,

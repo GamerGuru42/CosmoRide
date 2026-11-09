@@ -185,9 +185,12 @@ VALUES
 ON CONFLICT (route_id, stop_order) DO NOTHING;
 
 -- ============================================================
--- 6. APPROVED FLEET VEHICLES
--- Operating Rule: 3 buses operating simultaneously for Girls' operations,
--- each with safe passenger capacity (approved 30 seats).
+-- 6. FLEET VEHICLES (DEVELOPMENT & STAGING REFERENCE FIXTURES)
+-- Institutional Model: 3 buses operating simultaneously for Girls' operations,
+-- each with configured safe seating capacity ceiling (proposed 30 seats).
+-- IMPORTANT: These are development/staging fixtures, not verified production fleet assets.
+-- In production, vehicles must be registered with genuine registration documents
+-- and verified physical capacity audits by transport administration.
 -- ============================================================
 
 INSERT INTO public.vehicles (id, registration_number, name, safe_capacity, vehicle_type, is_active)
@@ -205,8 +208,10 @@ VALUES
 ON CONFLICT (registration_number) DO NOTHING;
 
 -- ============================================================
--- 7. INSTITUTIONAL DRIVERS (MODE A & MODE B)
--- Demonstrating both direct smartphone access and assisted operations
+-- 7. INSTITUTIONAL DRIVERS (MODE A & MODE B - STAGING REFERENCE FIXTURES)
+-- Demonstrating both direct smartphone access and assisted operations.
+-- IMPORTANT: These driver records are development/staging fixtures, not verified production personnel.
+-- Real operational drivers must be onboarded through university HR directory onboarding.
 -- ============================================================
 
 INSERT INTO public.drivers (id, full_name, phone, driver_reference, assigned_vehicle_id, status, has_app_access, notes)
@@ -223,5 +228,50 @@ VALUES
   -- Inter-Campus Shuttle Driver
   ('d1000000-0000-0000-0000-000000000006', 'Mr. Babatunde Adeleke', '+234 807 555 0106', 'DRV-CU-06', 'v1000000-0000-0000-0000-000000000005', 'active', TRUE, 'Direct smartphone app user')
 ON CONFLICT (driver_reference) DO NOTHING;
+
+-- ============================================================
+-- 8. RECURRING WEEKDAY TIMETABLE TEMPLATES (MONDAY–FRIDAY)
+-- Confirmed 4 Boys' Journey Patterns across weekdays (day_of_week 1 to 5):
+-- Pattern 1: 07:30 AM (Main Boys -> Wuye Boys -> Main Campus)
+-- Pattern 2: 08:30 AM Direct (Main Boys -> Main Campus, express)
+-- Pattern 3: 16:00 PM Direct (Main Campus -> Main Boys, express)
+-- Pattern 4: 16:50 PM planned / 17:00 PM latest (Main Campus -> Wuye Boys -> Main Boys, single trip)
+-- Note: Weekends (Sunday 0, Saturday 6) are strictly excluded.
+-- ============================================================
+
+INSERT INTO public.schedules (
+  id, route_id, day_of_week, departure_time, latest_departure_time, direction, proposed_allocation, is_active, notes
+)
+VALUES
+  -- Monday (day_of_week = 1)
+  ('sc000000-0000-0001-0000-000000000001', 'r1000000-0000-0000-0000-000000000002', 1, '07:30:00', NULL, 'inbound', 30, TRUE, 'Pattern 1: Main Boys -> Wuye Boys -> Main Campus'),
+  ('sc000000-0000-0002-0000-000000000001', 'r1000000-0000-0000-0000-000000000005', 1, '08:30:00', NULL, 'inbound', 30, TRUE, 'Pattern 2: Main Boys -> Main Campus Express (no Wuye stop)'),
+  ('sc000000-0000-0003-0000-000000000001', 'r1000000-0000-0000-0000-000000000006', 1, '16:00:00', NULL, 'outbound', 30, TRUE, 'Pattern 3: Main Campus -> Main Boys Express (no Wuye stop)'),
+  ('sc000000-0000-0004-0000-000000000001', 'r1000000-0000-0000-0000-000000000003', 1, '16:50:00', '17:00:00', 'outbound', 30, TRUE, 'Pattern 4: Main Campus -> Wuye Boys -> Main Boys (16:50-17:00 departure window)'),
+
+  -- Tuesday (day_of_week = 2)
+  ('sc000000-0000-0001-0000-000000000002', 'r1000000-0000-0000-0000-000000000002', 2, '07:30:00', NULL, 'inbound', 30, TRUE, 'Pattern 1: Main Boys -> Wuye Boys -> Main Campus'),
+  ('sc000000-0000-0002-0000-000000000002', 'r1000000-0000-0000-0000-000000000005', 2, '08:30:00', NULL, 'inbound', 30, TRUE, 'Pattern 2: Main Boys -> Main Campus Express (no Wuye stop)'),
+  ('sc000000-0000-0003-0000-000000000002', 'r1000000-0000-0000-0000-000000000006', 2, '16:00:00', NULL, 'outbound', 30, TRUE, 'Pattern 3: Main Campus -> Main Boys Express (no Wuye stop)'),
+  ('sc000000-0000-0004-0000-000000000002', 'r1000000-0000-0000-0000-000000000003', 2, '16:50:00', '17:00:00', 'outbound', 30, TRUE, 'Pattern 4: Main Campus -> Wuye Boys -> Main Boys (16:50-17:00 departure window)'),
+
+  -- Wednesday (day_of_week = 3)
+  ('sc000000-0000-0001-0000-000000000003', 'r1000000-0000-0000-0000-000000000002', 3, '07:30:00', NULL, 'inbound', 30, TRUE, 'Pattern 1: Main Boys -> Wuye Boys -> Main Campus'),
+  ('sc000000-0000-0002-0000-000000000003', 'r1000000-0000-0000-0000-000000000005', 3, '08:30:00', NULL, 'inbound', 30, TRUE, 'Pattern 2: Main Boys -> Main Campus Express (no Wuye stop)'),
+  ('sc000000-0000-0003-0000-000000000003', 'r1000000-0000-0000-0000-000000000006', 3, '16:00:00', NULL, 'outbound', 30, TRUE, 'Pattern 3: Main Campus -> Main Boys Express (no Wuye stop)'),
+  ('sc000000-0000-0004-0000-000000000003', 'r1000000-0000-0000-0000-000000000003', 3, '16:50:00', '17:00:00', 'outbound', 30, TRUE, 'Pattern 4: Main Campus -> Wuye Boys -> Main Boys (16:50-17:00 departure window)'),
+
+  -- Thursday (day_of_week = 4)
+  ('sc000000-0000-0001-0000-000000000004', 'r1000000-0000-0000-0000-000000000002', 4, '07:30:00', NULL, 'inbound', 30, TRUE, 'Pattern 1: Main Boys -> Wuye Boys -> Main Campus'),
+  ('sc000000-0000-0002-0000-000000000004', 'r1000000-0000-0000-0000-000000000005', 4, '08:30:00', NULL, 'inbound', 30, TRUE, 'Pattern 2: Main Boys -> Main Campus Express (no Wuye stop)'),
+  ('sc000000-0000-0003-0000-000000000004', 'r1000000-0000-0000-0000-000000000006', 4, '16:00:00', NULL, 'outbound', 30, TRUE, 'Pattern 3: Main Campus -> Main Boys Express (no Wuye stop)'),
+  ('sc000000-0000-0004-0000-000000000004', 'r1000000-0000-0000-0000-000000000003', 4, '16:50:00', '17:00:00', 'outbound', 30, TRUE, 'Pattern 4: Main Campus -> Wuye Boys -> Main Boys (16:50-17:00 departure window)'),
+
+  -- Friday (day_of_week = 5)
+  ('sc000000-0000-0001-0000-000000000005', 'r1000000-0000-0000-0000-000000000002', 5, '07:30:00', NULL, 'inbound', 30, TRUE, 'Pattern 1: Main Boys -> Wuye Boys -> Main Campus'),
+  ('sc000000-0000-0002-0000-000000000005', 'r1000000-0000-0000-0000-000000000005', 5, '08:30:00', NULL, 'inbound', 30, TRUE, 'Pattern 2: Main Boys -> Main Campus Express (no Wuye stop)'),
+  ('sc000000-0000-0003-0000-000000000005', 'r1000000-0000-0000-0000-000000000006', 5, '16:00:00', NULL, 'outbound', 30, TRUE, 'Pattern 3: Main Campus -> Main Boys Express (no Wuye stop)'),
+  ('sc000000-0000-0004-0000-000000000005', 'r1000000-0000-0000-0000-000000000003', 5, '16:50:00', '17:00:00', 'outbound', 30, TRUE, 'Pattern 4: Main Campus -> Wuye Boys -> Main Boys (16:50-17:00 departure window)')
+ON CONFLICT (id) DO NOTHING;
 
 

@@ -33,9 +33,11 @@ export interface LivePassenger {
 export interface LiveJourneyOperation {
   id: string;
   scheduledDeparture: string;
+  latestPermittedDeparture?: string | null;
   actualDeparture: string | null;
   actualArrival: string | null;
   status: "scheduled" | "boarding" | "in_transit" | "completed" | "cancelled";
+  isOverdue?: boolean;
   routeCode: string;
   routeName: string;
   transportGroupName: string;
@@ -139,6 +141,11 @@ export function LiveOperationsView({
                         <span className="font-mono font-bold text-sm text-[#102D4A]">
                           {formatTime(j.scheduledDeparture)}
                         </span>
+                        {j.latestPermittedDeparture && j.latestPermittedDeparture !== j.scheduledDeparture && (
+                          <span className="block font-sans text-[10px] text-slate-500">
+                            Window: {formatTime(j.scheduledDeparture)} – {formatTime(j.latestPermittedDeparture)}
+                          </span>
+                        )}
                         <div className="font-semibold text-xs text-slate-900 mt-0.5">
                           {j.routeCode}
                         </div>
@@ -158,6 +165,13 @@ export function LiveOperationsView({
                         {j.boardedCount}/{j.bookedCount} boarded
                       </span>
                     </div>
+
+                    {j.isOverdue && (
+                      <div className="mt-2 rounded bg-rose-50 border border-rose-200 px-2 py-1 text-[10px] font-semibold text-[#D9534F] flex items-center gap-1.5">
+                        <span className="h-1.5 w-1.5 rounded-full bg-[#D9534F] animate-pulse" />
+                        <span>Overdue (Past {formatTime(j.latestPermittedDeparture || j.scheduledDeparture)})</span>
+                      </div>
+                    )}
 
                     {j.isDelayed && (
                       <div className="mt-2 rounded bg-amber-50 px-2 py-1 text-[10px] font-semibold text-amber-800">
@@ -191,6 +205,17 @@ export function LiveOperationsView({
                       <span className="font-mono font-bold text-[#102D4A]">
                         {formatTime(selectedJourney.scheduledDeparture)}
                       </span>
+                      {selectedJourney.latestPermittedDeparture &&
+                        selectedJourney.latestPermittedDeparture !== selectedJourney.scheduledDeparture && (
+                          <span className="text-slate-500">
+                            {" "}(Window: {formatTime(selectedJourney.scheduledDeparture)} – {formatTime(selectedJourney.latestPermittedDeparture)})
+                          </span>
+                        )}
+                      {selectedJourney.actualDeparture && (
+                        <span className="text-emerald-700 font-semibold">
+                          {" "}• Departed: {formatTime(selectedJourney.actualDeparture)}
+                        </span>
+                      )}
                     </p>
                   </div>
 
@@ -203,6 +228,18 @@ export function LiveOperationsView({
                     </button>
                   </div>
                 </div>
+
+                {selectedJourney.isOverdue && (
+                  <div className="rounded-lg bg-rose-50 border border-rose-200 p-3 text-xs text-[#D9534F] flex items-center justify-between">
+                    <div className="flex items-center gap-2">
+                      <span className="text-sm">⚠️</span>
+                      <div>
+                        <span className="font-bold">Overdue Departure Alert:</span> This bus has exceeded its latest permitted departure threshold ({formatTime(selectedJourney.latestPermittedDeparture || selectedJourney.scheduledDeparture)}) without recorded departure.
+                      </div>
+                    </div>
+                    <span className="rounded bg-rose-100 px-2 py-0.5 text-[10px] font-bold uppercase text-rose-800 whitespace-nowrap">Attention Required</span>
+                  </div>
+                )}
 
                 {/* Hardware & Driver Specs */}
                 <div className="grid gap-3 sm:grid-cols-3">

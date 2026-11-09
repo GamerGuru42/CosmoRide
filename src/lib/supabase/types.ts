@@ -440,6 +440,7 @@ export type Database = {
           route_id: string;
           day_of_week: number;
           departure_time: string;
+          latest_departure_time: string | null;
           direction: RouteDirection;
           proposed_allocation: number;
           is_active: boolean;
@@ -451,6 +452,7 @@ export type Database = {
           route_id: string;
           day_of_week: number;
           departure_time: string;
+          latest_departure_time?: string | null;
           direction?: RouteDirection;
           proposed_allocation: number;
           is_active?: boolean;
@@ -462,6 +464,7 @@ export type Database = {
           route_id?: string;
           day_of_week?: number;
           departure_time?: string;
+          latest_departure_time?: string | null;
           direction?: RouteDirection;
           proposed_allocation?: number;
           is_active?: boolean;
@@ -488,6 +491,7 @@ export type Database = {
           driver_record_id: string | null;
           journey_date: string;
           scheduled_departure: string;
+          latest_permitted_departure: string | null;
           actual_departure: string | null;
           actual_arrival: string | null;
           estimated_arrival: string | null;
@@ -512,6 +516,7 @@ export type Database = {
           driver_record_id?: string | null;
           journey_date: string;
           scheduled_departure: string;
+          latest_permitted_departure?: string | null;
           actual_departure?: string | null;
           actual_arrival?: string | null;
           estimated_arrival?: string | null;
@@ -536,6 +541,7 @@ export type Database = {
           driver_record_id?: string | null;
           journey_date?: string;
           scheduled_departure?: string;
+          latest_permitted_departure?: string | null;
           actual_departure?: string | null;
           actual_arrival?: string | null;
           estimated_arrival?: string | null;

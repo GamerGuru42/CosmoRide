@@ -273,8 +273,8 @@ export default async function BoardingOfficerDashboardPage() {
 
               const journeyBoarded = bookings.filter((b) => b.status === "checked_in").length;
               const journeyConfirmed = bookings.filter((b) => b.status === "confirmed").length;
-              const safeCap = vehicle?.safe_capacity || 30;
-              const capCeiling = Math.min(journey.proposed_allocation, safeCap);
+              const safeCap = vehicle?.safe_capacity ?? journey.proposed_allocation ?? 0;
+              const capCeiling = safeCap > 0 ? Math.min(journey.proposed_allocation, safeCap) : journey.proposed_allocation;
               const progressPct = Math.min(100, Math.round((journeyBoarded / capCeiling) * 100));
 
               return (

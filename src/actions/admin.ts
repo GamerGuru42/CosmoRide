@@ -440,6 +440,7 @@ export async function createScheduleTemplateAction({
   routeId,
   dayOfWeek,
   departureTime,
+  latestDepartureTime,
   direction = "outbound",
   proposedAllocation = 30,
   notes,
@@ -447,6 +448,7 @@ export async function createScheduleTemplateAction({
   routeId: string;
   dayOfWeek: number; // 0=Sun, 1=Mon, ..., 6=Sat
   departureTime: string; // HH:MI:SS
+  latestDepartureTime?: string | null; // HH:MI:SS
   direction?: "outbound" | "inbound";
   proposedAllocation?: number;
   notes?: string;
@@ -454,12 +456,20 @@ export async function createScheduleTemplateAction({
   try {
     const { supabase, user } = await verifyAdminCaller();
 
+    if (latestDepartureTime && latestDepartureTime < departureTime) {
+      return {
+        success: false,
+        error: "Latest permitted departure time cannot be earlier than planned departure time.",
+      };
+    }
+
     const { data: sched, error } = await supabase
       .from("schedules")
       .insert({
         route_id: routeId,
         day_of_week: dayOfWeek,
         departure_time: departureTime,
+        latest_departure_time: latestDepartureTime || null,
         direction,
         proposed_allocation: proposedAllocation,
         notes: notes?.trim() || null,
@@ -475,7 +485,12 @@ export async function createScheduleTemplateAction({
       action: "SCHEDULE_TEMPLATE_CREATED",
       entity_type: "schedule",
       entity_id: sched.id,
-      details: { route_id: routeId, day_of_week: dayOfWeek, departure_time: departureTime },
+      details: {
+        route_id: routeId,
+        day_of_week: dayOfWeek,
+        departure_time: departureTime,
+        latest_departure_time: latestDepartureTime || null,
+      },
     });
 
     revalidatePath("/admin/schedules");

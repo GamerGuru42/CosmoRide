@@ -109,7 +109,7 @@ export default async function AdminDashboardPage() {
       transportGroupName: tgName || "General Fleet",
       vehicleRegistration: vehicle?.registration_number || null,
       vehicleName: vehicle?.name || null,
-      safeCapacity: vehicle?.safe_capacity || j.proposed_allocation || 30,
+      safeCapacity: vehicle?.safe_capacity ?? j.proposed_allocation ?? 0,
       driverName: driver?.full_name || null,
       driverMode,
       bookedCount: confirmedBookings,

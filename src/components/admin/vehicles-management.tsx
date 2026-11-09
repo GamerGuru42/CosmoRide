@@ -188,7 +188,7 @@ export function VehiclesManagement({ initialVehicles }: VehiclesManagementProps)
             Cosmopolitan University Fleet Inventory ({filteredVehicles.length})
           </h3>
           <p className="mt-0.5 text-xs text-[#526B82]">
-            Authorised electric buses and campus shuttles with certified safe seating capacities.
+            Authorised electric buses and campus shuttles with approved safe seating capacities.
           </p>
         </div>
 
@@ -466,7 +466,7 @@ export function VehiclesManagement({ initialVehicles }: VehiclesManagementProps)
 
               <div>
                 <label className="block font-semibold text-[#102D4A] mb-1">
-                  Certified Safe Capacity *
+                  Approved Safe Capacity (Seats) *
                 </label>
                 <input
                   type="number"

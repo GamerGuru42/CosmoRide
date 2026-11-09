@@ -218,7 +218,7 @@ export function ReportsView({
           </p>
           <p className="mt-2 text-3xl font-bold text-[#102D4A]">{avgSeatUtilization}%</p>
           <p className="mt-1 text-xs text-[#526B82]">
-            {totalBooked} booked of {totalCapacity} certified seats
+            {totalBooked} booked of {totalCapacity} approved safe seats
           </p>
         </div>
 
