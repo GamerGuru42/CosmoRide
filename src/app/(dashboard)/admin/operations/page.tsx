@@ -74,6 +74,7 @@ export default async function AdminOperationsPage({
       bookings(
         id,
         status,
+        passenger_category,
         pickup_stop:stops(name),
         profile:profiles(
           full_name,
@@ -164,6 +165,7 @@ export default async function AdminOperationsPage({
         studentName: (prof as { full_name?: string })?.full_name || "Student",
         matricNumber: (prof as { student_id?: string })?.student_id || null,
         status: b.status as LivePassenger["status"],
+        passengerCategory: (b.passenger_category as "seated" | "standing") || "seated",
         boardingStopName: (pStop as { name?: string })?.name || "Campus Stop",
         boardedAt,
       };

@@ -42,6 +42,7 @@ export type IncidentStatus =
   | "investigating"
   | "resolved"
   | "dismissed";
+export type PassengerCategory = "seated" | "standing";
 export type DriverStatus = "active" | "on_leave" | "suspended" | "inactive";
 export type StopEventType = "approaching" | "arrived" | "pickup_completed" | "departed";
 export type ReadinessStatus = "pending" | "passed" | "failed_unsafe";
@@ -332,6 +333,8 @@ export type Database = {
           registration_number: string;
           name: string | null;
           safe_capacity: number;
+          seated_capacity: number;
+          standing_capacity: number;
           vehicle_type: string;
           is_active: boolean;
           status: string;
@@ -345,6 +348,8 @@ export type Database = {
           registration_number: string;
           name?: string | null;
           safe_capacity: number;
+          seated_capacity?: number;
+          standing_capacity?: number;
           vehicle_type?: string;
           is_active?: boolean;
           status?: string;
@@ -358,6 +363,8 @@ export type Database = {
           registration_number?: string;
           name?: string | null;
           safe_capacity?: number;
+          seated_capacity?: number;
+          standing_capacity?: number;
           vehicle_type?: string;
           is_active?: boolean;
           status?: string;
@@ -609,6 +616,7 @@ export type Database = {
           student_id: string;
           boarding_stop_id: string;
           status: BookingStatus;
+          passenger_category: PassengerCategory;
           ticket_token: string | null;
           boarding_pass_issued_at: string | null;
           booked_at: string;
@@ -622,6 +630,7 @@ export type Database = {
           student_id: string;
           boarding_stop_id: string;
           status?: BookingStatus;
+          passenger_category?: PassengerCategory;
           ticket_token?: string | null;
           boarding_pass_issued_at?: string | null;
           booked_at?: string;
@@ -635,6 +644,7 @@ export type Database = {
           student_id?: string;
           boarding_stop_id?: string;
           status?: BookingStatus;
+          passenger_category?: PassengerCategory;
           ticket_token?: string | null;
           boarding_pass_issued_at?: string | null;
           booked_at?: string;
@@ -743,6 +753,7 @@ export type Database = {
           boarding_method: BoardingMethod;
           exception_reason: string | null;
           is_verified: boolean;
+          passenger_category: PassengerCategory | null;
           created_at: string;
         };
         Insert: {
@@ -756,6 +767,7 @@ export type Database = {
           boarding_method?: BoardingMethod;
           exception_reason?: string | null;
           is_verified?: boolean;
+          passenger_category?: PassengerCategory | null;
           created_at?: string;
         };
         Update: {
@@ -769,6 +781,7 @@ export type Database = {
           boarding_method?: BoardingMethod;
           exception_reason?: string | null;
           is_verified?: boolean;
+          passenger_category?: PassengerCategory | null;
           created_at?: string;
         };
         Relationships: [

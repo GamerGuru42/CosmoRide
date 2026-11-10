@@ -26,6 +26,8 @@ export interface JourneyListItem {
   driverReference: string | null;
   driverMode: "app" | "assisted" | "unassigned";
   bookedCount: number;
+  seatedCount?: number;
+  standingCount?: number;
   boardedCount: number;
   isDelayed: boolean;
   delayMinutes: number;
@@ -196,7 +198,7 @@ export function JourneysManagement({
                   <th className="px-4 py-3 font-semibold">Route &amp; Corridor</th>
                   <th className="px-4 py-3 font-semibold">Assigned Bus</th>
                   <th className="px-4 py-3 font-semibold">Driver</th>
-                  <th className="px-4 py-3 font-semibold text-center">Booked / Safe Cap</th>
+                  <th className="px-4 py-3 font-semibold text-center">Passengers / Capacity</th>
                   <th className="px-4 py-3 font-semibold text-center">Boarded</th>
                   <th className="px-4 py-3 font-semibold">Status</th>
                   <th className="px-4 py-3 font-semibold text-right">Actions</th>
@@ -251,16 +253,18 @@ export function JourneysManagement({
                       )}
                     </td>
                     <td className="px-4 py-3 text-center whitespace-nowrap">
-                      <span
-                        className={`font-semibold ${
+                      <div
+                        className={`font-semibold text-xs ${
                           j.bookedCount >= j.safeCapacity
                             ? "text-[#D9534F]"
                             : "text-[#102D4A]"
                         }`}
                       >
-                        {j.bookedCount}
-                      </span>
-                      <span className="text-slate-400"> / {j.safeCapacity}</span>
+                        Total: {j.bookedCount}/{j.safeCapacity || 30}
+                      </div>
+                      <div className="text-[10px] text-slate-500 font-mono">
+                        Seated: {j.seatedCount ?? 0}/20 · Standing: {j.standingCount ?? 0}/10
+                      </div>
                     </td>
                     <td className="px-4 py-3 text-center whitespace-nowrap font-bold text-emerald-700">
                       {j.boardedCount}

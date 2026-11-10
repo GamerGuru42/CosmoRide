@@ -24,6 +24,8 @@ export interface DepartureJourney {
   proposedAllocation: number;
   safeCapacity: number;
   bookedCount: number;
+  seatedCount?: number;
+  standingCount?: number;
   routeId: string;
   routeName: string;
   routeCode: string;
@@ -35,6 +37,7 @@ export interface DepartureJourney {
   vehicleName: string | null;
   stops: DepartureStop[];
   userBookingId?: string | null;
+  userPassengerCategory?: "seated" | "standing" | null;
   userWaitlistPosition?: number | null;
   latestStopUpdate?: {
     eventType: string;
@@ -276,15 +279,37 @@ export function DepartureBoard({ journeys, currentUserId, onBookingSuccess }: De
                         </span>
                       </div>
 
-                      <p className="text-xs font-mono text-[#526B82]">
-                        {isFull ? (
-                          <span className="text-purple-700 font-bold">Safe Limit Reached ({j.safeCapacity} max)</span>
-                        ) : (
-                          <span>
-                            <strong className="text-[#20A477] font-bold">{availableSeats}</strong> seats open / {j.safeCapacity} cap
-                          </span>
-                        )}
-                      </p>
+                      {(() => {
+                        const seatedLimit = 20;
+                        const standingLimit = 10;
+                        const totalLimit = j.safeCapacity || 30;
+                        const seatedOccupied = j.seatedCount ?? Math.min(j.bookedCount, seatedLimit);
+                        const standingOccupied = j.standingCount ?? Math.max(0, j.bookedCount - seatedLimit);
+                        const seatedRemaining = Math.max(0, seatedLimit - seatedOccupied);
+                        const standingRemaining = Math.max(0, standingLimit - standingOccupied);
+                        const totalRemaining = Math.max(0, totalLimit - j.bookedCount);
+
+                        return (
+                          <div className="text-xs font-mono text-[#526B82]">
+                            {isFull ? (
+                              <span className="text-purple-700 font-bold block">Capacity Reached (30/30 max)</span>
+                            ) : (
+                              <div>
+                                <span className="block">
+                                  <strong className="text-[#20A477] font-bold">{totalRemaining}</strong> open / {totalLimit} total
+                                </span>
+                                <span className="text-[10px] text-slate-500 block">
+                                  {seatedRemaining > 0 ? (
+                                    <span>{seatedRemaining} seated ({seatedOccupied}/20) · {standingRemaining} standing ({standingOccupied}/10)</span>
+                                  ) : (
+                                    <span className="text-amber-700 font-medium">Seated full (20/20) · {standingRemaining} standing open ({standingOccupied}/10)</span>
+                                  )}
+                                </span>
+                              </div>
+                            )}
+                          </div>
+                        );
+                      })()}
                     </div>
 
                     {/* Booking Action Button */}
@@ -292,7 +317,7 @@ export function DepartureBoard({ journeys, currentUserId, onBookingSuccess }: De
                       {hasUserBooked ? (
                         <span className="inline-flex items-center gap-1.5 px-3 py-2 rounded-lg bg-[#20A477]/10 text-[#20A477] text-xs font-bold border border-[#20A477]/20">
                           <CheckCircleIcon className="w-4 h-4" />
-                          Reserved
+                          Reserved · {j.userPassengerCategory === "standing" ? "Standing" : "Seated"}
                         </span>
                       ) : hasUserWaitlisted ? (
                         <span className="inline-flex items-center gap-1.5 px-3 py-2 rounded-lg bg-purple-50 text-purple-700 text-xs font-bold border border-purple-200">
@@ -317,7 +342,7 @@ export function DepartureBoard({ journeys, currentUserId, onBookingSuccess }: De
                           onClick={() => handleOpenBooking(j)}
                           className="px-4 py-2 rounded-lg bg-[#102D4A] hover:bg-[#18426C] text-white text-xs font-bold transition-colors shadow-xs"
                         >
-                          Book Seat
+                          {j.bookedCount < 20 ? "Book Seat" : "Book Standing Place"}
                         </button>
                       )}
                     </div>
@@ -380,13 +405,11 @@ export function DepartureBoard({ journeys, currentUserId, onBookingSuccess }: De
                   RESERVATION
                 </span>
                 <h3 className="text-base font-bold text-white font-mono">
-                  {calculateAvailableSeats(
-                    activeBookingJourney.proposedAllocation,
-                    activeBookingJourney.safeCapacity,
-                    activeBookingJourney.bookedCount
-                  ) <= 0
+                  {activeBookingJourney.bookedCount >= (activeBookingJourney.safeCapacity || 30)
                     ? "Join Waiting List"
-                    : "Confirm Bus Seat"}
+                    : activeBookingJourney.bookedCount >= 20
+                    ? "Confirm Standing Place"
+                    : "Confirm Seated Place"}
                 </h3>
               </div>
               <button
@@ -443,9 +466,25 @@ export function DepartureBoard({ journeys, currentUserId, onBookingSuccess }: De
                       </span>
                     </div>
                     <div className="flex justify-between items-center text-[#526B82]">
-                      <span>Effective Capacity</span>
+                      <span>Vehicle Capacity</span>
                       <span className="font-semibold text-[#102D4A]">
-                        Safe Limit: {activeBookingJourney.safeCapacity} seats
+                        30 passengers max (20 seated, 10 standing)
+                      </span>
+                    </div>
+                    <div className="flex justify-between items-center text-[#526B82]">
+                      <span>Automatic Place</span>
+                      <span className={`font-bold ${
+                        activeBookingJourney.bookedCount < 20
+                          ? "text-[#20A477]"
+                          : activeBookingJourney.bookedCount < 30
+                          ? "text-amber-700"
+                          : "text-purple-700"
+                      }`}>
+                        {activeBookingJourney.bookedCount < 20
+                          ? "Seated Passenger Place (FCFS)"
+                          : activeBookingJourney.bookedCount < 30
+                          ? "Standing Passenger Place (FCFS - 20 seats full)"
+                          : "Waiting List Entry"}
                       </span>
                     </div>
                   </div>
@@ -473,15 +512,15 @@ export function DepartureBoard({ journeys, currentUserId, onBookingSuccess }: De
                   </div>
 
                   {/* Capacity Note */}
-                  {calculateAvailableSeats(
-                    activeBookingJourney.proposedAllocation,
-                    activeBookingJourney.safeCapacity,
-                    activeBookingJourney.bookedCount
-                  ) <= 0 && (
+                  {activeBookingJourney.bookedCount >= (activeBookingJourney.safeCapacity || 30) ? (
                     <div className="p-2.5 rounded-lg bg-purple-50 border border-purple-200 text-xs text-purple-700">
-                      <strong>Waitlist Notice:</strong> All seats on this bus are currently confirmed. If you confirm, you will be added to the official waiting list and automatically promoted if someone cancels.
+                      <strong>Waitlist Notice:</strong> All 30 passenger places (20 seated, 10 standing) on this bus are currently confirmed. If you confirm, you will be added to the official waiting list and automatically promoted if a passenger cancels.
                     </div>
-                  )}
+                  ) : activeBookingJourney.bookedCount >= 20 ? (
+                    <div className="p-2.5 rounded-lg bg-amber-50 border border-amber-200 text-xs text-amber-800">
+                      <strong>Standing Place Notice:</strong> All 20 seated places are confirmed. Your reservation will be automatically allocated a <strong>Standing Passenger Place</strong> (10 standing capacity max).
+                    </div>
+                  ) : null}
 
                   {/* Actions */}
                   <div className="pt-2 flex gap-3">
@@ -500,12 +539,10 @@ export function DepartureBoard({ journeys, currentUserId, onBookingSuccess }: De
                     >
                       {isPending
                         ? "Processing..."
-                        : calculateAvailableSeats(
-                            activeBookingJourney.proposedAllocation,
-                            activeBookingJourney.safeCapacity,
-                            activeBookingJourney.bookedCount
-                          ) <= 0
+                        : activeBookingJourney.bookedCount >= (activeBookingJourney.safeCapacity || 30)
                         ? "Join Waitlist"
+                        : activeBookingJourney.bookedCount >= 20
+                        ? "Confirm Standing Place"
                         : "Confirm Seat"}
                     </button>
                   </div>

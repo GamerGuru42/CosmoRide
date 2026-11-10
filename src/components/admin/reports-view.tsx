@@ -214,11 +214,11 @@ export function ReportsView({
       <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
         <div className="rounded-xl border border-slate-200 bg-white p-5 shadow-sm">
           <p className="text-xs font-semibold uppercase tracking-wider text-[#526B82]">
-            Seat Utilization Rate
+            Capacity Utilization Rate
           </p>
           <p className="mt-2 text-3xl font-bold text-[#102D4A]">{avgSeatUtilization}%</p>
           <p className="mt-1 text-xs text-[#526B82]">
-            {totalBooked} booked of {totalCapacity} approved safe seats
+            {totalBooked} booked of {totalCapacity} approved passenger places
           </p>
         </div>
 

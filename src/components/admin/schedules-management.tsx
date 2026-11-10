@@ -276,7 +276,7 @@ export function SchedulesManagement({
                     </td>
                     <td className="px-4 py-3 text-center whitespace-nowrap">
                       <span className="inline-flex items-center rounded-md bg-blue-50 px-2 py-0.5 font-mono font-bold text-blue-900 text-xs">
-                        {s.proposedAllocation} seats
+                        {s.proposedAllocation} cap (20 seated, 10 standing)
                       </span>
                     </td>
                     <td className="px-4 py-3 text-[#526B82]">

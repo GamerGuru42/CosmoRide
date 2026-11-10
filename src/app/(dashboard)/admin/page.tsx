@@ -68,7 +68,7 @@ export default async function AdminDashboardPage() {
         full_name,
         has_app_access
       ),
-      bookings(id, status),
+      bookings(id, status, passenger_category),
       boarding_records(id)
     `)
     .eq("journey_date", todayStr)
@@ -83,9 +83,18 @@ export default async function AdminDashboardPage() {
       ? transportGroup[0]?.name
       : transportGroup?.name;
 
-    const confirmedBookings = (j.bookings ?? []).filter(
-      (b: { id: string; status: string }) =>
-        b.status === "confirmed" || b.status === "boarded"
+    const activeBookings = (j.bookings ?? []).filter(
+      (b: { id: string; status: string; passenger_category?: string }) =>
+        b.status === "confirmed" || b.status === "checked_in" || b.status === "boarded"
+    );
+    const confirmedBookings = activeBookings.length;
+    const seatedCount = activeBookings.filter(
+      (b: { id: string; status: string; passenger_category?: string }) =>
+        b.passenger_category === "seated"
+    ).length;
+    const standingCount = activeBookings.filter(
+      (b: { id: string; status: string; passenger_category?: string }) =>
+        b.passenger_category === "standing"
     ).length;
 
     const boardedCount = (j.boarding_records ?? []).length;
@@ -113,6 +122,8 @@ export default async function AdminDashboardPage() {
       driverName: driver?.full_name || null,
       driverMode,
       bookedCount: confirmedBookings,
+      seatedCount,
+      standingCount,
       boardedCount,
       isDelayed,
       delayMinutes: j.delay_minutes || 0,

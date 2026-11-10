@@ -27,6 +27,8 @@ export interface AdminJourneyOverview {
   driverName: string | null;
   driverMode: "app" | "assisted" | "unassigned";
   bookedCount: number;
+  seatedCount?: number;
+  standingCount?: number;
   boardedCount: number;
   isDelayed: boolean;
   delayMinutes: number;
@@ -335,7 +337,7 @@ export function AdminOverview({
                   <th className="px-4 py-3 font-semibold">Route & Corridor</th>
                   <th className="px-4 py-3 font-semibold">Assigned Vehicle</th>
                   <th className="px-4 py-3 font-semibold">Driver & Mode</th>
-                  <th className="px-4 py-3 font-semibold text-center">Booked / Safe Cap</th>
+                  <th className="px-4 py-3 font-semibold text-center">Passengers / Capacity</th>
                   <th className="px-4 py-3 font-semibold text-center">Boarded</th>
                   <th className="px-4 py-3 font-semibold">Status</th>
                   <th className="px-4 py-3 font-semibold text-right">Actions</th>
@@ -390,8 +392,8 @@ export function AdminOverview({
                       )}
                     </td>
                     <td className="px-4 py-3 text-center whitespace-nowrap">
-                      <span
-                        className={`font-semibold ${
+                      <div
+                        className={`font-semibold text-xs ${
                           j.bookedCount >= j.safeCapacity
                             ? "text-[#D9534F]"
                             : j.bookedCount > 0
@@ -399,9 +401,11 @@ export function AdminOverview({
                             : "text-slate-400"
                         }`}
                       >
-                        {j.bookedCount}
-                      </span>
-                      <span className="text-slate-400"> / {j.safeCapacity}</span>
+                        Total: {j.bookedCount}/{j.safeCapacity || 30}
+                      </div>
+                      <div className="text-[10px] text-slate-500 font-mono">
+                        Seated: {j.seatedCount ?? 0}/20 · Standing: {j.standingCount ?? 0}/10
+                      </div>
                       <div className="w-16 mx-auto bg-slate-100 rounded-full h-1 mt-1 overflow-hidden">
                         <div
                           className={`h-full ${

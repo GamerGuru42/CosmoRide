@@ -42,6 +42,7 @@ export default async function StudentHomePage() {
       id,
       ticket_token,
       status,
+      passenger_category,
       booked_at,
       journey:journeys (
         id,
@@ -78,6 +79,7 @@ export default async function StudentHomePage() {
         id: b.id,
         ticketToken: b.ticket_token,
         status: b.status as "confirmed" | "checked_in",
+        passengerCategory: (b as unknown as { passenger_category?: "seated" | "standing" }).passenger_category || "seated",
         bookedAt: b.booked_at,
         journey: {
           id: j.id,
@@ -165,17 +167,31 @@ export default async function StudentHomePage() {
         safe_capacity: number;
       } | null;
 
-      // Count booked seats
+      // Count booked seats and category distribution
       const { count: bookedCount } = await supabase
         .from("bookings")
         .select("*", { count: "exact", head: true })
         .eq("journey_id", jd.id)
         .in("status", ["confirmed", "checked_in"]);
 
+      const { count: seatedCount } = await supabase
+        .from("bookings")
+        .select("*", { count: "exact", head: true })
+        .eq("journey_id", jd.id)
+        .eq("passenger_category", "seated")
+        .in("status", ["confirmed", "checked_in"]);
+
+      const { count: standingCount } = await supabase
+        .from("bookings")
+        .select("*", { count: "exact", head: true })
+        .eq("journey_id", jd.id)
+        .eq("passenger_category", "standing")
+        .in("status", ["confirmed", "checked_in"]);
+
       // Check if current user has a booking
       const { data: userBooking } = await supabase
         .from("bookings")
-        .select("id")
+        .select("id, passenger_category")
         .eq("journey_id", jd.id)
         .eq("student_id", user.id)
         .in("status", ["confirmed", "checked_in"])
@@ -225,6 +241,8 @@ export default async function StudentHomePage() {
         proposedAllocation: jd.proposed_allocation,
         safeCapacity: vehicleInfo?.safe_capacity ?? 30,
         bookedCount: bookedCount ?? 0,
+        seatedCount: seatedCount ?? 0,
+        standingCount: standingCount ?? 0,
         routeId: routeInfo?.id ?? "",
         routeName: routeInfo?.name ?? "Campus Route",
         routeCode: routeInfo?.code ?? "CR",
@@ -236,6 +254,7 @@ export default async function StudentHomePage() {
         vehicleName: vehicleInfo?.name ?? null,
         stops: stopsList,
         userBookingId: userBooking?.id ?? null,
+        userPassengerCategory: (userBooking as unknown as { passenger_category?: "seated" | "standing" })?.passenger_category ?? null,
         userWaitlistPosition: userWaitlist?.position ?? null,
       });
     }

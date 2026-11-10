@@ -26,6 +26,7 @@ export interface LivePassenger {
   studentName: string;
   matricNumber: string | null;
   status: "confirmed" | "boarded" | "cancelled" | "no_show";
+  passengerCategory?: "seated" | "standing" | null;
   boardingStopName: string;
   boardedAt: string | null;
 }
@@ -130,11 +131,10 @@ export function LiveOperationsView({
                   <div
                     key={j.id}
                     onClick={() => setSelectedJourneyId(j.id)}
-                    className={`cursor-pointer rounded-xl border p-4 transition-all ${
-                      isSelected
+                    className={`cursor-pointer rounded-xl border p-4 transition-all ${isSelected
                         ? "border-[#102D4A] bg-[#102D4A]/5 shadow-sm ring-1 ring-[#102D4A]"
                         : "border-slate-200 bg-white hover:border-slate-300 hover:bg-slate-50"
-                    }`}
+                      }`}
                   >
                     <div className="flex items-start justify-between">
                       <div>
@@ -251,7 +251,7 @@ export function LiveOperationsView({
                       {selectedJourney.vehiclePlate || "Not Assigned"}
                     </p>
                     <p className="text-[11px] text-[#526B82]">
-                      Safe Cap: {selectedJourney.safeCapacity} seats
+                      Safe Cap: {selectedJourney.safeCapacity || 30} passengers (20 seated, 10 standing)
                     </p>
                   </div>
 
@@ -332,9 +332,8 @@ export function LiveOperationsView({
                               </span>
                               <span>•</span>
                               <span
-                                className={`font-semibold ${
-                                  m.isAssisted ? "text-amber-800" : "text-emerald-700"
-                                }`}
+                                className={`font-semibold ${m.isAssisted ? "text-amber-800" : "text-emerald-700"
+                                  }`}
                               >
                                 {m.isAssisted
                                   ? "🤝 Boarding Officer Recorded (Assisted)"
@@ -391,6 +390,7 @@ export function LiveOperationsView({
                     <tr>
                       <th className="px-3 py-2 font-semibold">Student Name</th>
                       <th className="px-3 py-2 font-semibold">Matric No</th>
+                      <th className="px-3 py-2 font-semibold">Allocation</th>
                       <th className="px-3 py-2 font-semibold">Pickup Stop</th>
                       <th className="px-3 py-2 font-semibold">Status</th>
                       <th className="px-3 py-2 font-semibold">Boarded At</th>
@@ -405,16 +405,25 @@ export function LiveOperationsView({
                         <td className="px-3 py-2 font-mono text-slate-600">
                           {p.matricNumber || "N/A"}
                         </td>
+                        <td className="px-3 py-2">
+                          <span
+                            className={`rounded-full px-2 py-0.5 text-[10px] font-bold ${p.passengerCategory === "standing"
+                                ? "bg-amber-100 text-amber-800 border border-amber-200"
+                                : "bg-emerald-100 text-emerald-800 border border-emerald-200"
+                              }`}
+                          >
+                            {p.passengerCategory === "standing" ? "Standing" : "Seated"}
+                          </span>
+                        </td>
                         <td className="px-3 py-2 text-slate-700">{p.boardingStopName}</td>
                         <td className="px-3 py-2">
                           <span
-                            className={`rounded-full px-2 py-0.5 text-[10px] font-semibold ${
-                              p.status === "boarded"
+                            className={`rounded-full px-2 py-0.5 text-[10px] font-semibold ${p.status === "boarded"
                                 ? "bg-emerald-100 text-emerald-800"
                                 : p.status === "confirmed"
-                                ? "bg-blue-100 text-blue-800"
-                                : "bg-slate-100 text-slate-700"
-                            }`}
+                                  ? "bg-blue-100 text-blue-800"
+                                  : "bg-slate-100 text-slate-700"
+                              }`}
                           >
                             {p.status.toUpperCase()}
                           </span>

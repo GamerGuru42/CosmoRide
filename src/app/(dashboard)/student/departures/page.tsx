@@ -68,17 +68,31 @@ export default async function StudentDeparturesPage() {
         safe_capacity: number;
       } | null;
 
-      // Count confirmed and checked-in bookings
+      // Count confirmed and checked-in bookings and category breakdown
       const { count: bookedCount } = await supabase
         .from("bookings")
         .select("*", { count: "exact", head: true })
         .eq("journey_id", jd.id)
         .in("status", ["confirmed", "checked_in"]);
 
+      const { count: seatedCount } = await supabase
+        .from("bookings")
+        .select("*", { count: "exact", head: true })
+        .eq("journey_id", jd.id)
+        .eq("passenger_category", "seated")
+        .in("status", ["confirmed", "checked_in"]);
+
+      const { count: standingCount } = await supabase
+        .from("bookings")
+        .select("*", { count: "exact", head: true })
+        .eq("journey_id", jd.id)
+        .eq("passenger_category", "standing")
+        .in("status", ["confirmed", "checked_in"]);
+
       // Check user's booking status
       const { data: userBooking } = await supabase
         .from("bookings")
-        .select("id")
+        .select("id, passenger_category")
         .eq("journey_id", jd.id)
         .eq("student_id", user.id)
         .in("status", ["confirmed", "checked_in"])
@@ -144,6 +158,8 @@ export default async function StudentDeparturesPage() {
         proposedAllocation: jd.proposed_allocation,
         safeCapacity: vehicleInfo?.safe_capacity ?? 30,
         bookedCount: bookedCount ?? 0,
+        seatedCount: seatedCount ?? 0,
+        standingCount: standingCount ?? 0,
         routeId: routeInfo?.id ?? "",
         routeName: routeInfo?.name ?? "Campus Route",
         routeCode: routeInfo?.code ?? "CR",
@@ -155,6 +171,7 @@ export default async function StudentDeparturesPage() {
         vehicleName: vehicleInfo?.name ?? null,
         stops: stopsList,
         userBookingId: userBooking?.id ?? null,
+        userPassengerCategory: (userBooking as unknown as { passenger_category?: "seated" | "standing" })?.passenger_category ?? null,
         userWaitlistPosition: userWaitlist?.position ?? null,
         latestStopUpdate: latestUpdateRec
           ? {

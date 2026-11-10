@@ -32,6 +32,7 @@ interface StudentHomeViewProps {
     id: string;
     ticketToken: string | null;
     status: "confirmed" | "checked_in" | "no_show" | "cancelled" | "expired";
+    passengerCategory?: "seated" | "standing" | null;
     bookedAt: string;
     journey: {
       id: string;
@@ -103,6 +104,7 @@ export function StudentHomeView({
       scheduledDeparture: j.scheduledDeparture,
       vehicleName: j.vehicle.name,
       vehicleRegistration: j.vehicle.registrationNumber,
+      passengerCategory: nextBooking.passengerCategory || "seated",
       bookedAt: nextBooking.bookedAt,
     });
   }
@@ -200,9 +202,20 @@ export function StudentHomeView({
             <div className="p-6">
               <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 border-b border-white/10 pb-5">
                 <div>
-                  <span className="text-[10px] font-mono uppercase tracking-widest text-[#20A477] font-bold">
-                    ROUTE {nextBooking.journey.route.code}
-                  </span>
+                  <div className="flex items-center gap-2">
+                    <span className="text-[10px] font-mono uppercase tracking-widest text-[#20A477] font-bold">
+                      ROUTE {nextBooking.journey.route.code}
+                    </span>
+                    <span
+                      className={`text-[10px] uppercase font-bold tracking-wider px-2 py-0.5 rounded-full ${
+                        nextBooking.passengerCategory === "standing"
+                          ? "bg-amber-400/20 text-amber-200 border border-amber-400/30"
+                          : "bg-emerald-400/20 text-emerald-200 border border-emerald-400/30"
+                      }`}
+                    >
+                      {nextBooking.passengerCategory === "standing" ? "Standing (10 max)" : "Seated (20 max)"}
+                    </span>
+                  </div>
                   <h3 className="text-xl font-bold tracking-tight text-white mt-0.5">
                     {nextBooking.journey.route.name}
                   </h3>

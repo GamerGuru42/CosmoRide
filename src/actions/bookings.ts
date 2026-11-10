@@ -19,6 +19,7 @@ interface BookRpcResult {
   ticket_token?: string;
   waitlist_position?: number;
   seats_remaining?: number;
+  passenger_category?: "seated" | "standing";
 }
 
 interface CancelRpcResult {

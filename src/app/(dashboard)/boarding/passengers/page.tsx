@@ -85,6 +85,7 @@ export default async function BoardingPassengersPage({ searchParams }: PageProps
       bookings (
         id,
         status,
+        passenger_category,
         checked_in_at,
         ticket_token,
         booked_at,
@@ -146,6 +147,7 @@ export default async function BoardingPassengersPage({ searchParams }: PageProps
         studentEmail: null,
         boardingStopName: pickup?.name || "Designated Stop",
         status: b.status as ManifestPassenger["status"],
+        passengerCategory: (b.passenger_category as "seated" | "standing") || "seated",
         checkedInAt: b.checked_in_at,
         boardingMethod: boardingRec?.boarding_method || null,
         ticketToken: b.ticket_token,

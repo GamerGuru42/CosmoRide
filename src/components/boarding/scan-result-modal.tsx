@@ -8,6 +8,7 @@ export interface ScanResultPayload {
   message: string;
   passengerName?: string;
   studentId?: string;
+  passengerCategory?: "seated" | "standing" | null;
   boardedCount?: number;
   capacity?: number;
   busRegistration?: string;
@@ -108,6 +109,19 @@ export function ScanResultModal({
                 <p className="text-xs font-mono font-medium text-[#526B82] mt-0.5">
                   ID: {result.studentId}
                 </p>
+              )}
+              {result.passengerCategory && (
+                <div className="mt-2.5">
+                  <span
+                    className={`inline-block px-3 py-1 rounded-full text-xs font-bold uppercase tracking-wider ${
+                      result.passengerCategory === "standing"
+                        ? "bg-amber-100 text-amber-900 border border-amber-300"
+                        : "bg-emerald-100 text-emerald-900 border border-emerald-300"
+                    }`}
+                  >
+                    {result.passengerCategory === "standing" ? "Standing Place (10 max)" : "Seated Place (20 max)"}
+                  </span>
+                </div>
               )}
             </div>
           ) : null}

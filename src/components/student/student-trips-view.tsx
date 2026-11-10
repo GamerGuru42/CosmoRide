@@ -18,6 +18,7 @@ export interface TripItem {
   id: string;
   ticketToken: string | null;
   status: "confirmed" | "checked_in" | "no_show" | "cancelled";
+  passengerCategory?: "seated" | "standing" | null;
   bookedAt: string;
   cancelledAt: string | null;
   checkedInAt: string | null;
@@ -102,6 +103,7 @@ export function StudentTripsView({
       scheduledDeparture: j.scheduledDeparture,
       vehicleName: j.vehicle.name,
       vehicleRegistration: j.vehicle.registrationNumber,
+      passengerCategory: trip.passengerCategory || "seated",
       bookedAt: trip.bookedAt,
     });
   }
@@ -241,6 +243,15 @@ export function StudentTripsView({
                           }`}
                         >
                           {isBoarded ? "BOARDED" : "CONFIRMED"}
+                        </span>
+                        <span
+                          className={`text-[10px] uppercase font-bold tracking-wider px-2 py-0.5 rounded-full ${
+                            trip.passengerCategory === "standing"
+                              ? "bg-amber-100 text-amber-800 border border-amber-300"
+                              : "bg-emerald-100 text-emerald-800 border border-emerald-300"
+                          }`}
+                        >
+                          {trip.passengerCategory === "standing" ? "Standing (10 max)" : "Seated (20 max)"}
                         </span>
                       </div>
                       <h3 className="text-base font-bold text-[#102D4A] mt-1">

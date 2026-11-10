@@ -21,6 +21,7 @@ export interface BoardingVerificationResult {
   message: string;
   passengerName?: string;
   studentId?: string;
+  passengerCategory?: "seated" | "standing";
   boardedCount?: number;
   capacity?: number;
   busRegistration?: string;
@@ -87,6 +88,7 @@ export async function verifyAndBoardPassAction(
       message: (result?.message as string) || (result?.error as string) || "Verification complete",
       passengerName: result?.passenger_name as string | undefined,
       studentId: result?.student_id as string | undefined,
+      passengerCategory: result?.passenger_category as "seated" | "standing" | undefined,
       boardedCount: result?.boarded_count as number | undefined,
       capacity: result?.capacity as number | undefined,
       busRegistration: result?.bus_registration as string | undefined,

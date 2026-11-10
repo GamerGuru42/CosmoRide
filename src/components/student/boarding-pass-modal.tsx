@@ -12,6 +12,7 @@ export interface BoardingPassData {
   status: "confirmed" | "checked_in" | "no_show" | "cancelled" | "expired";
   studentName: string;
   studentId: string | null;
+  passengerCategory?: "seated" | "standing" | null;
   routeName: string;
   routeCode: string;
   originName: string;
@@ -93,6 +94,19 @@ export function BoardingPassModal({ pass, onClose }: BoardingPassModalProps) {
             {UNIVERSITY_NAME}
           </p>
 
+          {/* Passenger Allocation Category Badge */}
+          <div className="mt-2.5">
+            <span
+              className={`inline-block px-2.5 py-0.5 rounded text-[10px] font-extrabold uppercase tracking-wider ${
+                pass.passengerCategory === "standing"
+                  ? "bg-amber-400 text-amber-950"
+                  : "bg-emerald-400 text-emerald-950"
+              }`}
+            >
+              {pass.passengerCategory === "standing" ? "Standing Passenger (10 max)" : "Seated Passenger (20 max)"}
+            </span>
+          </div>
+
           {/* Route Display */}
           <div className="mt-6 flex items-center justify-between">
             <div className="flex-1">
@@ -162,6 +176,15 @@ export function BoardingPassModal({ pass, onClose }: BoardingPassModalProps) {
               </p>
               <p className="text-xs font-semibold text-[#102D4A] truncate">
                 {pass.pickupStopName}
+              </p>
+            </div>
+
+            <div>
+              <p className="text-[10px] uppercase text-[#526B82] font-semibold tracking-wider">
+                ALLOCATION
+              </p>
+              <p className="text-xs font-bold text-[#102D4A]">
+                {pass.passengerCategory === "standing" ? "Standing (10 max)" : "Seated (20 max)"}
               </p>
             </div>
 

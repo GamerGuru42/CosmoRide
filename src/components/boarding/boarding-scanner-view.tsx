@@ -106,6 +106,7 @@ export function BoardingScannerView({ journeys }: BoardingScannerViewProps) {
         message: res.message,
         passengerName: res.passengerName,
         studentId: res.studentId,
+        passengerCategory: res.passengerCategory,
         boardedCount: res.boardedCount,
         capacity: res.capacity,
         busRegistration: res.busRegistration || currentJourney.vehicleRegistration,

@@ -33,6 +33,7 @@ export interface ManifestPassenger {
   studentEmail: string | null;
   boardingStopName: string;
   status: "confirmed" | "checked_in" | "no_show" | "cancelled";
+  passengerCategory?: "seated" | "standing" | null;
   checkedInAt: string | null;
   boardingMethod: string | null;
   ticketToken: string | null;
@@ -120,6 +121,10 @@ export function PassengerManifestView({
   const noShowCount = passengers.filter((p) => p.status === "no_show").length;
   const cancelledCount = passengers.filter((p) => p.status === "cancelled").length;
   const waitlistCount = waitlist.length;
+
+  const activePassengers = passengers.filter((p) => p.status === "confirmed" || p.status === "checked_in");
+  const seatedCount = activePassengers.filter((p) => p.passengerCategory === "seated").length;
+  const standingCount = activePassengers.filter((p) => p.passengerCategory === "standing").length;
 
   const capacityCeiling = currentJourney
     ? Math.min(currentJourney.proposedAllocation, currentJourney.safeCapacity)
@@ -234,10 +239,10 @@ export function PassengerManifestView({
           <div className="h-8 w-px bg-slate-200" />
           <div className="text-right">
             <span className="text-[10px] uppercase font-bold text-[#526B82] block">
-              Vehicle Capacity
+              Seated / Standing / Total
             </span>
-            <span className="text-xs font-bold text-[#20A477] font-mono">
-              {boardedCount} / {capacityCeiling} Max
+            <span className="text-xs font-bold text-[#102D4A] font-mono">
+              {seatedCount}/20 S · {standingCount}/10 St · {activePassengers.length}/30 Max
             </span>
           </div>
         </div>
@@ -396,6 +401,7 @@ export function PassengerManifestView({
                 <tr>
                   <th className="py-3 px-4">#</th>
                   <th className="py-3 px-4">Student Name & ID</th>
+                  <th className="py-3 px-4">Allocation</th>
                   <th className="py-3 px-4">Pickup Point</th>
                   <th className="py-3 px-4">Status</th>
                   <th className="py-3 px-4">Boarding Detail</th>
@@ -405,7 +411,7 @@ export function PassengerManifestView({
               <tbody className="divide-y divide-slate-100 text-slate-700">
                 {filteredPassengers.length === 0 ? (
                   <tr>
-                    <td colSpan={6} className="py-8 text-center text-xs text-[#526B82]">
+                    <td colSpan={7} className="py-8 text-center text-xs text-[#526B82]">
                       No passengers found matching the selected filter.
                     </td>
                   </tr>
@@ -424,6 +430,17 @@ export function PassengerManifestView({
                             {p.studentMatric}
                           </div>
                         )}
+                      </td>
+                      <td className="py-3 px-4">
+                        <span
+                          className={`inline-block px-2 py-0.5 rounded text-[9px] font-bold uppercase tracking-wider ${
+                            p.passengerCategory === "standing"
+                              ? "bg-amber-100 text-amber-900 border border-amber-300"
+                              : "bg-emerald-100 text-emerald-900 border border-emerald-300"
+                          }`}
+                        >
+                          {p.passengerCategory === "standing" ? "Standing" : "Seated"}
+                        </span>
                       </td>
                       <td className="py-3 px-4 font-medium text-[#102D4A]">
                         {p.boardingStopName}

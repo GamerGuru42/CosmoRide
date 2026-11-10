@@ -247,7 +247,7 @@ export function VehiclesManagement({ initialVehicles }: VehiclesManagementProps)
                     </td>
                     <td className="px-4 py-3 text-center whitespace-nowrap">
                       <span className="inline-flex items-center rounded-md bg-slate-100 px-2 py-0.5 font-mono font-bold text-slate-800 text-xs">
-                        {v.safeCapacity} seats
+                        {v.safeCapacity} cap. (20 seated, 10 standing)
                       </span>
                     </td>
                     <td className="px-4 py-3 whitespace-nowrap capitalize text-[#526B82]">
