@@ -55,6 +55,28 @@ export async function createJourney(formData: unknown): Promise<ActionResponse> 
       return { success: false, error: "Selected vehicle is currently marked inactive." };
     }
 
+    // Check vehicle assignment conflict (30 minutes operational buffer)
+    const { data: conflictData } = await supabase.rpc(
+      "check_vehicle_assignment_conflict",
+      {
+        p_vehicle_id: parsed.data.vehicleId,
+        p_journey_date: parsed.data.journeyDate,
+        p_scheduled_departure: parsed.data.scheduledDeparture,
+      }
+    );
+
+    const conflict = conflictData as {
+      has_conflict: boolean;
+      error?: string;
+    } | null;
+
+    if (conflict?.has_conflict) {
+      return {
+        success: false,
+        error: conflict.error ?? "Vehicle assignment conflict: Overlapping departures are prohibited.",
+      };
+    }
+
     // Strict safety check: Proposed allocation must never exceed vehicle's safe approved capacity
     const effectiveAllocation = Math.min(
       parsed.data.proposedAllocation,

@@ -750,7 +750,7 @@ export async function updateUserRoleAndOperationAction({
 }: {
   userId: string;
   role: "student" | "boarding_officer" | "driver" | "admin";
-  adminRole?: "hostel_manager" | "bus_manager" | "super_admin" | null;
+  adminRole?: "hostel_manager" | "bus_manager" | "super_admin" | "operations_controller" | null;
   assignedTransportGroupId?: string | null;
   hostelId?: string | null;
 }): Promise<AdminActionResponse> {

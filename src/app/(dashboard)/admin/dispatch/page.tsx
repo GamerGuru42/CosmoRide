@@ -50,6 +50,9 @@ export default async function BusManagerDispatchPage() {
       proposed_allocation,
       delay_minutes,
       delay_reason,
+      is_rotated_vehicle,
+      active_movement_id,
+      rotation_campus_return_confirmed_at,
       routes!inner (
         id,
         code,
@@ -147,6 +150,9 @@ export default async function BusManagerDispatchPage() {
       seatedBoarded,
       standingBoarded,
       isOverdue,
+      isRotatedVehicle: Boolean(j.is_rotated_vehicle),
+      activeMovementId: j.active_movement_id || null,
+      rotationCampusReturnConfirmedAt: j.rotation_campus_return_confirmed_at || null,
     };
   });
 

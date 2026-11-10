@@ -69,12 +69,23 @@ export interface OversightAuditItem {
   details: Record<string, unknown>;
 }
 
+export interface OversightMovementItem {
+  id: string;
+  vehicleReg: string;
+  originName: string;
+  destinationName: string;
+  status: string;
+  initiatedAt: string;
+  operationalReason: string;
+}
+
 interface HostelManagerOversightViewProps {
   currentDate: string;
   hostelManagerName: string;
   journeys: OversightJourneyItem[];
   incidents: OversightIncidentItem[];
   recentAudits: OversightAuditItem[];
+  activeMovements?: OversightMovementItem[];
 }
 
 export function HostelManagerOversightView({
@@ -83,6 +94,7 @@ export function HostelManagerOversightView({
   journeys,
   incidents,
   recentAudits,
+  activeMovements = [],
 }: HostelManagerOversightViewProps) {
   const [fleetFilter, setFleetFilter] = useState<"all" | "boys" | "girls">("all");
 
@@ -251,6 +263,44 @@ export function HostelManagerOversightView({
           Showing {filteredJourneys.length} of {totalDepartures} services
         </span>
       </div>
+
+      {/* Active Vehicle Rotations & Repositioning Oversight */}
+      {activeMovements.length > 0 && (
+        <div className="rounded-2xl border border-amber-200 bg-amber-50/50 p-4 shadow-xs space-y-3">
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-2">
+              <span className="flex h-6 w-6 items-center justify-center rounded-lg bg-amber-100 text-amber-700 text-xs font-bold">
+                🔄
+              </span>
+              <h3 className="text-xs font-bold text-[#102D4A] uppercase tracking-wider">
+                Active Vehicle Rotations &amp; Empty Repositioning
+              </h3>
+            </div>
+            <span className="text-[11px] font-semibold text-amber-800">
+              {activeMovements.length} Bus{activeMovements.length > 1 ? "es" : ""} Returning to Main Campus
+            </span>
+          </div>
+
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+            {activeMovements.map((m) => (
+              <div key={m.id} className="rounded-xl border border-amber-200/80 bg-white p-3 text-xs space-y-1">
+                <div className="flex items-center justify-between">
+                  <span className="font-mono font-bold text-[#102D4A]">{m.vehicleReg}</span>
+                  <span className="inline-flex items-center gap-1 rounded-full bg-amber-100 px-2 py-0.5 text-[10px] font-bold text-amber-800">
+                    RETURNING EMPTY
+                  </span>
+                </div>
+                <div className="text-[11px] text-[#526B82]">
+                  {m.originName} → {m.destinationName}
+                </div>
+                <div className="text-[10px] text-slate-500 italic">
+                  {m.operationalReason}
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
 
       {/* Cross-Operation Journeys Oversight Table */}
       <div className="rounded-2xl border border-slate-200 bg-white shadow-xs overflow-hidden">
