@@ -64,7 +64,7 @@ export function SchedulesManagement({
   const [departureTime, setDepartureTime] = useState("07:30");
   const [latestDepartureTime, setLatestDepartureTime] = useState("");
   const [direction, setDirection] = useState<"outbound" | "inbound">("outbound");
-  const [allocation, setAllocation] = useState(30);
+  const [allocation, setAllocation] = useState(32);
   const [notes, setNotes] = useState("");
 
   // Generator form state
@@ -85,7 +85,7 @@ export function SchedulesManagement({
     setDepartureTime("07:30");
     setLatestDepartureTime("");
     setDirection("outbound");
-    setAllocation(30);
+    setAllocation(32);
     setNotes("");
     setActionError(null);
     setActionSuccess(null);
@@ -276,7 +276,7 @@ export function SchedulesManagement({
                     </td>
                     <td className="px-4 py-3 text-center whitespace-nowrap">
                       <span className="inline-flex items-center rounded-md bg-blue-50 px-2 py-0.5 font-mono font-bold text-blue-900 text-xs">
-                        {s.proposedAllocation} cap (20 seated, 10 standing)
+                        {s.proposedAllocation} cap (20 seated, 12 standing)
                       </span>
                     </td>
                     <td className="px-4 py-3 text-[#526B82]">

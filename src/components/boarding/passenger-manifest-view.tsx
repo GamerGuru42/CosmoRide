@@ -128,7 +128,7 @@ export function PassengerManifestView({
 
   const capacityCeiling = currentJourney
     ? Math.min(currentJourney.proposedAllocation, currentJourney.safeCapacity)
-    : 30;
+    : 32;
 
   function handleMarkNoShow(bookingId: string, studentName: string) {
     if (confirm(`Mark ${studentName} as a No-Show for this departure?`)) {
@@ -242,7 +242,7 @@ export function PassengerManifestView({
               Seated / Standing / Total
             </span>
             <span className="text-xs font-bold text-[#102D4A] font-mono">
-              {seatedCount}/20 S · {standingCount}/10 St · {activePassengers.length}/30 Max
+              {seatedCount}/20 S · {standingCount}/12 St · {activePassengers.length}/{capacityCeiling} Max
             </span>
           </div>
         </div>

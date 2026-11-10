@@ -251,7 +251,7 @@ export function StudentTripsView({
                               : "bg-emerald-100 text-emerald-800 border border-emerald-300"
                           }`}
                         >
-                          {trip.passengerCategory === "standing" ? "Standing (10 max)" : "Seated (20 max)"}
+                          {trip.passengerCategory === "standing" ? "Standing (12 max)" : "Seated (20 max)"}
                         </span>
                       </div>
                       <h3 className="text-base font-bold text-[#102D4A] mt-1">

@@ -239,7 +239,7 @@ export default async function StudentHomePage() {
         delayMinutes: jd.delay_minutes ?? 0,
         delayReason: jd.delay_reason,
         proposedAllocation: jd.proposed_allocation,
-        safeCapacity: vehicleInfo?.safe_capacity ?? 30,
+        safeCapacity: vehicleInfo?.safe_capacity ?? 32,
         bookedCount: bookedCount ?? 0,
         seatedCount: seatedCount ?? 0,
         standingCount: standingCount ?? 0,

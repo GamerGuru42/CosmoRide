@@ -46,7 +46,7 @@ export function VehiclesManagement({ initialVehicles }: VehiclesManagementProps)
   // Form inputs for Add
   const [regNumber, setRegNumber] = useState("");
   const [name, setName] = useState("");
-  const [safeCap, setSafeCap] = useState(30);
+  const [safeCap, setSafeCap] = useState(32);
   const [vehType, setVehType] = useState("electric_bus");
   const [ownType, setOwnType] = useState("university_owned");
   const [vehRef, setVehRef] = useState("");
@@ -54,7 +54,7 @@ export function VehiclesManagement({ initialVehicles }: VehiclesManagementProps)
 
   // Edit form state
   const [editStatus, setEditStatus] = useState<VehicleRecord["status"]>("available");
-  const [editSafeCap, setEditSafeCap] = useState(30);
+  const [editSafeCap, setEditSafeCap] = useState(32);
   const [editNotes, setEditNotes] = useState("");
 
   const filteredVehicles = vehicles.filter((v) => {
@@ -70,7 +70,7 @@ export function VehiclesManagement({ initialVehicles }: VehiclesManagementProps)
   const handleOpenAddModal = () => {
     setRegNumber("");
     setName("");
-    setSafeCap(30);
+    setSafeCap(32);
     setVehType("electric_bus");
     setOwnType("university_owned");
     setVehRef("");
@@ -247,7 +247,7 @@ export function VehiclesManagement({ initialVehicles }: VehiclesManagementProps)
                     </td>
                     <td className="px-4 py-3 text-center whitespace-nowrap">
                       <span className="inline-flex items-center rounded-md bg-slate-100 px-2 py-0.5 font-mono font-bold text-slate-800 text-xs">
-                        {v.safeCapacity} cap. (20 seated, 10 standing)
+                        {v.safeCapacity} cap. (20 seated, 12 standing)
                       </span>
                     </td>
                     <td className="px-4 py-3 whitespace-nowrap capitalize text-[#526B82]">

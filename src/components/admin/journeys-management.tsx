@@ -260,10 +260,10 @@ export function JourneysManagement({
                             : "text-[#102D4A]"
                         }`}
                       >
-                        Total: {j.bookedCount}/{j.safeCapacity || 30}
+                        Total: {j.bookedCount}/{j.safeCapacity || 32}
                       </div>
                       <div className="text-[10px] text-slate-500 font-mono">
-                        Seated: {j.seatedCount ?? 0}/20 · Standing: {j.standingCount ?? 0}/10
+                        Seated: {j.seatedCount ?? 0}/20 · Standing: {j.standingCount ?? 0}/12
                       </div>
                     </td>
                     <td className="px-4 py-3 text-center whitespace-nowrap font-bold text-emerald-700">

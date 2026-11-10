@@ -262,9 +262,9 @@ describe("Phase 6.10: Electric Bus Seating & Standing Capacity Verification", ()
     it("allocates 'seated' category to the first 20 confirmed passengers", () => {
       const journey: SimulatedJourney = {
         id: "j_test_01",
-        safeCapacity: 30,
+        safeCapacity: 32,
         seatedCapacity: 20,
-        standingCapacity: 10,
+        standingCapacity: 12,
         bookings: [],
         waitlist: [],
       };
@@ -279,12 +279,12 @@ describe("Phase 6.10: Electric Bus Seating & Standing Capacity Verification", ()
       assert.equal(seatedCount, 20, "Must have exactly 20 seated passengers");
     });
 
-    it("allocates 'standing' category to the next 10 confirmed passengers (21-30)", () => {
+    it("allocates 'standing' category to the next 12 confirmed passengers (21-32)", () => {
       const journey: SimulatedJourney = {
         id: "j_test_02",
-        safeCapacity: 30,
+        safeCapacity: 32,
         seatedCapacity: 20,
-        standingCapacity: 10,
+        standingCapacity: 12,
         bookings: [],
         waitlist: [],
       };
@@ -294,8 +294,8 @@ describe("Phase 6.10: Electric Bus Seating & Standing Capacity Verification", ()
         bookSeat(journey, `student_${i}`);
       }
 
-      // Next 10 receive standing
-      for (let i = 21; i <= 30; i++) {
+      // Next 12 receive standing
+      for (let i = 21; i <= 32; i++) {
         const res = bookSeat(journey, `student_${i}`);
         assert.equal(res.status, "confirmed", `Student ${i} should be confirmed`);
         assert.equal(res.category, "standing", `Student ${i} must receive 'standing'`);
@@ -306,27 +306,27 @@ describe("Phase 6.10: Electric Bus Seating & Standing Capacity Verification", ()
       const standingCount = active.filter((b) => b.passengerCategory === "standing").length;
 
       assert.equal(seatedCount, 20, "Must have exactly 20 seated passengers");
-      assert.equal(standingCount, 10, "Must have exactly 10 standing passengers");
-      assert.equal(active.length, 30, "Total active passengers must equal 30");
+      assert.equal(standingCount, 12, "Must have exactly 12 standing passengers");
+      assert.equal(active.length, 32, "Total active passengers must equal 32");
     });
 
-    it("places the 31st passenger on the waiting list when 30 capacity is reached", () => {
+    it("places the 33rd passenger on the waiting list when 32 capacity is reached", () => {
       const journey: SimulatedJourney = {
         id: "j_test_03",
-        safeCapacity: 30,
+        safeCapacity: 32,
         seatedCapacity: 20,
-        standingCapacity: 10,
+        standingCapacity: 12,
         bookings: [],
         waitlist: [],
       };
 
-      for (let i = 1; i <= 30; i++) {
+      for (let i = 1; i <= 32; i++) {
         bookSeat(journey, `student_${i}`);
       }
 
-      // 31st attempt
-      const res = bookSeat(journey, "student_31");
-      assert.equal(res.status, "waitlisted", "31st student must be waitlisted");
+      // 33rd attempt
+      const res = bookSeat(journey, "student_33");
+      assert.equal(res.status, "waitlisted", "33rd student must be waitlisted");
       assert.equal(res.position, 1, "Must be position #1 on waitlist");
       assert.equal(journey.waitlist.length, 1);
     });
@@ -334,15 +334,15 @@ describe("Phase 6.10: Electric Bus Seating & Standing Capacity Verification", ()
     it("rebalances capacity when a seated passenger cancels: earliest standing upgraded to seated, waitlist promoted to standing", () => {
       const journey: SimulatedJourney = {
         id: "j_test_04",
-        safeCapacity: 30,
+        safeCapacity: 32,
         seatedCapacity: 20,
-        standingCapacity: 10,
+        standingCapacity: 12,
         bookings: [],
         waitlist: [],
       };
 
-      // Fill 30 passengers + 1 on waitlist
-      for (let i = 1; i <= 31; i++) {
+      // Fill 32 passengers + 1 on waitlist
+      for (let i = 1; i <= 33; i++) {
         bookSeat(journey, `student_${i}`);
       }
 
@@ -354,34 +354,34 @@ describe("Phase 6.10: Electric Bus Seating & Standing Capacity Verification", ()
       const cancelRes = cancelBooking(journey, "b_student_5");
       assert.ok(cancelRes.success);
       assert.equal(cancelRes.upgradedStudentId, "student_21", "Student 21 (earliest standing) must be upgraded to seated");
-      assert.equal(cancelRes.promotedStudentId, "student_31", "Student 31 from waitlist must be promoted to standing");
+      assert.equal(cancelRes.promotedStudentId, "student_33", "Student 33 from waitlist must be promoted to standing");
 
-      // Verify invariant: exactly 20 seated, 10 standing, 0 on waitlist
+      // Verify invariant: exactly 20 seated, 12 standing, 0 on waitlist
       const active = journey.bookings.filter((b) => b.status === "confirmed");
       const seatedCount = active.filter((b) => b.passengerCategory === "seated").length;
       const standingCount = active.filter((b) => b.passengerCategory === "standing").length;
 
       assert.equal(seatedCount, 20, "Must maintain exactly 20 seated");
-      assert.equal(standingCount, 10, "Must maintain exactly 10 standing");
-      assert.equal(active.length, 30, "Total active passengers must still be 30");
+      assert.equal(standingCount, 12, "Must maintain exactly 12 standing");
+      assert.equal(active.length, 32, "Total active passengers must still be 32");
       assert.equal(s21?.passengerCategory, "seated", "Student 21 must now be seated");
 
-      const s31 = journey.bookings.find((b) => b.studentId === "student_31");
-      assert.equal(s31?.passengerCategory, "standing", "Student 31 must be standing");
+      const s33 = journey.bookings.find((b) => b.studentId === "student_33");
+      assert.equal(s33?.passengerCategory, "standing", "Student 33 must be standing");
       assert.equal(journey.waitlist.length, 0, "Waitlist should now be empty");
     });
 
     it("promotes waitlist candidate directly to standing when a standing passenger cancels", () => {
       const journey: SimulatedJourney = {
         id: "j_test_05",
-        safeCapacity: 30,
+        safeCapacity: 32,
         seatedCapacity: 20,
-        standingCapacity: 10,
+        standingCapacity: 12,
         bookings: [],
         waitlist: [],
       };
 
-      for (let i = 1; i <= 31; i++) {
+      for (let i = 1; i <= 33; i++) {
         bookSeat(journey, `student_${i}`);
       }
 
@@ -389,29 +389,29 @@ describe("Phase 6.10: Electric Bus Seating & Standing Capacity Verification", ()
       const cancelRes = cancelBooking(journey, "b_student_25");
       assert.ok(cancelRes.success);
       assert.equal(cancelRes.upgradedStudentId, undefined, "No upgrade needed when standing cancels");
-      assert.equal(cancelRes.promotedStudentId, "student_31", "Student 31 promoted directly to standing");
+      assert.equal(cancelRes.promotedStudentId, "student_33", "Student 33 promoted directly to standing");
 
       const active = journey.bookings.filter((b) => b.status === "confirmed");
       const seatedCount = active.filter((b) => b.passengerCategory === "seated").length;
       const standingCount = active.filter((b) => b.passengerCategory === "standing").length;
 
       assert.equal(seatedCount, 20, "20 seated retained");
-      assert.equal(standingCount, 10, "10 standing retained");
-      assert.equal(active.length, 30, "Total 30 retained");
+      assert.equal(standingCount, 12, "12 standing retained");
+      assert.equal(active.length, 32, "Total 32 retained");
     });
 
     it("checked-in passengers continue counting towards active occupied capacity", () => {
       const journey: SimulatedJourney = {
         id: "j_test_06",
-        safeCapacity: 30,
+        safeCapacity: 32,
         seatedCapacity: 20,
-        standingCapacity: 10,
+        standingCapacity: 12,
         bookings: [],
         waitlist: [],
       };
 
-      // Fill 30 places
-      for (let i = 1; i <= 30; i++) {
+      // Fill 32 places
+      for (let i = 1; i <= 32; i++) {
         bookSeat(journey, `student_${i}`);
       }
 
@@ -424,16 +424,16 @@ describe("Phase 6.10: Electric Bus Seating & Standing Capacity Verification", ()
       }
 
       // An additional booking attempt must STILL be waitlisted because checked_in passengers occupy capacity
-      const res = bookSeat(journey, "student_31");
+      const res = bookSeat(journey, "student_33");
       assert.equal(res.status, "waitlisted", "Checked-in passengers must not release capacity");
     });
 
     it("standing passengers are never counted as seated passengers", () => {
       const journey: SimulatedJourney = {
         id: "j_test_07",
-        safeCapacity: 30,
+        safeCapacity: 32,
         seatedCapacity: 20,
-        standingCapacity: 10,
+        standingCapacity: 12,
         bookings: [],
         waitlist: [],
       };
@@ -500,10 +500,10 @@ describe("Phase 6.10: Electric Bus Seating & Standing Capacity Verification", ()
     );
     const journeysMgmtContent = fs.readFileSync(journeysMgmtPath, "utf-8");
 
-    it("boarding pass modal renders distinct Seated (20 max) vs Standing (10 max) badges", () => {
+    it("boarding pass modal renders distinct Seated (20 max) vs Standing (12 max) badges", () => {
       assert.ok(
         boardingPassModalContent.includes("Seated Passenger (20 max)") &&
-          boardingPassModalContent.includes("Standing Passenger (10 max)"),
+          boardingPassModalContent.includes("Standing Passenger (12 max)"),
         "Boarding pass must clearly state passenger category"
       );
       assert.ok(
@@ -512,9 +512,9 @@ describe("Phase 6.10: Electric Bus Seating & Standing Capacity Verification", ()
       );
     });
 
-    it("departure board shows total 30 max, 20 seated, 10 standing, and remaining capacity", () => {
+    it("departure board shows total 32 max, 20 seated, 12 standing, and remaining capacity", () => {
       assert.ok(
-        departureBoardContent.includes("30 total") || departureBoardContent.includes("30 max"),
+        departureBoardContent.includes("32 total") || departureBoardContent.includes("32 max"),
         "Departure board must specify total capacity"
       );
       assert.ok(
@@ -525,7 +525,7 @@ describe("Phase 6.10: Electric Bus Seating & Standing Capacity Verification", ()
 
     it("student trips view displays allocation badge on active trip cards", () => {
       assert.ok(
-        tripsViewContent.includes("Standing (10 max)") && tripsViewContent.includes("Seated (20 max)"),
+        tripsViewContent.includes("Standing (12 max)") && tripsViewContent.includes("Seated (20 max)"),
         "Trips view must render category allocation badges"
       );
     });
@@ -533,7 +533,7 @@ describe("Phase 6.10: Electric Bus Seating & Standing Capacity Verification", ()
     it("boarding officer scan result modal displays Seated Place vs Standing Place badges", () => {
       assert.ok(
         scanResultModalContent.includes("Seated Place (20 max)") &&
-          scanResultModalContent.includes("Standing Place (10 max)"),
+          scanResultModalContent.includes("Standing Place (12 max)"),
         "Scan result modal must identify passenger category"
       );
     });
@@ -546,17 +546,17 @@ describe("Phase 6.10: Electric Bus Seating & Standing Capacity Verification", ()
       assert.ok(
         manifestViewContent.includes("Seated / Standing / Total") &&
           manifestViewContent.includes("/20 S") &&
-          manifestViewContent.includes("/10 St"),
+          manifestViewContent.includes("/12 St"),
         "Manifest must display seated and standing breakdown"
       );
     });
 
-    it("admin journey views display Seated: X/20, Standing: X/10, Total: X/30", () => {
+    it("admin journey views display Seated: X/20, Standing: X/12, Total: X/32", () => {
       assert.ok(
         journeysMgmtContent.includes("Seated:") &&
           journeysMgmtContent.includes("/20") &&
           journeysMgmtContent.includes("Standing:") &&
-          journeysMgmtContent.includes("/10"),
+          journeysMgmtContent.includes("/12"),
         "Admin journeys table must display seated and standing breakdown"
       );
     });

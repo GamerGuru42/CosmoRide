@@ -135,9 +135,9 @@ export default async function BoardingScannerPage() {
       vehicleRegistration: vehicle?.registration_number || "UNASSIGNED",
       vehicleName: vehicle?.name || null,
       vehicleId: vehicle?.id || null,
-      safeCapacity: vehicle?.safe_capacity ?? j.proposed_allocation ?? 0,
+      safeCapacity: vehicle?.safe_capacity ?? j.proposed_allocation ?? 32,
       seatedCapacity: vehicle?.seated_capacity ?? 20,
-      standingCapacity: vehicle?.standing_capacity ?? 10,
+      standingCapacity: vehicle?.standing_capacity ?? 12,
       proposedAllocation: j.proposed_allocation,
       passengers,
     };

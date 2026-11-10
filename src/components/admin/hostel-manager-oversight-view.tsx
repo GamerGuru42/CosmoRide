@@ -368,7 +368,7 @@ export function HostelManagerOversightView({
 
                     <td className="py-3 px-4 text-center font-mono">
                       <span className="font-bold text-[#102D4A] block">
-                        {j.boardedCount} / 30
+                        {j.boardedCount} / {j.safeCapacity || 32}
                       </span>
                       <span className="text-[10px] text-[#526B82]">
                         {j.seatedBoarded}S • {j.standingBoarded}St
@@ -497,3 +497,4 @@ export function HostelManagerOversightView({
     </div>
   );
 }
+

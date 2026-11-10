@@ -364,7 +364,7 @@ export function BusManagerDispatchView({
                       {j.vehicleName && <span className="ml-1 text-[#526B82]">({j.vehicleName})</span>}
                     </span>
                     <span>
-                      Capacity: <strong className="text-slate-900">{j.safeCapacity} max</strong> (20 seated + 10 standing)
+                      Capacity: <strong className="text-slate-900">{j.safeCapacity} max</strong> (20 seated + 12 standing)
                     </span>
                   </div>
                 </div>
@@ -414,10 +414,10 @@ export function BusManagerDispatchView({
                 <div className="flex flex-col sm:flex-row items-end sm:items-center gap-3">
                   <div className="text-right text-xs">
                     <div className="font-bold text-[#102D4A]">
-                      {j.boardedCount} / 30 Boarded
+                      {j.boardedCount} / {j.safeCapacity || 32} Boarded
                     </div>
                     <div className="text-[11px] text-[#526B82]">
-                      {j.seatedBoarded}/20 Seated • {j.standingBoarded}/10 Standing
+                      {j.seatedBoarded}/20 Seated • {j.standingBoarded}/{j.standingCapacity || 12} Standing
                     </div>
                     <div className="text-[10px] text-slate-400">
                       {j.bookedCount} total reserved
@@ -470,3 +470,4 @@ export function BusManagerDispatchView({
     </div>
   );
 }
+

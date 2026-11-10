@@ -193,18 +193,18 @@ ON CONFLICT (route_id, stop_order) DO NOTHING;
 -- and verified physical capacity audits by transport administration.
 -- ============================================================
 
-INSERT INTO public.vehicles (id, registration_number, name, safe_capacity, vehicle_type, is_active)
+INSERT INTO public.vehicles (id, registration_number, name, safe_capacity, seated_capacity, standing_capacity, vehicle_type, is_active)
 VALUES
   -- Girls' Operation Buses (3 Simultaneous Operating Units)
-  ('v1000000-0000-0000-0000-000000000001', 'CU-EB-01', 'Electric Bus 01 (Girls Fleet)', 30, 'electric_bus', TRUE),
-  ('v1000000-0000-0000-0000-000000000002', 'CU-EB-02', 'Electric Bus 02 (Girls Fleet)', 30, 'electric_bus', TRUE),
-  ('v1000000-0000-0000-0000-000000000003', 'CU-EB-03', 'Electric Bus 03 (Girls Fleet)', 30, 'electric_bus', TRUE),
+  ('v1000000-0000-0000-0000-000000000001', 'CU-EB-01', 'Electric Bus 01 (Girls Fleet)', 32, 20, 12, 'electric_bus', TRUE),
+  ('v1000000-0000-0000-0000-000000000002', 'CU-EB-02', 'Electric Bus 02 (Girls Fleet)', 32, 20, 12, 'electric_bus', TRUE),
+  ('v1000000-0000-0000-0000-000000000003', 'CU-EB-03', 'Electric Bus 03 (Girls Fleet)', 32, 20, 12, 'electric_bus', TRUE),
 
   -- Boys' Operation Buses
-  ('v1000000-0000-0000-0000-000000000004', 'CU-EB-04', 'Electric Bus 04 (Boys Fleet)', 30, 'electric_bus', TRUE),
+  ('v1000000-0000-0000-0000-000000000004', 'CU-EB-04', 'Electric Bus 04 (Boys Fleet)', 32, 20, 12, 'electric_bus', TRUE),
 
   -- Inter-Campus Shuttle
-  ('v1000000-0000-0000-0000-000000000005', 'CU-EB-05', 'Electric Bus 05 (Inter-Campus)', 30, 'electric_bus', TRUE)
+  ('v1000000-0000-0000-0000-000000000005', 'CU-EB-05', 'Electric Bus 05 (Inter-Campus)', 32, 20, 12, 'electric_bus', TRUE)
 ON CONFLICT (registration_number) DO NOTHING;
 
 -- ============================================================
@@ -244,34 +244,34 @@ INSERT INTO public.schedules (
 )
 VALUES
   -- Monday (day_of_week = 1)
-  ('sc000000-0000-0001-0000-000000000001', 'r1000000-0000-0000-0000-000000000002', 1, '07:30:00', NULL, 'inbound', 30, TRUE, 'Pattern 1: Main Boys -> Wuye Boys -> Main Campus'),
-  ('sc000000-0000-0002-0000-000000000001', 'r1000000-0000-0000-0000-000000000005', 1, '08:30:00', NULL, 'inbound', 30, TRUE, 'Pattern 2: Main Boys -> Main Campus Express (no Wuye stop)'),
-  ('sc000000-0000-0003-0000-000000000001', 'r1000000-0000-0000-0000-000000000006', 1, '16:00:00', NULL, 'outbound', 30, TRUE, 'Pattern 3: Main Campus -> Main Boys Express (no Wuye stop)'),
-  ('sc000000-0000-0004-0000-000000000001', 'r1000000-0000-0000-0000-000000000003', 1, '16:50:00', '17:00:00', 'outbound', 30, TRUE, 'Pattern 4: Main Campus -> Wuye Boys -> Main Boys (16:50-17:00 departure window)'),
+  ('sc000000-0000-0001-0000-000000000001', 'r1000000-0000-0000-0000-000000000002', 1, '07:30:00', NULL, 'inbound', 32, TRUE, 'Pattern 1: Main Boys -> Wuye Boys -> Main Campus'),
+  ('sc000000-0000-0002-0000-000000000001', 'r1000000-0000-0000-0000-000000000005', 1, '08:30:00', NULL, 'inbound', 32, TRUE, 'Pattern 2: Main Boys -> Main Campus Express (no Wuye stop)'),
+  ('sc000000-0000-0003-0000-000000000001', 'r1000000-0000-0000-0000-000000000006', 1, '16:00:00', NULL, 'outbound', 32, TRUE, 'Pattern 3: Main Campus -> Main Boys Express (no Wuye stop)'),
+  ('sc000000-0000-0004-0000-000000000001', 'r1000000-0000-0000-0000-000000000003', 1, '16:50:00', '17:00:00', 'outbound', 32, TRUE, 'Pattern 4: Main Campus -> Wuye Boys -> Main Boys (16:50-17:00 departure window)'),
 
   -- Tuesday (day_of_week = 2)
-  ('sc000000-0000-0001-0000-000000000002', 'r1000000-0000-0000-0000-000000000002', 2, '07:30:00', NULL, 'inbound', 30, TRUE, 'Pattern 1: Main Boys -> Wuye Boys -> Main Campus'),
-  ('sc000000-0000-0002-0000-000000000002', 'r1000000-0000-0000-0000-000000000005', 2, '08:30:00', NULL, 'inbound', 30, TRUE, 'Pattern 2: Main Boys -> Main Campus Express (no Wuye stop)'),
-  ('sc000000-0000-0003-0000-000000000002', 'r1000000-0000-0000-0000-000000000006', 2, '16:00:00', NULL, 'outbound', 30, TRUE, 'Pattern 3: Main Campus -> Main Boys Express (no Wuye stop)'),
-  ('sc000000-0000-0004-0000-000000000002', 'r1000000-0000-0000-0000-000000000003', 2, '16:50:00', '17:00:00', 'outbound', 30, TRUE, 'Pattern 4: Main Campus -> Wuye Boys -> Main Boys (16:50-17:00 departure window)'),
+  ('sc000000-0000-0001-0000-000000000002', 'r1000000-0000-0000-0000-000000000002', 2, '07:30:00', NULL, 'inbound', 32, TRUE, 'Pattern 1: Main Boys -> Wuye Boys -> Main Campus'),
+  ('sc000000-0000-0002-0000-000000000002', 'r1000000-0000-0000-0000-000000000005', 2, '08:30:00', NULL, 'inbound', 32, TRUE, 'Pattern 2: Main Boys -> Main Campus Express (no Wuye stop)'),
+  ('sc000000-0000-0003-0000-000000000002', 'r1000000-0000-0000-0000-000000000006', 2, '16:00:00', NULL, 'outbound', 32, TRUE, 'Pattern 3: Main Campus -> Main Boys Express (no Wuye stop)'),
+  ('sc000000-0000-0004-0000-000000000002', 'r1000000-0000-0000-0000-000000000003', 2, '16:50:00', '17:00:00', 'outbound', 32, TRUE, 'Pattern 4: Main Campus -> Wuye Boys -> Main Boys (16:50-17:00 departure window)'),
 
   -- Wednesday (day_of_week = 3)
-  ('sc000000-0000-0001-0000-000000000003', 'r1000000-0000-0000-0000-000000000002', 3, '07:30:00', NULL, 'inbound', 30, TRUE, 'Pattern 1: Main Boys -> Wuye Boys -> Main Campus'),
-  ('sc000000-0000-0002-0000-000000000003', 'r1000000-0000-0000-0000-000000000005', 3, '08:30:00', NULL, 'inbound', 30, TRUE, 'Pattern 2: Main Boys -> Main Campus Express (no Wuye stop)'),
-  ('sc000000-0000-0003-0000-000000000003', 'r1000000-0000-0000-0000-000000000006', 3, '16:00:00', NULL, 'outbound', 30, TRUE, 'Pattern 3: Main Campus -> Main Boys Express (no Wuye stop)'),
-  ('sc000000-0000-0004-0000-000000000003', 'r1000000-0000-0000-0000-000000000003', 3, '16:50:00', '17:00:00', 'outbound', 30, TRUE, 'Pattern 4: Main Campus -> Wuye Boys -> Main Boys (16:50-17:00 departure window)'),
+  ('sc000000-0000-0001-0000-000000000003', 'r1000000-0000-0000-0000-000000000002', 3, '07:30:00', NULL, 'inbound', 32, TRUE, 'Pattern 1: Main Boys -> Wuye Boys -> Main Campus'),
+  ('sc000000-0000-0002-0000-000000000003', 'r1000000-0000-0000-0000-000000000005', 3, '08:30:00', NULL, 'inbound', 32, TRUE, 'Pattern 2: Main Boys -> Main Campus Express (no Wuye stop)'),
+  ('sc000000-0000-0003-0000-000000000003', 'r1000000-0000-0000-0000-000000000006', 3, '16:00:00', NULL, 'outbound', 32, TRUE, 'Pattern 3: Main Campus -> Main Boys Express (no Wuye stop)'),
+  ('sc000000-0000-0004-0000-000000000003', 'r1000000-0000-0000-0000-000000000003', 3, '16:50:00', '17:00:00', 'outbound', 32, TRUE, 'Pattern 4: Main Campus -> Wuye Boys -> Main Boys (16:50-17:00 departure window)'),
 
   -- Thursday (day_of_week = 4)
-  ('sc000000-0000-0001-0000-000000000004', 'r1000000-0000-0000-0000-000000000002', 4, '07:30:00', NULL, 'inbound', 30, TRUE, 'Pattern 1: Main Boys -> Wuye Boys -> Main Campus'),
-  ('sc000000-0000-0002-0000-000000000004', 'r1000000-0000-0000-0000-000000000005', 4, '08:30:00', NULL, 'inbound', 30, TRUE, 'Pattern 2: Main Boys -> Main Campus Express (no Wuye stop)'),
-  ('sc000000-0000-0003-0000-000000000004', 'r1000000-0000-0000-0000-000000000006', 4, '16:00:00', NULL, 'outbound', 30, TRUE, 'Pattern 3: Main Campus -> Main Boys Express (no Wuye stop)'),
-  ('sc000000-0000-0004-0000-000000000004', 'r1000000-0000-0000-0000-000000000003', 4, '16:50:00', '17:00:00', 'outbound', 30, TRUE, 'Pattern 4: Main Campus -> Wuye Boys -> Main Boys (16:50-17:00 departure window)'),
+  ('sc000000-0000-0001-0000-000000000004', 'r1000000-0000-0000-0000-000000000002', 4, '07:30:00', NULL, 'inbound', 32, TRUE, 'Pattern 1: Main Boys -> Wuye Boys -> Main Campus'),
+  ('sc000000-0000-0002-0000-000000000004', 'r1000000-0000-0000-0000-000000000005', 4, '08:30:00', NULL, 'inbound', 32, TRUE, 'Pattern 2: Main Boys -> Main Campus Express (no Wuye stop)'),
+  ('sc000000-0000-0003-0000-000000000004', 'r1000000-0000-0000-0000-000000000006', 4, '16:00:00', NULL, 'outbound', 32, TRUE, 'Pattern 3: Main Campus -> Main Boys Express (no Wuye stop)'),
+  ('sc000000-0000-0004-0000-000000000004', 'r1000000-0000-0000-0000-000000000003', 4, '16:50:00', '17:00:00', 'outbound', 32, TRUE, 'Pattern 4: Main Campus -> Wuye Boys -> Main Boys (16:50-17:00 departure window)'),
 
   -- Friday (day_of_week = 5)
-  ('sc000000-0000-0001-0000-000000000005', 'r1000000-0000-0000-0000-000000000002', 5, '07:30:00', NULL, 'inbound', 30, TRUE, 'Pattern 1: Main Boys -> Wuye Boys -> Main Campus'),
-  ('sc000000-0000-0002-0000-000000000005', 'r1000000-0000-0000-0000-000000000005', 5, '08:30:00', NULL, 'inbound', 30, TRUE, 'Pattern 2: Main Boys -> Main Campus Express (no Wuye stop)'),
-  ('sc000000-0000-0003-0000-000000000005', 'r1000000-0000-0000-0000-000000000006', 5, '16:00:00', NULL, 'outbound', 30, TRUE, 'Pattern 3: Main Campus -> Main Boys Express (no Wuye stop)'),
-  ('sc000000-0000-0004-0000-000000000005', 'r1000000-0000-0000-0000-000000000003', 5, '16:50:00', '17:00:00', 'outbound', 30, TRUE, 'Pattern 4: Main Campus -> Wuye Boys -> Main Boys (16:50-17:00 departure window)')
+  ('sc000000-0000-0001-0000-000000000005', 'r1000000-0000-0000-0000-000000000002', 5, '07:30:00', NULL, 'inbound', 32, TRUE, 'Pattern 1: Main Boys -> Wuye Boys -> Main Campus'),
+  ('sc000000-0000-0002-0000-000000000005', 'r1000000-0000-0000-0000-000000000005', 5, '08:30:00', NULL, 'inbound', 32, TRUE, 'Pattern 2: Main Boys -> Main Campus Express (no Wuye stop)'),
+  ('sc000000-0000-0003-0000-000000000005', 'r1000000-0000-0000-0000-000000000006', 5, '16:00:00', NULL, 'outbound', 32, TRUE, 'Pattern 3: Main Campus -> Main Boys Express (no Wuye stop)'),
+  ('sc000000-0000-0004-0000-000000000005', 'r1000000-0000-0000-0000-000000000003', 5, '16:50:00', '17:00:00', 'outbound', 32, TRUE, 'Pattern 4: Main Campus -> Wuye Boys -> Main Boys (16:50-17:00 departure window)')
 ON CONFLICT (id) DO NOTHING;
 
 

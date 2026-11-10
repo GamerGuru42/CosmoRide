@@ -103,7 +103,7 @@ export function BoardingPassModal({ pass, onClose }: BoardingPassModalProps) {
                   : "bg-emerald-400 text-emerald-950"
               }`}
             >
-              {pass.passengerCategory === "standing" ? "Standing Passenger (10 max)" : "Seated Passenger (20 max)"}
+              {pass.passengerCategory === "standing" ? "Standing Passenger (12 max)" : "Seated Passenger (20 max)"}
             </span>
           </div>
 
@@ -184,7 +184,7 @@ export function BoardingPassModal({ pass, onClose }: BoardingPassModalProps) {
                 ALLOCATION
               </p>
               <p className="text-xs font-bold text-[#102D4A]">
-                {pass.passengerCategory === "standing" ? "Standing (10 max)" : "Seated (20 max)"}
+                {pass.passengerCategory === "standing" ? "Standing (12 max)" : "Seated (20 max)"}
               </p>
             </div>
 

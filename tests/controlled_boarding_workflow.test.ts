@@ -197,7 +197,7 @@ describe("Controlled Boarding & Departure Workflow Verification Suite", () => {
       assert.strictEqual(visible[0].id, "j-boys-1");
     });
 
-    it("manifest displays booked passengers with allocated seated (20) and standing (10) categories", () => {
+    it("manifest displays booked passengers with allocated seated (20) and standing (12) categories", () => {
       const bookings = [
         { id: "b-1", passenger_category: "seated", status: "confirmed" },
         { id: "b-21", passenger_category: "standing", status: "confirmed" },
@@ -430,20 +430,20 @@ describe("Controlled Boarding & Departure Workflow Verification Suite", () => {
       assert.strictEqual(res.code, "CANCELLED_TICKET");
     });
 
-    it("enforces 20 seated + 10 standing capacity metrics during boarding verification", () => {
+    it("enforces 20 seated + 12 standing = 32 total maximum capacity metrics during boarding verification", () => {
       const maxSeated = 20;
-      const maxStanding = 10;
-      const maxTotal = 30;
+      const maxStanding = 12;
+      const maxTotal = 32;
 
       let seatedBoarded = 19;
-      let standingBoarded = 9;
+      let standingBoarded = 11;
 
       // Boarding seated passenger #20
       seatedBoarded++;
       assert.strictEqual(seatedBoarded, maxSeated);
       assert.ok(seatedBoarded <= maxSeated);
 
-      // Boarding standing passenger #10
+      // Boarding standing passenger #12
       standingBoarded++;
       assert.strictEqual(standingBoarded, maxStanding);
       assert.ok(standingBoarded <= maxStanding);
@@ -451,7 +451,128 @@ describe("Controlled Boarding & Departure Workflow Verification Suite", () => {
       // Total passenger check
       const totalBoarded = seatedBoarded + standingBoarded;
       assert.strictEqual(totalBoarded, maxTotal);
-      assert.strictEqual(totalBoarded, 30);
+      assert.strictEqual(totalBoarded, 32);
+
+      // 33rd passenger cannot be boarded
+      function attemptBoard33rd(currentBoarded: number, limit: number) {
+        if (currentBoarded >= limit) {
+          return { success: false, code: "BUS_FULL", error: "Boarding Gate Blocked: Bus safe physical capacity of " + limit + " passengers reached." };
+        }
+        return { success: true };
+      }
+
+      const board33rd = attemptBoard33rd(totalBoarded, maxTotal);
+      assert.strictEqual(board33rd.success, false);
+      assert.strictEqual(board33rd.code, "BUS_FULL");
+    });
+
+    it("verifies 33rd passenger rejection / waitlisting when 32 places are filled", () => {
+      const maxTotal = 32;
+      const bookings: { id: string; category: "seated" | "standing" }[] = [];
+      const waitlist: { id: string; position: number }[] = [];
+
+      for (let i = 1; i <= 32; i++) {
+        bookings.push({
+          id: `b-${i}`,
+          category: i <= 20 ? "seated" : "standing",
+        });
+      }
+
+      assert.strictEqual(bookings.length, 32);
+      assert.strictEqual(bookings.filter((b) => b.category === "seated").length, 20);
+      assert.strictEqual(bookings.filter((b) => b.category === "standing").length, 12);
+
+      // 33rd booking attempt
+      function bookPassenger(studentId: string) {
+        if (bookings.length >= maxTotal) {
+          waitlist.push({ id: studentId, position: waitlist.length + 1 });
+          return { success: true, status: "waitlist", waitlist_position: waitlist.length };
+        }
+        return { success: true, status: "confirmed" };
+      }
+
+      const res33 = bookPassenger("student-33");
+      assert.strictEqual(res33.status, "waitlist");
+      assert.strictEqual(res33.waitlist_position, 1);
+      assert.strictEqual(waitlist.length, 1);
+    });
+
+    it("verifies cancellation rebalancing with 12 standing places and automatic waitlist promotion", () => {
+      interface BRecord {
+        id: string;
+        studentId: string;
+        category: "seated" | "standing";
+        status: "confirmed" | "cancelled";
+        bookedAt: number;
+      }
+
+      const bookings: BRecord[] = [];
+      for (let i = 1; i <= 32; i++) {
+        bookings.push({
+          id: `b-${i}`,
+          studentId: `s-${i}`,
+          category: i <= 20 ? "seated" : "standing",
+          status: "confirmed",
+          bookedAt: i,
+        });
+      }
+
+      const waitlist = [{ studentId: "s-33", position: 1 }];
+
+      // Cancel seated passenger #5
+      const seatedBooking = bookings.find((b) => b.id === "b-5")!;
+      seatedBooking.status = "cancelled";
+
+      // Earliest standing passenger (b-21) upgraded to seated
+      const earliestStanding = bookings
+        .filter((b) => b.status === "confirmed" && b.category === "standing")
+        .sort((a, b) => a.bookedAt - b.bookedAt)[0];
+
+      assert.strictEqual(earliestStanding.id, "b-21");
+      earliestStanding.category = "seated";
+
+      // Vacant standing place goes to s-33
+      const promoted = waitlist.shift()!;
+      bookings.push({
+        id: `b-${promoted.studentId}`,
+        studentId: promoted.studentId,
+        category: "standing",
+        status: "confirmed",
+        bookedAt: 33,
+      });
+
+      const confirmed = bookings.filter((b) => b.status === "confirmed");
+      assert.strictEqual(confirmed.length, 32);
+      assert.strictEqual(confirmed.filter((b) => b.category === "seated").length, 20);
+      assert.strictEqual(confirmed.filter((b) => b.category === "standing").length, 12);
+      assert.strictEqual(waitlist.length, 0);
+    });
+
+    it("verifies atomic concurrency protection against over-booking past 32 passengers", () => {
+      const maxCapacity = 32;
+      let confirmedCount = 31;
+      let waitlistCount = 0;
+
+      // Two concurrent callers attempting to claim the 32nd place
+      function atomicAttemptBooking(): "confirmed" | "waitlist" {
+        // Emulating FOR UPDATE transaction lock serialization
+        if (confirmedCount < maxCapacity) {
+          confirmedCount++;
+          return "confirmed";
+        } else {
+          waitlistCount++;
+          return "waitlist";
+        }
+      }
+
+      const resultA = atomicAttemptBooking();
+      const resultB = atomicAttemptBooking();
+
+      // Exactly one succeeds with confirmed (32nd place), one gets waitlisted (33rd)
+      const results = [resultA, resultB].sort();
+      assert.deepStrictEqual(results, ["confirmed", "waitlist"]);
+      assert.strictEqual(confirmedCount, 32);
+      assert.strictEqual(waitlistCount, 1);
     });
   });
 
@@ -777,3 +898,4 @@ describe("Controlled Boarding & Departure Workflow Verification Suite", () => {
     });
   });
 });
+

@@ -213,7 +213,7 @@ export function StudentHomeView({
                           : "bg-emerald-400/20 text-emerald-200 border border-emerald-400/30"
                       }`}
                     >
-                      {nextBooking.passengerCategory === "standing" ? "Standing (10 max)" : "Seated (20 max)"}
+                      {nextBooking.passengerCategory === "standing" ? "Standing (12 max)" : "Seated (20 max)"}
                     </span>
                   </div>
                   <h3 className="text-xl font-bold tracking-tight text-white mt-0.5">

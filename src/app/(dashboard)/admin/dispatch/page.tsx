@@ -136,9 +136,9 @@ export default async function BusManagerDispatchPage() {
       driverName: driver?.full_name || null,
       driverPhone: driver?.phone || null,
       driverHasAppAccess: Boolean(driver?.has_app_access),
-      safeCapacity: vehicle?.safe_capacity ?? j.proposed_allocation ?? 30,
+      safeCapacity: vehicle?.safe_capacity ?? j.proposed_allocation ?? 32,
       seatedCapacity: vehicle?.seated_capacity ?? 20,
-      standingCapacity: vehicle?.standing_capacity ?? 10,
+      standingCapacity: vehicle?.standing_capacity ?? 12,
       readinessStatus,
       delayMinutes: j.delay_minutes || 0,
       delayReason: j.delay_reason || null,
@@ -156,3 +156,4 @@ export default async function BusManagerDispatchPage() {
     </div>
   );
 }
+

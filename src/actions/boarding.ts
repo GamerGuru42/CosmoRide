@@ -105,9 +105,9 @@ export async function verifyAndBoardPassAction(
       boardedSeatedCount: result?.boarded_seated_count as number | undefined,
       boardedStandingCount: result?.boarded_standing_count as number | undefined,
       seatedLimit: (result?.seated_limit as number) ?? 20,
-      standingLimit: (result?.standing_limit as number) ?? 10,
-      capacity: (result?.total_capacity as number) ?? (result?.capacity as number) ?? 30,
-      totalCapacity: (result?.total_capacity as number) ?? 30,
+      standingLimit: (result?.standing_limit as number) ?? 12,
+      capacity: (result?.total_capacity as number) ?? (result?.capacity as number) ?? 32,
+      totalCapacity: (result?.total_capacity as number) ?? 32,
       busRegistration: result?.bus_registration as string | undefined,
     };
   } catch (err: unknown) {

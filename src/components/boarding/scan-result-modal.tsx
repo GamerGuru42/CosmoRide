@@ -119,7 +119,7 @@ export function ScanResultModal({
                         : "bg-emerald-100 text-emerald-900 border border-emerald-300"
                     }`}
                   >
-                    {result.passengerCategory === "standing" ? "Standing Place (10 max)" : "Seated Place (20 max)"}
+                    {result.passengerCategory === "standing" ? "Standing Place (12 max)" : "Seated Place (20 max)"}
                   </span>
                 </div>
               )}

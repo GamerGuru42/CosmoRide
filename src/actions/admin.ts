@@ -445,7 +445,7 @@ export async function createScheduleTemplateAction({
   departureTime,
   latestDepartureTime,
   direction = "outbound",
-  proposedAllocation = 30,
+  proposedAllocation = 32,
   notes,
 }: {
   routeId: string;

@@ -136,8 +136,8 @@ export function BoardingScannerView({ journeys }: BoardingScannerViewProps) {
   ).length;
 
   const seatedLimit = currentJourney?.seatedCapacity ?? 20;
-  const standingLimit = currentJourney?.standingCapacity ?? 10;
-  const totalSafeCapacity = Math.min(30, currentJourney?.safeCapacity || 30);
+  const standingLimit = currentJourney?.standingCapacity ?? 12;
+  const totalSafeCapacity = Math.min(32, currentJourney?.safeCapacity || 32);
 
   // Handler for QR scan
   function handleScan(token: string) {
@@ -521,7 +521,7 @@ export function BoardingScannerView({ journeys }: BoardingScannerViewProps) {
         </div>
       </div>
 
-      {/* Live Capacity Gauge Bar (20 Seated + 10 Standing = 30 Maximum) */}
+      {/* Live Capacity Gauge Bar (20 Seated + 12 Standing = 32 Maximum) */}
       <div className="bg-white rounded-2xl border border-slate-200 p-6 shadow-xs space-y-4">
         <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 text-xs font-bold">
           <div className="flex items-center gap-2">
@@ -539,7 +539,7 @@ export function BoardingScannerView({ journeys }: BoardingScannerViewProps) {
             </span>
           </div>
           <span className="font-mono text-sm text-[#102D4A]">
-            {boardedCount} Boarded / {totalSafeCapacity} Capacity (Max 30)
+            {boardedCount} Boarded / {totalSafeCapacity} Capacity (Max 32)
           </span>
         </div>
 
@@ -565,7 +565,7 @@ export function BoardingScannerView({ journeys }: BoardingScannerViewProps) {
               {standingBoarded} <span className="text-xs font-normal text-[#526B82]">/ {standingLimit}</span>
             </span>
             <span className="text-[10px] text-amber-700 block font-medium">
-              Standing Area (Max 10)
+              Standing Area (Max 12)
             </span>
           </div>
 
@@ -590,10 +590,10 @@ export function BoardingScannerView({ journeys }: BoardingScannerViewProps) {
                 boardedCount >= totalSafeCapacity ? "text-rose-600" : "text-[#20A477]"
               }`}
             >
-              {boardedCount} / 30
+              {boardedCount} / {totalSafeCapacity}
             </span>
             <span className="text-[10px] text-[#526B82] block">
-              {Math.max(0, 30 - boardedCount)} places remaining
+              {Math.max(0, totalSafeCapacity - boardedCount)} places remaining
             </span>
           </div>
         </div>
@@ -602,13 +602,13 @@ export function BoardingScannerView({ journeys }: BoardingScannerViewProps) {
         <div className="w-full h-3 rounded-full bg-slate-100 overflow-hidden">
           <div
             className={`h-full transition-all duration-300 ${
-              boardedCount >= 30
+              boardedCount >= totalSafeCapacity
                 ? "bg-[#D9534F]"
                 : boardedCount >= 20
                 ? "bg-[#E5A13B]"
                 : "bg-[#20A477]"
             }`}
-            style={{ width: `${Math.min(100, Math.round((boardedCount / 30) * 100))}%` }}
+            style={{ width: `${Math.min(100, Math.round((boardedCount / totalSafeCapacity) * 100))}%` }}
           />
         </div>
       </div>

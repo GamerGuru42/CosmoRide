@@ -335,15 +335,15 @@ describe("Phase 6.6: Operational Configuration & Data-Integrity Audit", () => {
       assert.ok(seedContent.includes("'DRV-CU-03'"), "Driver 03 exists");
     });
 
-    it("confirms safe seating capacity is approved at 30 seats per bus (within 1–100)", () => {
-      // Each vehicle in seed has capacity 30
+    it("confirms safe seating capacity is approved at 32 passengers per bus (20 seated + 12 standing)", () => {
+      // Each vehicle in seed has capacity 32 (20 seated, 12 standing)
       const vehicleLines = seedContent
         .split("\n")
         .filter((l) => l.includes("CU-EB-01") || l.includes("CU-EB-02") || l.includes("CU-EB-03"));
 
       assert.strictEqual(vehicleLines.length, 3);
       for (const line of vehicleLines) {
-        assert.ok(line.includes(", 30,"), "Safe capacity must be approved at 30 seats");
+        assert.ok(line.includes("32, 20, 12"), "Safe capacity must be approved at 32 passengers (20 seated, 12 standing)");
       }
     });
   });

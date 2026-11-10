@@ -127,7 +127,7 @@ export default async function HostelManagerOversightPage() {
       boardedCount,
       seatedBoarded,
       standingBoarded,
-      safeCapacity: vehicle?.safe_capacity ?? j.proposed_allocation ?? 30,
+      safeCapacity: vehicle?.safe_capacity ?? j.proposed_allocation ?? 32,
       isOverdue,
       delayMinutes: j.delay_minutes || 0,
       delayReason: j.delay_reason || null,
@@ -204,3 +204,4 @@ export default async function HostelManagerOversightPage() {
     </div>
   );
 }
+

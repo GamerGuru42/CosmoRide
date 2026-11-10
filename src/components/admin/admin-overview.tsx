@@ -401,10 +401,10 @@ export function AdminOverview({
                             : "text-slate-400"
                         }`}
                       >
-                        Total: {j.bookedCount}/{j.safeCapacity || 30}
+                        Total: {j.bookedCount}/{j.safeCapacity || 32}
                       </div>
                       <div className="text-[10px] text-slate-500 font-mono">
-                        Seated: {j.seatedCount ?? 0}/20 · Standing: {j.standingCount ?? 0}/10
+                        Seated: {j.seatedCount ?? 0}/20 · Standing: {j.standingCount ?? 0}/12
                       </div>
                       <div className="w-16 mx-auto bg-slate-100 rounded-full h-1 mt-1 overflow-hidden">
                         <div

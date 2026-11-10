@@ -251,7 +251,7 @@ export function LiveOperationsView({
                       {selectedJourney.vehiclePlate || "Not Assigned"}
                     </p>
                     <p className="text-[11px] text-[#526B82]">
-                      Safe Cap: {selectedJourney.safeCapacity || 30} passengers (20 seated, 10 standing)
+                      Safe Cap: {selectedJourney.safeCapacity || 32} passengers (20 seated, 12 standing)
                     </p>
                   </div>
 
