@@ -141,7 +141,7 @@ export function StudentProfileView({ profile }: StudentProfileViewProps) {
               AUTHORIZED TRANSPORT FLEET
             </span>
             <p className="text-xs font-bold text-[#102D4A] mt-0.5">
-              {profile.transportGroupName || "Standard Student Corridor"}
+              {profile.transportGroupName || "Standard Student Fleet"}
             </p>
           </div>
 

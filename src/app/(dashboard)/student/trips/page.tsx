@@ -90,7 +90,7 @@ export default async function StudentTripsPage() {
           delayMinutes: j.delay_minutes ?? 0,
           delayReason: j.delay_reason,
           route: {
-            name: j.route?.name || "Corridor Route",
+            name: j.route?.name || "Transit Route",
             code: j.route?.code || "CR",
           },
           vehicle: {

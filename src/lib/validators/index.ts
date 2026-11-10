@@ -129,7 +129,16 @@ export const createJourneySchema = z.object({
 
 export const updateJourneyStatusSchema = z.object({
   journeyId: z.string().uuid(),
-  status: z.enum(["scheduled", "boarding", "in_transit", "completed", "cancelled"]),
+  status: z.enum([
+    "scheduled",
+    "bus_arrived",
+    "boarding",
+    "boarding_closed",
+    "ready_to_depart",
+    "in_transit",
+    "completed",
+    "cancelled",
+  ]),
   delayMinutes: z.number().int().min(0).optional(),
   delayReason: z.string().optional(),
 });

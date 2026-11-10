@@ -209,7 +209,7 @@ function getStatusConfig(code: BoardingStatusCode | "INVALID") {
 
     case "WRONG_JOURNEY":
       return {
-        badge: "CORRIDOR / ROUTE MISMATCH",
+        badge: "FLEET / ROUTE MISMATCH",
         headline: "WRONG BUS OR JOURNEY",
         icon: "🚌",
         bannerBg: "bg-[#D9534F]",

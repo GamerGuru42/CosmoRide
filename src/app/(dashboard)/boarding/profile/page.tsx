@@ -5,7 +5,7 @@ import { ROLE_LABELS, DEVELOPER_ATTRIBUTION } from "@/lib/constants";
 
 export const metadata: Metadata = {
   title: "Officer Profile & Transport Authorization — CosmoRide",
-  description: "Boarding officer operational profile and transport corridor assignment.",
+  description: "Boarding officer operational profile and hostel fleet assignment.",
 };
 
 export const dynamic = "force-dynamic";
@@ -71,7 +71,7 @@ export default async function BoardingOfficerProfilePage() {
           Officer Profile & Authorization
         </h1>
         <p className="text-xs text-[#526B82] mt-0.5">
-          Authorized university boarding representative details and corridor assignments.
+          Authorized university boarding representative details and operation assignments.
         </p>
       </div>
 
@@ -107,10 +107,10 @@ export default async function BoardingOfficerProfilePage() {
         <div className="grid gap-3 pt-3 border-t border-slate-100 sm:grid-cols-2 text-xs">
           <div className="rounded-xl bg-[#F6F8FA] border border-slate-200 p-3.5 space-y-1">
             <span className="text-[10px] font-bold text-[#526B82] uppercase tracking-wider block">
-              Assigned Transport Corridor
+              Assigned Hostel Operation / Fleet
             </span>
             <span className="text-sm font-bold text-[#102D4A] block">
-              {transportGroup?.name || "All Corridors (Supervisory)"}
+              {transportGroup?.name || "All Operations (Supervisory)"}
             </span>
             <span className="text-[11px] text-[#526B82] block">
               {transportGroup?.description || "University-wide transport oversight"}
@@ -161,7 +161,7 @@ export default async function BoardingOfficerProfilePage() {
             <span>Security Policy Notice</span>
           </div>
           <p className="leading-relaxed">
-            In accordance with university transport governance, boarding officers cannot alter their assigned transport group or elevate privileges. For corridor re-assignment, contact the Directorate of University Transport.
+            In accordance with university transport governance, boarding officers cannot alter their assigned transport group or elevate privileges. For operation re-assignment, contact the Directorate of University Transport.
           </p>
         </div>
       </div>

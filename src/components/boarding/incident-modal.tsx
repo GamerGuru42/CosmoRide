@@ -15,7 +15,7 @@ const INCIDENT_CATEGORIES = [
   { value: "bus_breakdown", label: "Bus Breakdown / Mechanical Failure" },
   { value: "missed_pickup", label: "Missed Scheduled Pickup Stop" },
   { value: "overcrowding", label: "Overcrowding / Line Contention" },
-  { value: "incorrect_passenger_assignment", label: "Incorrect Corridor / Student Mismatch" },
+  { value: "incorrect_passenger_assignment", label: "Incorrect Route / Student Mismatch" },
   { value: "other", label: "Other Operational Exception" },
 ];
 

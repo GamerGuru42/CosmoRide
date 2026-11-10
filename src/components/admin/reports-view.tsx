@@ -89,7 +89,7 @@ export function ReportsView({
       "Scheduled Departure",
       "Route Code",
       "Route Name",
-      "Corridor",
+      "Fleet / Operation",
       "Vehicle Plate",
       "Driver",
       "Safe Capacity",
@@ -253,7 +253,7 @@ export function ReportsView({
         </div>
       </div>
 
-      {/* Corridor Breakdown & Journey Analytics Table */}
+      {/* Fleet Operation Breakdown & Journey Analytics Table */}
       <div className="rounded-xl border border-slate-200 bg-white shadow-sm overflow-hidden">
         <div className="border-b border-slate-200 px-5 py-4">
           <h3 className="text-sm font-bold text-[#102D4A]">
@@ -274,7 +274,7 @@ export function ReportsView({
               <thead className="border-b border-slate-200 bg-slate-50 text-[11px] uppercase tracking-wider text-[#526B82]">
                 <tr>
                   <th className="px-4 py-3 font-semibold">Date &amp; Time</th>
-                  <th className="px-4 py-3 font-semibold">Route &amp; Corridor</th>
+                  <th className="px-4 py-3 font-semibold">Route &amp; Operation</th>
                   <th className="px-4 py-3 font-semibold">Vehicle</th>
                   <th className="px-4 py-3 font-semibold">Driver</th>
                   <th className="px-4 py-3 font-semibold text-center">Safe Cap</th>

@@ -53,7 +53,7 @@ export function JourneysManagement({
 }: JourneysManagementProps) {
   const [selectedDate, setSelectedDate] = useState(initialDate);
   const [statusFilter, setStatusFilter] = useState("all");
-  const [corridorFilter, setCorridorFilter] = useState("all");
+  const [operationFilter, setOperationFilter] = useState("all");
   const [isPending, startTransition] = useTransition();
 
   // Cancel modal state
@@ -64,10 +64,10 @@ export function JourneysManagement({
 
   const filteredJourneys = journeys.filter((j) => {
     const matchesStatus = statusFilter === "all" || j.status === statusFilter;
-    const matchesCorridor =
-      corridorFilter === "all" ||
-      j.transportGroupName.toLowerCase().includes(corridorFilter.toLowerCase());
-    return matchesStatus && matchesCorridor;
+    const matchesOperation =
+      operationFilter === "all" ||
+      j.transportGroupName.toLowerCase().includes(operationFilter.toLowerCase());
+    return matchesStatus && matchesOperation;
   });
 
   const handleDateChange = (newDate: string) => {
@@ -132,11 +132,11 @@ export function JourneysManagement({
           </select>
 
           <select
-            value={corridorFilter}
-            onChange={(e) => setCorridorFilter(e.target.value)}
+            value={operationFilter}
+            onChange={(e) => setOperationFilter(e.target.value)}
             className="rounded-lg border border-slate-300 bg-white px-3 py-1.5 text-xs text-slate-700 focus:border-[#102D4A] focus:outline-none"
           >
-            <option value="all">All Corridors</option>
+            <option value="all">All Fleet Operations</option>
             <option value="girls">Girls&apos; Fleet</option>
             <option value="boys">Boys&apos; Fleet</option>
           </select>
@@ -195,7 +195,7 @@ export function JourneysManagement({
               <thead className="border-b border-slate-200 bg-slate-50 text-[11px] uppercase tracking-wider text-[#526B82]">
                 <tr>
                   <th className="px-4 py-3 font-semibold">Departure</th>
-                  <th className="px-4 py-3 font-semibold">Route &amp; Corridor</th>
+                  <th className="px-4 py-3 font-semibold">Route &amp; Operation</th>
                   <th className="px-4 py-3 font-semibold">Assigned Bus</th>
                   <th className="px-4 py-3 font-semibold">Driver</th>
                   <th className="px-4 py-3 font-semibold text-center">Passengers / Capacity</th>

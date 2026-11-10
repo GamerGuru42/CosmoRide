@@ -17,10 +17,14 @@ export type UserRole = "student" | "boarding_officer" | "driver" | "admin";
 export type Gender = "male" | "female" | "mixed";
 export type JourneyStatus =
   | "scheduled"
+  | "bus_arrived"
   | "boarding"
+  | "boarding_closed"
+  | "ready_to_depart"
   | "in_transit"
   | "completed"
   | "cancelled";
+export type AdminRoleType = "hostel_manager" | "bus_manager" | "super_admin";
 export type BookingStatus =
   | "confirmed"
   | "checked_in"
@@ -60,6 +64,7 @@ export type Database = {
           student_id: string | null;
           phone: string | null;
           avatar_url: string | null;
+          admin_role: AdminRoleType | null;
           is_active: boolean;
           created_at: string;
           updated_at: string;
@@ -73,6 +78,7 @@ export type Database = {
           student_id?: string | null;
           phone?: string | null;
           avatar_url?: string | null;
+          admin_role?: AdminRoleType | null;
           is_active?: boolean;
           created_at?: string;
           updated_at?: string;
@@ -86,6 +92,7 @@ export type Database = {
           student_id?: string | null;
           phone?: string | null;
           avatar_url?: string | null;
+          admin_role?: AdminRoleType | null;
           is_active?: boolean;
           created_at?: string;
           updated_at?: string;
@@ -501,6 +508,17 @@ export type Database = {
           latest_permitted_departure: string | null;
           actual_departure: string | null;
           actual_arrival: string | null;
+          bus_arrived_at: string | null;
+          bus_arrived_by: string | null;
+          boarding_opened_at: string | null;
+          boarding_opened_by: string | null;
+          boarding_window_minutes: number;
+          boarding_closed_at: string | null;
+          boarding_closed_by: string | null;
+          departure_authorised_at: string | null;
+          departure_authorised_by: string | null;
+          departure_confirmed_by: string | null;
+          boarding_notes: string | null;
           estimated_arrival: string | null;
           proposed_allocation: number;
           status: JourneyStatus;
@@ -526,6 +544,17 @@ export type Database = {
           latest_permitted_departure?: string | null;
           actual_departure?: string | null;
           actual_arrival?: string | null;
+          bus_arrived_at?: string | null;
+          bus_arrived_by?: string | null;
+          boarding_opened_at?: string | null;
+          boarding_opened_by?: string | null;
+          boarding_window_minutes?: number;
+          boarding_closed_at?: string | null;
+          boarding_closed_by?: string | null;
+          departure_authorised_at?: string | null;
+          departure_authorised_by?: string | null;
+          departure_confirmed_by?: string | null;
+          boarding_notes?: string | null;
           estimated_arrival?: string | null;
           proposed_allocation: number;
           status?: JourneyStatus;
@@ -551,6 +580,17 @@ export type Database = {
           latest_permitted_departure?: string | null;
           actual_departure?: string | null;
           actual_arrival?: string | null;
+          bus_arrived_at?: string | null;
+          bus_arrived_by?: string | null;
+          boarding_opened_at?: string | null;
+          boarding_opened_by?: string | null;
+          boarding_window_minutes?: number;
+          boarding_closed_at?: string | null;
+          boarding_closed_by?: string | null;
+          departure_authorised_at?: string | null;
+          departure_authorised_by?: string | null;
+          departure_confirmed_by?: string | null;
+          boarding_notes?: string | null;
           estimated_arrival?: string | null;
           proposed_allocation?: number;
           status?: JourneyStatus;
@@ -1312,6 +1352,46 @@ export type Database = {
           p_officer_id: string;
           p_mark_unboarded_as_noshow?: boolean;
           p_closure_notes?: string | null;
+        };
+        Returns: Json;
+      };
+      confirm_bus_arrival: {
+        Args: {
+          p_journey_id: string;
+          p_user_id: string;
+          p_notes?: string | null;
+        };
+        Returns: Json;
+      };
+      open_journey_boarding: {
+        Args: {
+          p_journey_id: string;
+          p_officer_id: string;
+          p_window_minutes?: number | null;
+        };
+        Returns: Json;
+      };
+      close_journey_boarding: {
+        Args: {
+          p_journey_id: string;
+          p_officer_id: string;
+          p_notes?: string | null;
+        };
+        Returns: Json;
+      };
+      authorise_journey_departure: {
+        Args: {
+          p_journey_id: string;
+          p_officer_id: string;
+          p_notes?: string | null;
+        };
+        Returns: Json;
+      };
+      confirm_journey_dispatch: {
+        Args: {
+          p_journey_id: string;
+          p_user_id: string;
+          p_notes?: string | null;
         };
         Returns: Json;
       };

@@ -72,6 +72,21 @@ export const DEPARTURE_STATUS_CONFIG = {
     badgeClass: "bg-[#E5A13B]/10 text-[#E5A13B] border border-[#E5A13B]/20 animate-pulse",
     dotClass: "bg-[#E5A13B]",
   },
+  bus_arrived: {
+    label: "BUS ARRIVED",
+    badgeClass: "bg-cyan-50 text-cyan-700 border border-cyan-200",
+    dotClass: "bg-cyan-600",
+  },
+  boarding_closed: {
+    label: "BOARDING CLOSED",
+    badgeClass: "bg-amber-100 text-amber-800 border border-amber-300",
+    dotClass: "bg-amber-700",
+  },
+  ready_to_depart: {
+    label: "READY TO DEPART",
+    badgeClass: "bg-blue-50 text-blue-700 border border-blue-200",
+    dotClass: "bg-blue-600",
+  },
   delayed: {
     label: "DELAYED",
     badgeClass: "bg-[#E5A13B]/15 text-[#D9534F] border border-[#D9534F]/30",

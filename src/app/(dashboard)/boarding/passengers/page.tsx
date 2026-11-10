@@ -176,7 +176,7 @@ export default async function BoardingPassengersPage({ searchParams }: PageProps
       journeyDate: j.journey_date,
       scheduledDeparture: j.scheduled_departure,
       status: j.status as ManifestJourney["status"],
-      routeCode: route?.code || "CORRIDOR",
+      routeCode: route?.code || "ROUTE",
       routeName: route?.name || "University Route",
       vehicleRegistration: vehicle?.registration_number || "Unassigned",
       driverName: driver?.full_name || "Assigned Driver",

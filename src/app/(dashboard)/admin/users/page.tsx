@@ -11,7 +11,7 @@ import {
 
 export const metadata: Metadata = {
   title: "Users & Staff Roles — CosmoRide Admin",
-  description: "User directory, operational staff role assignments, and corridor isolation settings.",
+  description: "User directory, operational staff role assignments, and fleet isolation settings.",
 };
 
 export const dynamic = "force-dynamic";
@@ -42,6 +42,7 @@ export default async function AdminUsersPage() {
       student_id,
       phone,
       role,
+      admin_role,
       assigned_transport_group_id,
       hostel_id,
       created_at,
@@ -60,6 +61,7 @@ export default async function AdminUsersPage() {
       studentId: p.student_id,
       phone: p.phone,
       role: (p.role || "student") as UserProfileItem["role"],
+      adminRole: (p.admin_role as UserProfileItem["adminRole"]) || null,
       assignedTransportGroupId: p.assigned_transport_group_id,
       transportGroupName: tg?.name || null,
       hostelName: h?.name || null,
@@ -93,7 +95,7 @@ export default async function AdminUsersPage() {
     <div>
       <PageHeader
         title="User Roles &amp; Staff Permissions"
-        description="Manage university student accounts, assign boarding officer credentials, and enforce corridor operational boundaries."
+        description="Manage university student accounts, assign boarding officer credentials, and enforce fleet operational boundaries."
       />
 
       <UsersManagement

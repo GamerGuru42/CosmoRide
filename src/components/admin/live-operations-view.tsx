@@ -201,7 +201,7 @@ export function LiveOperationsView({
                       {selectedJourney.routeName}
                     </h3>
                     <p className="text-xs text-[#526B82]">
-                      Corridor: {selectedJourney.transportGroupName} • Scheduled:{" "}
+                      Fleet Operation: {selectedJourney.transportGroupName} • Scheduled:{" "}
                       <span className="font-mono font-bold text-[#102D4A]">
                         {formatTime(selectedJourney.scheduledDeparture)}
                       </span>

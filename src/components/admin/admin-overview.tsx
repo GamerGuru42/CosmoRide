@@ -83,11 +83,11 @@ export function AdminOverview({
   registeredStudentsCount,
   totalDriversCount,
 }: AdminOverviewProps) {
-  const [corridorFilter, setCorridorFilter] = useState<string>("all");
+  const [fleetFilter, setFleetFilter] = useState<string>("all");
 
   const filteredJourneys = journeys.filter((j) => {
-    if (corridorFilter === "all") return true;
-    return j.transportGroupName.toLowerCase().includes(corridorFilter.toLowerCase());
+    if (fleetFilter === "all") return true;
+    return j.transportGroupName.toLowerCase().includes(fleetFilter.toLowerCase());
   });
 
   // Calculate real metrics
@@ -226,7 +226,7 @@ export function AdminOverview({
           <div>
             <h2 className="text-base font-bold text-[#102D4A]">Operational Command Actions</h2>
             <p className="text-xs text-[#526B82]">
-              Direct shortcuts for daily journey generation, driver assignments, and corridor policies.
+              Direct shortcuts for daily journey generation, driver assignments, and fleet policies.
             </p>
           </div>
           <div className="flex flex-wrap items-center gap-2">
@@ -274,22 +274,22 @@ export function AdminOverview({
               </p>
             </div>
 
-            {/* Corridor Filter Tabs */}
+            {/* Fleet Filter Tabs */}
             <div className="flex items-center rounded-lg bg-slate-100 p-1 text-xs">
               <button
-                onClick={() => setCorridorFilter("all")}
+                onClick={() => setFleetFilter("all")}
                 className={`rounded-md px-2.5 py-1 font-medium transition-colors ${
-                  corridorFilter === "all"
+                  fleetFilter === "all"
                     ? "bg-white text-[#102D4A] shadow-sm font-semibold"
                     : "text-[#526B82] hover:text-[#102D4A]"
                 }`}
               >
-                All Corridors
+                All Fleets
               </button>
               <button
-                onClick={() => setCorridorFilter("girls")}
+                onClick={() => setFleetFilter("girls")}
                 className={`rounded-md px-2.5 py-1 font-medium transition-colors ${
-                  corridorFilter === "girls"
+                  fleetFilter === "girls"
                     ? "bg-white text-[#102D4A] shadow-sm font-semibold"
                     : "text-[#526B82] hover:text-[#102D4A]"
                 }`}
@@ -297,9 +297,9 @@ export function AdminOverview({
                 Girls&apos; Fleet
               </button>
               <button
-                onClick={() => setCorridorFilter("boys")}
+                onClick={() => setFleetFilter("boys")}
                 className={`rounded-md px-2.5 py-1 font-medium transition-colors ${
-                  corridorFilter === "boys"
+                  fleetFilter === "boys"
                     ? "bg-white text-[#102D4A] shadow-sm font-semibold"
                     : "text-[#526B82] hover:text-[#102D4A]"
                 }`}
@@ -334,7 +334,7 @@ export function AdminOverview({
               <thead className="border-b border-slate-200 bg-slate-50 text-[11px] uppercase tracking-wider text-[#526B82]">
                 <tr>
                   <th className="px-4 py-3 font-semibold">Departure</th>
-                  <th className="px-4 py-3 font-semibold">Route & Corridor</th>
+                  <th className="px-4 py-3 font-semibold">Route & Service</th>
                   <th className="px-4 py-3 font-semibold">Assigned Vehicle</th>
                   <th className="px-4 py-3 font-semibold">Driver & Mode</th>
                   <th className="px-4 py-3 font-semibold text-center">Passengers / Capacity</th>

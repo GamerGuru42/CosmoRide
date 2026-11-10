@@ -152,7 +152,7 @@ export default async function DriverProfilePage() {
             <span>Driver Safety Standards</span>
           </div>
           <p className="leading-relaxed">
-            All drivers must complete the Pre-Trip Vehicle Readiness Checklist prior to departing university terminals. Speed limits across Main Campus and Kado corridors must be strictly observed.
+            All drivers must complete the Pre-Trip Vehicle Readiness Checklist prior to departing university terminals. Speed limits across Main Campus and Kado routes must be strictly observed.
           </p>
         </div>
       </div>

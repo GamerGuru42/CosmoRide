@@ -155,7 +155,7 @@ export default async function DriverDashboardPage() {
       actualDeparture: j.actual_departure,
       actualArrival: j.actual_arrival,
       status: j.status as DriverJourneyData["status"],
-      routeCode: route?.code || "CORRIDOR",
+      routeCode: route?.code || "ROUTE",
       routeName: route?.name || "University Route",
       vehicleRegistration: vehicle?.registration_number || "UNASSIGNED",
       vehicleName: vehicle?.name || null,

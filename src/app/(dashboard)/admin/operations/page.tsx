@@ -192,7 +192,7 @@ export default async function AdminOperationsPage({
       isOverdue,
       routeCode: route?.code || "RT",
       routeName: route?.name || "Route",
-      transportGroupName: tgName || "General Corridor",
+      transportGroupName: tgName || "General Transit Operation",
       vehiclePlate: vehicle?.registration_number || null,
       vehicleName: vehicle?.name || null,
       safeCapacity: vehicle?.safe_capacity ?? j.proposed_allocation ?? 0,

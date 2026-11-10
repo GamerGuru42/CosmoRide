@@ -41,15 +41,16 @@ export interface AssistedJourneyData {
 
 interface AssistedDriverOperationsProps {
   officerName: string;
-  corridorName: string;
+  operationName?: string;
   journeys: AssistedJourneyData[];
 }
 
 export function AssistedDriverOperations({
   officerName,
-  corridorName,
+  operationName,
   journeys,
 }: AssistedDriverOperationsProps) {
+  const activeOperationName = operationName || "Assigned Hostel Operation";
   const [selectedJourneyId, setSelectedJourneyId] = useState<string>(
     journeys[0]?.id || ""
   );
@@ -143,10 +144,10 @@ export function AssistedDriverOperations({
       <div className="rounded-2xl border border-dashed border-slate-300 bg-white p-12 text-center">
         <span className="text-4xl block mb-2">🤝</span>
         <h3 className="text-base font-bold text-[#102D4A]">
-          No Assisted Journeys in Corridor
+          No Assisted Journeys in Operation
         </h3>
         <p className="text-xs text-[#526B82] max-w-sm mx-auto mt-1">
-          There are no scheduled journeys assigned in your corridor today requiring assisted operations.
+          There are no scheduled journeys assigned in your operation today requiring assisted operations.
         </p>
       </div>
     );
@@ -163,7 +164,7 @@ export function AssistedDriverOperations({
               ASSISTED OPERATIONS MODE
             </span>
             <span className="text-xs text-slate-300 font-mono">
-              Corridor: {corridorName}
+              Operation: {activeOperationName}
             </span>
           </div>
           <h2 className="text-xl font-bold">

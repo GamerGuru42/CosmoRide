@@ -156,7 +156,7 @@ export function PassengerManifestView({
           No Journeys Available
         </h3>
         <p className="text-xs text-[#526B82] max-w-sm mx-auto mt-1">
-          There are no scheduled journeys assigned to your corridor. Manifests will appear when trips are scheduled.
+          There are no scheduled journeys assigned to your operation. Manifests will appear when trips are scheduled.
         </p>
       </div>
     );
@@ -187,7 +187,7 @@ export function PassengerManifestView({
             Passenger Manifest & Roster
           </h2>
           <p className="text-xs text-[#526B82]">
-            Corridor: <span className="font-semibold text-[#102D4A]">{officerGroupName}</span> • Real-time passenger boarding registry
+            Operation: <span className="font-semibold text-[#102D4A]">{officerGroupName}</span> • Real-time passenger boarding registry
           </p>
         </div>
 

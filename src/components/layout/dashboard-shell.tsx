@@ -18,6 +18,7 @@ interface DashboardUser {
   email: string;
   fullName: string;
   role: UserRole;
+  adminRole?: string | null;
   avatarUrl: string | null;
   studentId?: string | null;
 }
@@ -30,7 +31,7 @@ interface DashboardShellProps {
 /**
  * Dashboard shell with role-adaptive navigation.
  * - For students: renders the modern mobile bottom bar + desktop top navigation layout.
- * - For operational staff (drivers, boarding officers, admins): renders the operational sidebar.
+ * - For operational staff (drivers, hostel reps, bus manager, hostel manager, admins): renders the operational sidebar.
  */
 export function DashboardShell({ user, children }: DashboardShellProps) {
   const pathname = usePathname();
@@ -43,7 +44,16 @@ export function DashboardShell({ user, children }: DashboardShellProps) {
   }
 
   const dashboardPath = ROLE_DASHBOARDS[user.role];
-  const navItems = getNavItems(user.role, dashboardPath);
+  const navItems = getNavItems(user.role, dashboardPath, user.adminRole);
+
+  const roleLabel =
+    user.role === "admin"
+      ? user.adminRole === "hostel_manager"
+        ? "Hostel Manager"
+        : user.adminRole === "bus_manager"
+        ? "Bus Manager"
+        : "Transport Administrator"
+      : ROLE_LABELS[user.role];
 
   async function handleSignOut() {
     const supabase = createClient();
@@ -78,7 +88,7 @@ export function DashboardShell({ user, children }: DashboardShellProps) {
               {APP_NAME}
             </p>
             <p className="text-xs text-[#526B82]">
-              {ROLE_LABELS[user.role]}
+              {roleLabel}
             </p>
           </div>
         </div>
@@ -174,7 +184,8 @@ export function DashboardShell({ user, children }: DashboardShellProps) {
 
 function getNavItems(
   role: UserRole,
-  basePath: string
+  basePath: string,
+  adminRole?: string | null
 ): { href: string; label: string; icon: string }[] {
   switch (role) {
     case "student":
@@ -182,9 +193,9 @@ function getNavItems(
     case "boarding_officer":
       return [
         { href: basePath, label: "Dashboard", icon: "🏠" },
-        { href: `${basePath}/boarding`, label: "Boarding", icon: "📋" },
+        { href: `${basePath}/boarding`, label: "Boarding Gate", icon: "📋" },
         { href: `${basePath}/assisted`, label: "Assisted Trips", icon: "🤝" },
-        { href: `${basePath}/passengers`, label: "Passengers", icon: "👥" },
+        { href: `${basePath}/passengers`, label: "Passenger Manifest", icon: "👥" },
         { href: `${basePath}/profile`, label: "Profile", icon: "👤" },
       ];
     case "driver":
@@ -194,8 +205,37 @@ function getNavItems(
         { href: `${basePath}/profile`, label: "Profile", icon: "👤" },
       ];
     case "admin":
+      if (adminRole === "bus_manager") {
+        return [
+          { href: `${basePath}/dispatch`, label: "Bus Dispatch Console", icon: "🚀" },
+          { href: `${basePath}/operations`, label: "Live Telemetry", icon: "📡" },
+          { href: `${basePath}/drivers`, label: "Driver Coordination", icon: "👨‍✈️" },
+          { href: `${basePath}/vehicles`, label: "Fleet Vehicles", icon: "🚍" },
+          { href: `${basePath}/schedules`, label: "Schedules", icon: "📅" },
+          { href: `${basePath}/journeys`, label: "Journeys", icon: "🚌" },
+          { href: `${basePath}/incidents`, label: "Incidents", icon: "⚠️" },
+          { href: `${basePath}/announcements`, label: "Announcements", icon: "📢" },
+        ];
+      }
+
+      if (adminRole === "hostel_manager") {
+        return [
+          { href: `${basePath}/oversight`, label: "Hostel Operations Oversight", icon: "🛡️" },
+          { href: `${basePath}/dispatch`, label: "Bus Dispatch Status", icon: "🚀" },
+          { href: basePath, label: "Control Centre", icon: "🎛️" },
+          { href: `${basePath}/operations`, label: "Live Operations", icon: "📡" },
+          { href: `${basePath}/journeys`, label: "Journeys", icon: "🚌" },
+          { href: `${basePath}/incidents`, label: "Incidents", icon: "⚠️" },
+          { href: `${basePath}/announcements`, label: "Announcements", icon: "📢" },
+          { href: `${basePath}/reports`, label: "Reports", icon: "📊" },
+          { href: `${basePath}/audit`, label: "Audit Logs", icon: "📜" },
+        ];
+      }
+
       return [
         { href: basePath, label: "Control Centre", icon: "🎛️" },
+        { href: `${basePath}/oversight`, label: "Hostel Oversight", icon: "🛡️" },
+        { href: `${basePath}/dispatch`, label: "Bus Dispatch", icon: "🚀" },
         { href: `${basePath}/operations`, label: "Live Operations", icon: "📡" },
         { href: `${basePath}/journeys`, label: "Journeys", icon: "🚌" },
         { href: `${basePath}/schedules`, label: "Schedules", icon: "📅" },

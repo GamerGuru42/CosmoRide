@@ -38,19 +38,19 @@ export default async function AssistedDriverOperationsPage() {
   }
 
   // Fetch transport group name
-  let corridorName = "All Transport Corridors (Supervisory)";
+  let operationName = "All Hostel Operations (Supervisory)";
   if (profile.assigned_transport_group_id) {
     const { data: tg } = await supabase
       .from("transport_groups")
       .select("name")
       .eq("id", profile.assigned_transport_group_id)
       .single();
-    if (tg) corridorName = tg.name;
+    if (tg) operationName = tg.name;
   }
 
   const todayStr = getTodayDateString();
 
-  // Fetch today's journeys in corridor
+  // Fetch today's journeys in operation
   let journeysQuery = supabase
     .from("journeys")
     .select(`
@@ -171,7 +171,7 @@ export default async function AssistedDriverOperationsPage() {
       actualDeparture: j.actual_departure,
       actualArrival: j.actual_arrival,
       status: j.status as AssistedJourneyData["status"],
-      routeCode: route?.code || "CORRIDOR",
+      routeCode: route?.code || "ROUTE",
       routeName: route?.name || "University Route",
       vehicleRegistration: vehicle?.registration_number || "UNASSIGNED",
       vehicleName: vehicle?.name || null,
@@ -195,7 +195,7 @@ export default async function AssistedDriverOperationsPage() {
     <div className="space-y-6">
       <AssistedDriverOperations
         officerName={profile.full_name}
-        corridorName={corridorName}
+        operationName={operationName}
         journeys={journeys}
       />
     </div>

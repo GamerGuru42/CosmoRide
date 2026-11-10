@@ -98,10 +98,10 @@ export function AnnouncementsManagement({
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 rounded-xl border border-slate-200 bg-white p-4 shadow-sm">
         <div>
           <h3 className="text-sm font-bold text-[#102D4A]">
-            Passenger Announcements &amp; Corridor Notices ({announcements.length})
+            Passenger Announcements &amp; Fleet Notices ({announcements.length})
           </h3>
           <p className="text-xs text-[#526B82]">
-            Broadcast official transport notices to students, boarding officers, or specific campus corridors.
+            Broadcast official transport notices to students, boarding officers, or specific campus fleet operations.
           </p>
         </div>
 
@@ -249,14 +249,14 @@ export function AnnouncementsManagement({
 
                 <div>
                   <label className="block font-semibold text-[#102D4A] mb-1">
-                    Corridor / Fleet Group
+                    Hostel Operation / Fleet Group
                   </label>
                   <select
                     value={transportGroupId}
                     onChange={(e) => setTransportGroupId(e.target.value)}
                     className="w-full rounded-lg border border-slate-300 p-2 focus:border-[#102D4A] focus:outline-none"
                   >
-                    <option value="">All Corridors</option>
+                    <option value="">All Fleet Operations</option>
                     {transportGroups.map((tg) => (
                       <option key={tg.id} value={tg.id}>
                         {tg.name}

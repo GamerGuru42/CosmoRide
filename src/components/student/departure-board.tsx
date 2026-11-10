@@ -3,6 +3,7 @@
 import React, { useState, useMemo, useTransition } from "react";
 import { formatTime, formatDate, calculateAvailableSeats, getTodayDateString } from "@/lib/utils";
 import { DEPARTURE_STATUS_CONFIG } from "@/lib/constants";
+import type { JourneyStatus } from "@/lib/supabase/types";
 import { bookSeat } from "@/actions/bookings";
 import { BusIcon, ClockIcon, AlertTriangleIcon, CheckCircleIcon } from "@/components/ui/icons";
 
@@ -18,7 +19,7 @@ export interface DepartureJourney {
   journeyDate: string;
   scheduledDeparture: string;
   actualDeparture: string | null;
-  status: "scheduled" | "boarding" | "in_transit" | "completed" | "cancelled";
+  status: JourneyStatus;
   delayMinutes: number;
   delayReason: string | null;
   proposedAllocation: number;
@@ -149,18 +150,18 @@ export function DepartureBoard({ journeys, currentUserId, onBookingSuccess }: De
             </button>
           </div>
 
-          {/* Route / Service Corridor Selector */}
+          {/* Route / Service Fleet Selector */}
           <div className="flex items-center gap-2">
-            <label htmlFor="service-corridor-filter" className="text-xs font-medium text-[#526B82]">Corridor:</label>
+            <label htmlFor="service-fleet-filter" className="text-xs font-medium text-[#526B82]">Service:</label>
             <select
-              id="service-corridor-filter"
+              id="service-fleet-filter"
               value={selectedRouteFilter}
               onChange={(e) => setSelectedRouteFilter(e.target.value)}
               className="text-xs font-semibold bg-white border border-slate-200 rounded-lg px-3 py-1.5 text-[#102D4A] focus:outline-none focus:border-[#102D4A]"
             >
-              <option value="all">All Corridors & Campuses</option>
+              <option value="all">All Services & Campuses</option>
               <option value="female">Girls&apos; Fleet Only</option>
-              <option value="male">Boys&apos; Corridor Only</option>
+              <option value="male">Boys&apos; Fleet Only</option>
               <option value="mixed">Inter-Campus Transfers</option>
             </select>
           </div>
@@ -195,6 +196,9 @@ export function DepartureBoard({ journeys, currentUserId, onBookingSuccess }: De
             else if (j.status === "in_transit") statusKey = "in_transit";
             else if (j.status === "completed") statusKey = "completed";
             else if (j.status === "boarding") statusKey = "boarding";
+            else if (j.status === "bus_arrived") statusKey = "bus_arrived";
+            else if (j.status === "boarding_closed") statusKey = "boarding_closed";
+            else if (j.status === "ready_to_depart") statusKey = "ready_to_depart";
             else if (isDelayed) statusKey = "delayed";
             else if (isFull) statusKey = "full";
             else statusKey = "booking_open";
@@ -239,7 +243,7 @@ export function DepartureBoard({ journeys, currentUserId, onBookingSuccess }: De
                       </p>
                     </div>
 
-                    {/* Corridor & Stops */}
+                    {/* Route & Stops */}
                     <div>
                       <div className="flex items-center gap-2">
                         <span className="font-bold text-sm text-[#102D4A]">
@@ -450,7 +454,7 @@ export function DepartureBoard({ journeys, currentUserId, onBookingSuccess }: De
                   {/* Summary Card */}
                   <div className="bg-[#F6F8FA] p-3.5 rounded-xl border border-slate-200 space-y-2 text-xs">
                     <div className="flex justify-between items-center text-[#102D4A] font-bold">
-                      <span>Corridor</span>
+                      <span>Route</span>
                       <span>{activeBookingJourney.originName} → {activeBookingJourney.destinationName}</span>
                     </div>
                     <div className="flex justify-between items-center text-[#526B82]">

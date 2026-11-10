@@ -87,7 +87,7 @@ export default async function BoardingOfficerDashboardPage() {
     .eq("journey_date", todayStr)
     .order("scheduled_departure", { ascending: true });
 
-  // Enforce transport group isolation: if boarding officer with assigned group, only fetch their corridor
+  // Enforce transport group isolation: if boarding officer with assigned group, only fetch their assigned operation
   if (profile.role === "boarding_officer" && profile.assigned_transport_group_id) {
     journeysQuery = journeysQuery.eq("routes.transport_group_id", profile.assigned_transport_group_id);
   }
@@ -123,13 +123,13 @@ export default async function BoardingOfficerDashboardPage() {
 
   return (
     <div className="space-y-6">
-      {/* Top Banner: Transport Corridor Badge & Greeting */}
+      {/* Top Banner: Transport Operation Badge & Greeting */}
       <div className="rounded-2xl bg-[#102D4A] p-6 text-white shadow-sm flex flex-col md:flex-row md:items-center justify-between gap-4">
         <div>
           <div className="flex items-center gap-2 mb-1.5">
             <span className="inline-flex items-center gap-1.5 rounded-full bg-emerald-500/20 px-2.5 py-0.5 text-[11px] font-bold text-emerald-300">
               <span className="h-2 w-2 rounded-full bg-emerald-400 animate-pulse" />
-              CORRIDOR ENFORCED
+              FLEET ENFORCED
             </span>
             <span className="text-xs text-slate-300 font-mono">
               {formatDate(todayStr)}
@@ -139,7 +139,7 @@ export default async function BoardingOfficerDashboardPage() {
             Boarding Operations Console
           </h1>
           <p className="text-xs text-slate-300 mt-1 max-w-xl">
-            Officer: <span className="text-white font-semibold">{profile.full_name}</span> • Assigned Corridor:{" "}
+            Officer: <span className="text-white font-semibold">{profile.full_name}</span> • Assigned Hostel Operation:{" "}
             <span className="text-emerald-300 font-semibold">{transportGroupName}</span>
           </p>
         </div>
@@ -225,11 +225,11 @@ export default async function BoardingOfficerDashboardPage() {
         </div>
       </div>
 
-      {/* Corridor Information Card */}
+      {/* Operation Information Card */}
       <div className="rounded-2xl border border-slate-200 bg-white p-5 shadow-2xs flex flex-col sm:flex-row sm:items-center justify-between gap-3">
         <div className="space-y-1">
           <span className="text-[10px] font-bold uppercase tracking-wider text-[#526B82]">
-            SECURITY & CORRIDOR ENFORCEMENT
+            SECURITY & FLEET ENFORCEMENT
           </span>
           <p className="text-xs text-[#102D4A] font-medium leading-relaxed">
             Your officer account is locked to <strong>{transportGroupName}</strong>. Pass validation strictly denies cross-group tickets and enforces vehicle capacity limits.
@@ -260,7 +260,7 @@ export default async function BoardingOfficerDashboardPage() {
               No Journeys Scheduled Today
             </h3>
             <p className="text-xs text-[#526B82] max-w-sm mx-auto mt-1">
-              There are no departures scheduled for your transport corridor today. Once administrators create scheduled journeys, they will appear here.
+              There are no departures scheduled for your hostel operation today. Once administrators create scheduled journeys, they will appear here.
             </p>
           </div>
         ) : (
@@ -287,7 +287,7 @@ export default async function BoardingOfficerDashboardPage() {
                     <div className="flex items-start justify-between gap-2">
                       <div>
                         <span className="text-[10px] font-bold font-mono uppercase tracking-wider text-[#526B82]">
-                          {route?.code || "CORRIDOR"}
+                          {route?.code || "ROUTE"}
                         </span>
                         <h3 className="text-base font-extrabold text-[#102D4A]">
                           {route?.name || "University Route"}

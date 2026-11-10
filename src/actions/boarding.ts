@@ -5,14 +5,20 @@ import { createClient } from "@/lib/supabase/server";
 
 export type BoardingStatusCode =
   | "VALID"
+  | "BOARDING_APPROVED"
   | "ALREADY_BOARDED"
   | "INVALID_TICKET"
   | "WRONG_JOURNEY"
   | "CANCELLED"
+  | "TICKET_CANCELLED"
   | "CROSS_GROUP_DENIED"
+  | "BUS_FULL"
   | "CAPACITY_EXCEEDED"
+  | "JOURNEY_NOT_BOARDING"
+  | "BOARDING_CLOSED"
   | "JOURNEY_CLOSED"
   | "UNAUTHORIZED"
+  | "FORBIDDEN"
   | "SERVER_ERROR";
 
 export interface BoardingVerificationResult {
@@ -23,7 +29,12 @@ export interface BoardingVerificationResult {
   studentId?: string;
   passengerCategory?: "seated" | "standing";
   boardedCount?: number;
+  boardedSeatedCount?: number;
+  boardedStandingCount?: number;
+  seatedLimit?: number;
+  standingLimit?: number;
   capacity?: number;
+  totalCapacity?: number;
   busRegistration?: string;
   originalScanAt?: string;
 }
@@ -33,6 +44,7 @@ export interface BoardingActionResponse<T = unknown> {
   message?: string;
   data?: T;
   error?: string;
+  code?: string;
 }
 
 /**
@@ -84,13 +96,18 @@ export async function verifyAndBoardPassAction(
 
     return {
       success: Boolean(result?.success),
-      code: (result?.code as BoardingStatusCode) || (result?.success ? "VALID" : "SERVER_ERROR"),
+      code: (result?.code as BoardingStatusCode) || (result?.success ? "BOARDING_APPROVED" : "SERVER_ERROR"),
       message: (result?.message as string) || (result?.error as string) || "Verification complete",
       passengerName: result?.passenger_name as string | undefined,
       studentId: result?.student_id as string | undefined,
       passengerCategory: result?.passenger_category as "seated" | "standing" | undefined,
       boardedCount: result?.boarded_count as number | undefined,
-      capacity: result?.capacity as number | undefined,
+      boardedSeatedCount: result?.boarded_seated_count as number | undefined,
+      boardedStandingCount: result?.boarded_standing_count as number | undefined,
+      seatedLimit: (result?.seated_limit as number) ?? 20,
+      standingLimit: (result?.standing_limit as number) ?? 10,
+      capacity: (result?.total_capacity as number) ?? (result?.capacity as number) ?? 30,
+      totalCapacity: (result?.total_capacity as number) ?? 30,
       busRegistration: result?.bus_registration as string | undefined,
     };
   } catch (err: unknown) {
@@ -104,9 +121,13 @@ export async function verifyAndBoardPassAction(
 }
 
 /**
- * Starts a boarding session for a journey (transitions status to 'boarding').
+ * Stage 2: Confirm Bus Arrival at designated pickup point.
+ * Doors remain closed; arrival does NOT automatically open boarding.
  */
-export async function startBoardingSession(journeyId: string): Promise<BoardingActionResponse> {
+export async function confirmBusArrivalAction(
+  journeyId: string,
+  notes?: string
+): Promise<BoardingActionResponse> {
   try {
     const supabase = await createClient();
     const {
@@ -117,40 +138,272 @@ export async function startBoardingSession(journeyId: string): Promise<BoardingA
       return { success: false, error: "Authentication required." };
     }
 
-    const { data: profile } = await supabase
-      .from("profiles")
-      .select("role")
-      .eq("id", user.id)
-      .single();
-
-    if (profile?.role !== "boarding_officer" && profile?.role !== "admin") {
-      return { success: false, error: "Only boarding officers or administrators can start boarding." };
-    }
-
-    const { error } = await supabase
-      .from("journeys")
-      .update({ status: "boarding" })
-      .eq("id", journeyId);
+    const { data, error } = await supabase.rpc("confirm_bus_arrival", {
+      p_journey_id: journeyId,
+      p_user_id: user.id,
+      p_notes: notes || null,
+    });
 
     if (error) {
       return { success: false, error: error.message };
     }
 
+    const result = data as Record<string, unknown>;
+    if (!result?.success) {
+      return {
+        success: false,
+        error: (result?.error as string) || "Failed to confirm bus arrival.",
+        code: result?.code as string,
+      };
+    }
+
     revalidatePath("/boarding");
     revalidatePath("/boarding/boarding");
+    revalidatePath("/admin/operations");
+    revalidatePath("/driver");
     revalidatePath("/student/departures");
 
-    return { success: true, message: "Boarding session started." };
+    return {
+      success: true,
+      message: (result.message as string) || "Bus arrival confirmed at pickup point.",
+      data: result,
+    };
   } catch (err: unknown) {
-    const message = err instanceof Error ? err.message : "Failed to start boarding session.";
+    const message = err instanceof Error ? err.message : "Failed to confirm bus arrival.";
     return { success: false, error: message };
   }
 }
 
 /**
- * Authorised journey closure workflow.
- * Summarises boarding metrics, optionally marks unboarded confirmed passengers as no-shows,
- * departs the bus, and logs the closure timestamp to audit logs.
+ * Stage 3: Open Boarding Session.
+ * Confirmed by representative after bus & queue readiness check.
+ * Starts visible countdown timer (default 10 mins or configured).
+ */
+export async function openBoardingSessionAction(
+  journeyId: string,
+  windowMinutes?: number
+): Promise<BoardingActionResponse> {
+  try {
+    const supabase = await createClient();
+    const {
+      data: { user },
+    } = await supabase.auth.getUser();
+
+    if (!user) {
+      return { success: false, error: "Authentication required." };
+    }
+
+    const { data, error } = await supabase.rpc("open_journey_boarding", {
+      p_journey_id: journeyId,
+      p_officer_id: user.id,
+      p_window_minutes: windowMinutes || null,
+    });
+
+    if (error) {
+      return { success: false, error: error.message };
+    }
+
+    const result = data as Record<string, unknown>;
+    if (!result?.success) {
+      return {
+        success: false,
+        error: (result?.error as string) || "Failed to open boarding session.",
+        code: result?.code as string,
+      };
+    }
+
+    revalidatePath("/boarding");
+    revalidatePath("/boarding/boarding");
+    revalidatePath("/admin/operations");
+    revalidatePath("/driver");
+    revalidatePath("/student/departures");
+
+    return {
+      success: true,
+      message: (result.message as string) || "Boarding session started.",
+      data: result,
+    };
+  } catch (err: unknown) {
+    const message = err instanceof Error ? err.message : "Failed to open boarding session.";
+    return { success: false, error: message };
+  }
+}
+
+/**
+ * Backwards-compatible alias for startBoardingSession
+ */
+export async function startBoardingSession(journeyId: string) {
+  return openBoardingSessionAction(journeyId);
+}
+
+/**
+ * Stage 5: Close Boarding Session.
+ * Representative manually closes boarding or reviews upon timer expiry.
+ * Timer expiry NEVER auto-departs bus.
+ * Preserves unboarded passengers WITHOUT auto-marking as no-shows.
+ */
+export async function closeBoardingSessionAction(
+  journeyId: string,
+  notes?: string
+): Promise<BoardingActionResponse> {
+  try {
+    const supabase = await createClient();
+    const {
+      data: { user },
+    } = await supabase.auth.getUser();
+
+    if (!user) {
+      return { success: false, error: "Authentication required." };
+    }
+
+    const { data, error } = await supabase.rpc("close_journey_boarding", {
+      p_journey_id: journeyId,
+      p_officer_id: user.id,
+      p_notes: notes || null,
+    });
+
+    if (error) {
+      return { success: false, error: error.message };
+    }
+
+    const result = data as Record<string, unknown>;
+    if (!result?.success) {
+      return {
+        success: false,
+        error: (result?.error as string) || "Failed to close boarding.",
+        code: result?.code as string,
+      };
+    }
+
+    revalidatePath("/boarding");
+    revalidatePath("/boarding/boarding");
+    revalidatePath("/boarding/passengers");
+    revalidatePath("/admin/operations");
+
+    return {
+      success: true,
+      message: (result.message as string) || "Boarding closed. Manifest ready for review.",
+      data: result,
+    };
+  } catch (err: unknown) {
+    const message = err instanceof Error ? err.message : "Failed to close boarding.";
+    return { success: false, error: message };
+  }
+}
+
+/**
+ * Stage 6: Authorise Journey Departure (Ready to Depart).
+ * The representative explicitly confirms boarding completion and authorises departure.
+ * Bus Manager sees that the journey is ready for dispatch; driver is instructed to close doors.
+ */
+export async function authoriseDepartureAction(
+  journeyId: string,
+  notes?: string
+): Promise<BoardingActionResponse> {
+  try {
+    const supabase = await createClient();
+    const {
+      data: { user },
+    } = await supabase.auth.getUser();
+
+    if (!user) {
+      return { success: false, error: "Authentication required." };
+    }
+
+    const { data, error } = await supabase.rpc("authorise_journey_departure", {
+      p_journey_id: journeyId,
+      p_officer_id: user.id,
+      p_notes: notes || null,
+    });
+
+    if (error) {
+      return { success: false, error: error.message };
+    }
+
+    const result = data as Record<string, unknown>;
+    if (!result?.success) {
+      return {
+        success: false,
+        error: (result?.error as string) || "Failed to authorise departure.",
+        code: result?.code as string,
+      };
+    }
+
+    revalidatePath("/boarding");
+    revalidatePath("/boarding/boarding");
+    revalidatePath("/admin/operations");
+    revalidatePath("/driver");
+    revalidatePath("/student/departures");
+
+    return {
+      success: true,
+      message: (result.message as string) || "Departure authorised. Ready for dispatch.",
+      data: result,
+    };
+  } catch (err: unknown) {
+    const message = err instanceof Error ? err.message : "Failed to authorise departure.";
+    return { success: false, error: message };
+  }
+}
+
+/**
+ * Stage 7: Confirm Journey Dispatch / Actual Departure.
+ * Confirms actual departure time, sets journey status to 'in_transit',
+ * and notifies students.
+ */
+export async function confirmDispatchAction(
+  journeyId: string,
+  notes?: string
+): Promise<BoardingActionResponse> {
+  try {
+    const supabase = await createClient();
+    const {
+      data: { user },
+    } = await supabase.auth.getUser();
+
+    if (!user) {
+      return { success: false, error: "Authentication required." };
+    }
+
+    const { data, error } = await supabase.rpc("confirm_journey_dispatch", {
+      p_journey_id: journeyId,
+      p_user_id: user.id,
+      p_notes: notes || null,
+    });
+
+    if (error) {
+      return { success: false, error: error.message };
+    }
+
+    const result = data as Record<string, unknown>;
+    if (!result?.success) {
+      return {
+        success: false,
+        error: (result?.error as string) || "Failed to confirm dispatch.",
+        code: result?.code as string,
+      };
+    }
+
+    revalidatePath("/boarding");
+    revalidatePath("/boarding/boarding");
+    revalidatePath("/boarding/passengers");
+    revalidatePath("/admin/operations");
+    revalidatePath("/driver");
+    revalidatePath("/student/departures");
+
+    return {
+      success: true,
+      message: (result.message as string) || "Journey successfully departed.",
+      data: result,
+    };
+  } catch (err: unknown) {
+    const message = err instanceof Error ? err.message : "Failed to record departure.";
+    return { success: false, error: message };
+  }
+}
+
+/**
+ * Authorised journey closure workflow (backwards compatible).
  */
 export async function closeAndDepartJourneyAction(
   journeyId: string,
@@ -170,7 +423,6 @@ export async function closeAndDepartJourneyAction(
     const { data, error } = await supabase.rpc("close_and_depart_journey", {
       p_journey_id: journeyId,
       p_officer_id: user.id,
-      p_mark_unboarded_as_noshow: markUnboardedAsNoShow,
       p_closure_notes: closureNotes || null,
     });
 
@@ -206,7 +458,13 @@ export async function closeAndDepartJourneyAction(
 /**
  * Backwards-compatible alias for closeAndDepartJourneyAction
  */
-export const departJourney = closeAndDepartJourneyAction;
+export async function departJourney(
+  journeyId: string,
+  markUnboardedAsNoShow = false,
+  closureNotes?: string
+) {
+  return closeAndDepartJourneyAction(journeyId, markUnboardedAsNoShow, closureNotes);
+}
 
 /**
  * Manual boarding override for a student who does not have their phone/QR pass.

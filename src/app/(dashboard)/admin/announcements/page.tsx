@@ -94,7 +94,7 @@ export default async function AdminAnnouncementsPage() {
     <div>
       <PageHeader
         title="Announcements &amp; Passenger Communications"
-        description="Publish university-wide transit bulletins, corridor notifications, and service disruption alerts."
+        description="Publish university-wide transit bulletins, fleet notifications, and service disruption alerts."
       />
 
       <AnnouncementsManagement

@@ -741,14 +741,16 @@ export async function updateSystemSettingAction(
 // 8. USER ROSTER & ROLE ASSIGNMENTS
 // ============================================================
 
-export async function updateUserRoleAndCorridorAction({
+export async function updateUserRoleAndOperationAction({
   userId,
   role,
+  adminRole,
   assignedTransportGroupId,
   hostelId,
 }: {
   userId: string;
   role: "student" | "boarding_officer" | "driver" | "admin";
+  adminRole?: "hostel_manager" | "bus_manager" | "super_admin" | null;
   assignedTransportGroupId?: string | null;
   hostelId?: string | null;
 }): Promise<AdminActionResponse> {
@@ -758,19 +760,22 @@ export async function updateUserRoleAndCorridorAction({
     // Check target user
     const { data: targetUser, error: fetchErr } = await supabase
       .from("profiles")
-      .select("role, full_name")
+      .select("role, full_name, admin_role")
       .eq("id", userId)
       .single();
 
     if (fetchErr || !targetUser) return { success: false, error: "Target user not found." };
 
+    const updatePayload: Database["public"]["Tables"]["profiles"]["Update"] = {
+      role,
+      assigned_transport_group_id: assignedTransportGroupId || null,
+      hostel_id: hostelId || null,
+      admin_role: role === "admin" ? (adminRole || null) : null,
+    };
+
     const { error: updateErr } = await supabase
       .from("profiles")
-      .update({
-        role,
-        assigned_transport_group_id: assignedTransportGroupId || null,
-        hostel_id: hostelId || null,
-      })
+      .update(updatePayload)
       .eq("id", userId);
 
     if (updateErr) return { success: false, error: updateErr.message };
@@ -784,12 +789,13 @@ export async function updateUserRoleAndCorridorAction({
       details: {
         previous_role: targetUser.role,
         new_role: role,
-        transport_group: assignedTransportGroupId,
+        admin_role: (updatePayload.admin_role ?? null) as string | null,
+        transport_group: assignedTransportGroupId ?? null,
       },
     });
 
     revalidatePath("/admin/users");
-    return { success: true, message: `Updated ${targetUser.full_name} to role ${role}.` };
+    return { success: true, message: `Updated ${targetUser.full_name} to role ${role}${adminRole ? ` (${adminRole})` : ""}.` };
   } catch (err: unknown) {
     const message = err instanceof Error ? err.message : "Failed to update user role.";
     return { success: false, error: message };

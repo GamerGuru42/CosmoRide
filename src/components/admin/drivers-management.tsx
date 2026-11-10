@@ -252,7 +252,7 @@ export function DriversManagement({
             Driver Roster &amp; Operational Modes ({filteredDrivers.length})
           </h3>
           <p className="mt-0.5 text-xs text-[#526B82]">
-            Authorised drivers for campus shuttles, girls&apos; fleet, and inter-campus transit corridors.
+            Authorised drivers for campus shuttles, girls&apos; fleet, and inter-campus transit routes.
           </p>
         </div>
 

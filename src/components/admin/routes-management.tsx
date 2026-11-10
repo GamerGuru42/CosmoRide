@@ -173,7 +173,7 @@ export function RoutesManagement({
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 rounded-xl border border-slate-200 bg-white p-4 shadow-sm">
         <div>
           <h3 className="text-sm font-bold text-[#102D4A]">
-            Campus Corridors &amp; Transit Routes ({routes.length})
+            Campus Transit Routes &amp; Stops ({routes.length})
           </h3>
           <p className="text-xs text-[#526B82]">
             Define official shuttle routes and intermediate passenger pickup points between Main and Kado campuses.
@@ -231,11 +231,11 @@ export function RoutesManagement({
                   </div>
 
                   <p className="mt-2 text-[11px] text-[#526B82] line-clamp-2">
-                    {r.description || "Campus transport corridor."}
+                    {r.description || "Campus transit route."}
                   </p>
 
                   <div className="mt-3 flex items-center justify-between border-t border-slate-100 pt-2 text-[11px] text-slate-500">
-                    <span>Corridor: {r.transportGroupName}</span>
+                    <span>Fleet: {r.transportGroupName}</span>
                     <span className="font-medium text-[#102D4A]">
                       {r.stops.length} stop(s)
                     </span>
@@ -262,7 +262,7 @@ export function RoutesManagement({
                     </h3>
                   </div>
                   <p className="mt-0.5 text-xs text-[#526B82]">
-                    Corridor: <span className="font-semibold">{selectedRoute.transportGroupName}</span> • {selectedRoute.stops.length} Ordered Transit Stop(s)
+                    Fleet: <span className="font-semibold">{selectedRoute.transportGroupName}</span> • {selectedRoute.stops.length} Ordered Transit Stop(s)
                   </p>
                 </div>
 
@@ -363,7 +363,7 @@ export function RoutesManagement({
           <div className="w-full max-w-md rounded-2xl bg-white p-6 shadow-xl">
             <h3 className="text-base font-bold text-[#102D4A]">Create Transportation Route</h3>
             <p className="mt-1 text-xs text-[#526B82]">
-              Define a new shuttle corridor for Cosmopolitan University bus services.
+              Define a new shuttle route for Cosmopolitan University bus services.
             </p>
 
             {actionError && (
@@ -397,8 +397,8 @@ export function RoutesManagement({
                     onChange={(e) => setNewGender(e.target.value as "male" | "female" | "mixed")}
                     className="w-full rounded-lg border border-slate-300 p-2 focus:border-[#102D4A] focus:outline-none"
                   >
-                    <option value="female">Girls&apos; Corridor</option>
-                    <option value="male">Boys&apos; Corridor</option>
+                    <option value="female">Girls&apos; Fleet</option>
+                    <option value="male">Boys&apos; Fleet</option>
                     <option value="mixed">Mixed / General Fleet</option>
                   </select>
                 </div>
@@ -435,7 +435,7 @@ export function RoutesManagement({
                 <label className="block font-semibold text-[#102D4A] mb-1">Description</label>
                 <textarea
                   rows={2}
-                  placeholder="Service corridor description, operating campuses..."
+                  placeholder="Service route description, operating campuses..."
                   value={newDesc}
                   onChange={(e) => setNewDesc(e.target.value)}
                   className="w-full rounded-lg border border-slate-300 p-2 focus:border-[#102D4A] focus:outline-none"

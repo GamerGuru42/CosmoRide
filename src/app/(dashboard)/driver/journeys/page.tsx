@@ -128,7 +128,7 @@ export default async function DriverJourneysPage() {
                 <div className="space-y-1">
                   <div className="flex items-center gap-2">
                     <span className="text-[10px] font-bold font-mono text-[#526B82] bg-slate-100 px-2 py-0.5 rounded">
-                      {route?.code || "CORRIDOR"}
+                      {route?.code || "ROUTE"}
                     </span>
                     <span className="text-xs text-slate-500 font-medium">
                       {formatDate(j.journey_date)}

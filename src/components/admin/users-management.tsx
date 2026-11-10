@@ -1,7 +1,7 @@
 "use client";
 
 import React, { useState, useTransition } from "react";
-import { updateUserRoleAndCorridorAction } from "@/actions/admin";
+import { updateUserRoleAndOperationAction } from "@/actions/admin";
 import { StatusBadge } from "@/components/ui/status-badge";
 
 export interface UserProfileItem {
@@ -10,6 +10,7 @@ export interface UserProfileItem {
   studentId: string | null;
   phone: string | null;
   role: "student" | "boarding_officer" | "driver" | "admin";
+  adminRole?: "hostel_manager" | "bus_manager" | "super_admin" | null;
   assignedTransportGroupId: string | null;
   transportGroupName: string | null;
   hostelName: string | null;
@@ -53,6 +54,7 @@ export function UsersManagement({
   // Modal state
   const [editingUser, setEditingUser] = useState<UserProfileItem | null>(null);
   const [newRole, setNewRole] = useState<UserProfileItem["role"]>("student");
+  const [newAdminRole, setNewAdminRole] = useState<"hostel_manager" | "bus_manager" | "super_admin" | "">("");
   const [newTgId, setNewTgId] = useState<string>("");
   const [newHostelId, setNewHostelId] = useState<string>("");
   const [actionError, setActionError] = useState<string | null>(null);
@@ -71,6 +73,7 @@ export function UsersManagement({
   const handleOpenEdit = (u: UserProfileItem) => {
     setEditingUser(u);
     setNewRole(u.role);
+    setNewAdminRole(u.adminRole || "");
     setNewTgId(u.assignedTransportGroupId || "");
     setNewHostelId(u.hostelId || "");
     setActionError(null);
@@ -84,9 +87,10 @@ export function UsersManagement({
     setActionSuccess(null);
 
     startTransition(async () => {
-      const res = await updateUserRoleAndCorridorAction({
+      const res = await updateUserRoleAndOperationAction({
         userId: editingUser.id,
         role: newRole,
+        adminRole: newRole === "admin" && newAdminRole ? newAdminRole : null,
         assignedTransportGroupId: newTgId || null,
         hostelId: newHostelId || null,
       });
@@ -144,7 +148,7 @@ export function UsersManagement({
             University User Directory &amp; Permissions
           </h3>
           <p className="mt-0.5 text-xs text-[#526B82]">
-            Staff role assignments, boarding officer corridor isolation, and student credentials.
+            Staff role assignments, boarding officer fleet boundaries, and administrative hierarchy.
           </p>
         </div>
 
@@ -160,7 +164,7 @@ export function UsersManagement({
                   <th className="px-4 py-3 font-semibold">User</th>
                   <th className="px-4 py-3 font-semibold">Matric / Staff ID</th>
                   <th className="px-4 py-3 font-semibold">Role</th>
-                  <th className="px-4 py-3 font-semibold">Assigned Corridor</th>
+                  <th className="px-4 py-3 font-semibold">Assigned Fleet / Operation</th>
                   <th className="px-4 py-3 font-semibold">Hostel</th>
                   <th className="px-4 py-3 font-semibold text-right">Actions</th>
                 </tr>
@@ -179,6 +183,15 @@ export function UsersManagement({
                     </td>
                     <td className="px-4 py-3 whitespace-nowrap">
                       <StatusBadge status={u.role} statusConfig={ROLE_CONFIG} />
+                      {u.role === "admin" && u.adminRole && (
+                        <span className="block text-[10px] text-[#20A477] font-semibold mt-0.5">
+                          {u.adminRole === "hostel_manager"
+                            ? "Hostel Manager"
+                            : u.adminRole === "bus_manager"
+                            ? "Bus Manager"
+                            : "Administrator"}
+                        </span>
+                      )}
                     </td>
                     <td className="px-4 py-3 whitespace-nowrap">
                       {u.transportGroupName ? (
@@ -197,7 +210,7 @@ export function UsersManagement({
                         onClick={() => handleOpenEdit(u)}
                         className="rounded px-2.5 py-1 text-xs font-semibold text-[#102D4A] hover:bg-slate-100 transition-colors"
                       >
-                        Edit Role / Corridor
+                        Edit Role / Permissions
                       </button>
                     </td>
                   </tr>
@@ -208,7 +221,7 @@ export function UsersManagement({
         )}
       </div>
 
-      {/* Modal: Edit User Role & Corridor */}
+      {/* Modal: Edit User Role & Permissions */}
       {editingUser && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4">
           <div className="w-full max-w-md rounded-2xl bg-white p-6 shadow-xl">
@@ -216,7 +229,7 @@ export function UsersManagement({
               Edit Permissions: {editingUser.fullName}
             </h3>
             <p className="mt-1 text-xs text-[#526B82]">
-              Assign system roles and configure corridor operational boundaries for boarding officers.
+              Assign administrative roles, hostel representative assignments, or fleet operational boundaries.
             </p>
 
             {actionError && (
@@ -241,15 +254,36 @@ export function UsersManagement({
                   className="w-full rounded-lg border border-slate-300 p-2 focus:border-[#102D4A] focus:outline-none"
                 >
                   <option value="student">Student (Bus Booking)</option>
-                  <option value="boarding_officer">Hostel Rep / Boarding Officer (Verification)</option>
+                  <option value="boarding_officer">Hostel Representative (Boarding &amp; QR Scanning)</option>
                   <option value="driver">Driver (Mode A App Access)</option>
-                  <option value="admin">Transport Administrator (Control Centre)</option>
+                  <option value="admin">Administrator (Control Centre &amp; Management)</option>
                 </select>
               </div>
 
+              {newRole === "admin" && (
+                <div>
+                  <label className="block font-semibold text-[#102D4A] mb-1">
+                    Administrative Assignment (Specialized Role)
+                  </label>
+                  <select
+                    value={newAdminRole}
+                    onChange={(e) => setNewAdminRole(e.target.value as typeof newAdminRole)}
+                    className="w-full rounded-lg border border-slate-300 p-2 focus:border-[#102D4A] focus:outline-none font-medium"
+                  >
+                    <option value="">-- Standard Transport Administrator --</option>
+                    <option value="hostel_manager">Hostel Manager (Supervises Representatives &amp; Bus Manager)</option>
+                    <option value="bus_manager">Bus Manager (Coordinates Drivers &amp; Bus Dispatch)</option>
+                    <option value="super_admin">Super Administrator (Full System Governance)</option>
+                  </select>
+                  <p className="mt-0.5 text-[10px] text-[#526B82]">
+                    There is 1 Hostel Manager (overall supervisor) and 1 Bus Manager (driver &amp; dispatch coordinator).
+                  </p>
+                </div>
+              )}
+
               <div>
                 <label className="block font-semibold text-[#102D4A] mb-1">
-                  Assigned Transport Group / Corridor
+                  Assigned Transport Group / Fleet
                 </label>
                 <select
                   value={newTgId}
@@ -264,7 +298,7 @@ export function UsersManagement({
                   ))}
                 </select>
                 <p className="mt-0.5 text-[10px] text-[#526B82]">
-                  Enforces corridor isolation for boarding officers (e.g. Girls&apos; vs Boys&apos; operations).
+                  Enforces fleet isolation for hostel representatives (e.g. Girls&apos; vs Boys&apos; operations).
                 </p>
               </div>
 
