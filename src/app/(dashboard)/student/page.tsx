@@ -28,6 +28,10 @@ export default async function StudentHomePage() {
     .eq("id", user.id)
     .single();
 
+  if (!profile?.student_id || profile.student_id.trim() === "") {
+    redirect("/register?reason=incomplete_profile");
+  }
+
   const student = {
     id: user.id,
     fullName: profile?.full_name || "Student",

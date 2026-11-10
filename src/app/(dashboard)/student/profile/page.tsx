@@ -38,6 +38,10 @@ export default async function StudentProfilePage() {
     .eq("id", user.id)
     .single();
 
+  if (!profile?.student_id || profile.student_id.trim() === "") {
+    redirect("/register?reason=incomplete_profile");
+  }
+
   const hostelInfo = profile?.hostel as unknown as {
     name: string;
     campus?: { name: string } | null;

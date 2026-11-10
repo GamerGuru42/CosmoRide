@@ -1321,6 +1321,13 @@ export type Database = {
       [_ in never]: never;
     };
     Functions: {
+      complete_student_profile: {
+        Args: {
+          p_full_name: string;
+          p_student_id: string;
+        };
+        Returns: Json;
+      };
       book_journey_seat: {
         Args: {
           p_journey_id: string;

@@ -26,6 +26,10 @@ export default async function StudentTripsPage() {
     .eq("id", user.id)
     .single();
 
+  if (!profile?.student_id || profile.student_id.trim() === "") {
+    redirect("/register?reason=incomplete_profile");
+  }
+
   const studentName = profile?.full_name || "Student";
   const studentId = profile?.student_id || null;
 

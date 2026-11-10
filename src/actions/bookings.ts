@@ -59,6 +59,21 @@ export async function bookSeat(
       return { success: false, error: "Authentication required to book a seat." };
     }
 
+    // Verify student profile completeness
+    const { data: profile } = await supabase
+      .from("profiles")
+      .select("student_id")
+      .eq("id", user.id)
+      .single();
+
+    if (!profile?.student_id || profile.student_id.trim() === "") {
+      return {
+        success: false,
+        error:
+          "Your student profile is incomplete. Please complete your registration with your matriculation number before booking.",
+      };
+    }
+
     // Call atomic stored procedure
     const { data, error } = await supabase.rpc("book_journey_seat", {
       p_journey_id: journeyId,
@@ -74,7 +89,10 @@ export async function bookSeat(
     if (!result || !result.success) {
       return {
         success: false,
-        error: result?.error ?? "Failed to reserve seat. Capacity may be full.",
+        error:
+          result?.message ??
+          result?.error ??
+          "Failed to reserve seat. Capacity may be full.",
       };
     }
 

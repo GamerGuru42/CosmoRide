@@ -20,6 +20,17 @@ export default async function StudentDeparturesPage() {
     redirect("/login");
   }
 
+  // Verify profile completeness
+  const { data: profile } = await supabase
+    .from("profiles")
+    .select("student_id")
+    .eq("id", user.id)
+    .single();
+
+  if (!profile?.student_id || profile.student_id.trim() === "") {
+    redirect("/register?reason=incomplete_profile");
+  }
+
   // Fetch all scheduled, boarding, or active journeys
   const today = getTodayDateString();
   const { data: journeysData, error } = await supabase

@@ -7,6 +7,7 @@ export const APP_NAME = "COSMORIDE";
 export const APP_DESCRIPTION = "University Bus Booking and Mobility Platform";
 export const APP_TAGLINE = "Your University. Your Ride.";
 export const UNIVERSITY_NAME = "Cosmopolitan University";
+export const UNIVERSITY_EMAIL_DOMAIN = "cosmopolitan.edu.ng";
 export const DEVELOPER_ATTRIBUTION = "Powered by NextGen Technologies";
 
 /**

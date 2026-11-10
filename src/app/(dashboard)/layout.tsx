@@ -41,6 +41,14 @@ export default async function DashboardLayout({
     );
   }
 
+  // If student profile is incomplete, redirect to registration completion
+  if (
+    profile.role === "student" &&
+    (!profile.student_id || profile.student_id.trim() === "")
+  ) {
+    redirect("/register?reason=incomplete_profile");
+  }
+
   return (
     <DashboardShell
       user={{
