@@ -33,6 +33,7 @@ export default async function VehicleRotationsPage() {
     .single();
 
   if (!profile || profile.role !== "admin") redirect("/student");
+  if (profile.admin_role !== "operations_controller") redirect("/admin");
 
   const todayStr = getTodayDateString();
 

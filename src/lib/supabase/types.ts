@@ -542,6 +542,7 @@ export type Database = {
           rotation_campus_return_confirmed_at: string | null;
           rotation_campus_return_confirmed_by: string | null;
           rotated_from_journey_id: string | null;
+          rotation_previous_vehicle_id: string | null;
           created_by: string | null;
           created_at: string;
           updated_at: string;
@@ -583,6 +584,7 @@ export type Database = {
           rotation_campus_return_confirmed_at?: string | null;
           rotation_campus_return_confirmed_by?: string | null;
           rotated_from_journey_id?: string | null;
+          rotation_previous_vehicle_id?: string | null;
           created_by?: string | null;
           created_at?: string;
           updated_at?: string;
@@ -624,6 +626,7 @@ export type Database = {
           rotation_campus_return_confirmed_at?: string | null;
           rotation_campus_return_confirmed_by?: string | null;
           rotated_from_journey_id?: string | null;
+          rotation_previous_vehicle_id?: string | null;
           created_by?: string | null;
           created_at?: string;
           updated_at?: string;
@@ -669,6 +672,13 @@ export type Database = {
             columns: ["created_by"];
             isOneToOne: false;
             referencedRelation: "profiles";
+            referencedColumns: ["id"];
+          },
+          {
+            foreignKeyName: "journeys_rotation_previous_vehicle_id_fkey";
+            columns: ["rotation_previous_vehicle_id"];
+            isOneToOne: false;
+            referencedRelation: "vehicles";
             referencedColumns: ["id"];
           }
         ];
@@ -1650,6 +1660,7 @@ export type Database = {
           p_journey_date: string;
           p_scheduled_departure: string;
           p_exclude_journey_id?: string | null;
+          p_source_journey_id?: string | null;
         };
         Returns: Json;
       };
@@ -1670,6 +1681,27 @@ export type Database = {
           p_movement_id: string;
           p_staff_id?: string | null;
           p_notes?: string | null;
+        };
+        Returns: Json;
+      };
+      admin_create_journey: {
+        Args: {
+          p_admin_id: string;
+          p_route_id: string;
+          p_vehicle_id: string;
+          p_driver_id?: string | null;
+          p_driver_record_id?: string | null;
+          p_journey_date?: string | null;
+          p_scheduled_departure?: string | null;
+          p_proposed_allocation?: number | null;
+          p_schedule_id?: string | null;
+        };
+        Returns: Json;
+      };
+      start_vehicle_repositioning: {
+        Args: {
+          p_movement_id: string;
+          p_staff_id?: string | null;
         };
         Returns: Json;
       };

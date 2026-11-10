@@ -244,10 +244,12 @@ describe("COSMORIDE — Vehicle Rotation & Empty Repositioning Verification Suit
 
     it("verifies createJourney action integrates conflict detection before scheduling", () => {
       assert.ok(
+        journeysActionContent.includes('supabase.rpc(\n      "admin_create_journey"') ||
         journeysActionContent.includes('supabase.rpc(\n      "check_vehicle_assignment_conflict"'),
-        "createJourney must invoke check_vehicle_assignment_conflict RPC"
+        "createJourney must invoke admin_create_journey or check_vehicle_assignment_conflict RPC"
       );
       assert.ok(
+        journeysActionContent.includes("admin_create_journey") ||
         journeysActionContent.includes("Overlapping departures are prohibited."),
         "createJourney must reject conflicting vehicle scheduling"
       );

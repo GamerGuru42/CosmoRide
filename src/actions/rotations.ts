@@ -57,7 +57,7 @@ export async function authorizeVehicleRotationAction({
   operationalReason: string;
   originName?: string;
   destinationName?: string;
-}): Promise<RotationActionResponse<{ movementId: string }>> {
+}): Promise<RotationActionResponse<{ movementId: string; movementStatus?: string }>> {
   try {
     const { supabase, profile } = await verifyAdminCaller();
 
@@ -101,6 +101,7 @@ export async function authorizeVehicleRotationAction({
       code: string;
       error?: string;
       movement_id?: string;
+      movement_status?: string;
       message?: string;
     };
 
@@ -116,10 +117,64 @@ export async function authorizeVehicleRotationAction({
     return {
       success: true,
       message: result.message || "Vehicle rotation authorized successfully.",
-      data: { movementId: result.movement_id! },
+      data: {
+        movementId: result.movement_id!,
+        movementStatus: result.movement_status,
+      },
     };
   } catch (err: unknown) {
     const message = err instanceof Error ? err.message : "Failed to authorize vehicle rotation.";
+    return { success: false, error: message };
+  }
+}
+
+/**
+ * Transition an empty repositioning movement from 'planned' to 'returning'
+ * once the source passenger journey has completed and all passengers have alighted.
+ */
+export async function startVehicleRepositioningAction({
+  movementId,
+}: {
+  movementId: string;
+}): Promise<RotationActionResponse> {
+  try {
+    const { supabase, user } = await verifyAdminCaller();
+
+    if (!movementId) {
+      return { success: false, error: "Movement ID is required." };
+    }
+
+    const { data, error } = await supabase.rpc("start_vehicle_repositioning", {
+      p_movement_id: movementId,
+      p_staff_id: user.id,
+    });
+
+    if (error) {
+      return { success: false, error: error.message };
+    }
+
+    const result = data as {
+      success: boolean;
+      code: string;
+      error?: string;
+      message?: string;
+    };
+
+    if (!result.success) {
+      return { success: false, error: result.error || "Failed to start vehicle repositioning." };
+    }
+
+    revalidatePath("/admin");
+    revalidatePath("/admin/rotations");
+    revalidatePath("/admin/dispatch");
+    revalidatePath("/admin/journeys");
+
+    return {
+      success: true,
+      message: result.message || "Empty repositioning movement started. Bus is returning to Main Campus.",
+    };
+  } catch (err: unknown) {
+    const message = err instanceof Error ? err.message : "Failed to start vehicle repositioning.";
     return { success: false, error: message };
   }
 }

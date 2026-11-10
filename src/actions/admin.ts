@@ -26,7 +26,7 @@ async function verifyAdminCaller() {
 
   const { data: profile } = await supabase
     .from("profiles")
-    .select("id, role, full_name")
+    .select("id, role, admin_role, full_name")
     .eq("id", user.id)
     .single();
 
@@ -755,7 +755,7 @@ export async function updateUserRoleAndOperationAction({
   hostelId?: string | null;
 }): Promise<AdminActionResponse> {
   try {
-    const { supabase, user } = await verifyAdminCaller();
+    const { supabase, user, profile } = await verifyAdminCaller();
 
     // Check target user
     const { data: targetUser, error: fetchErr } = await supabase
@@ -765,6 +765,16 @@ export async function updateUserRoleAndOperationAction({
       .single();
 
     if (fetchErr || !targetUser) return { success: false, error: "Target user not found." };
+
+    // Privilege escalation protection: Operations Controller assignment and modification is restricted to Super Admin
+    if (adminRole === "operations_controller" || targetUser.admin_role === "operations_controller") {
+      if (profile.admin_role !== "super_admin") {
+        return {
+          success: false,
+          error: "Permission denied: Only a Super Admin can assign or modify the Operations Controller role.",
+        };
+      }
+    }
 
     const updatePayload: Database["public"]["Tables"]["profiles"]["Update"] = {
       role,

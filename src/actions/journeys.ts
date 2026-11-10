@@ -40,70 +40,45 @@ export async function createJourney(formData: unknown): Promise<ActionResponse> 
       return { success: false, error: "Only administrators can create journeys." };
     }
 
-    // Verify vehicle and safe capacity
-    const { data: vehicle, error: vehicleError } = await supabase
-      .from("vehicles")
-      .select("safe_capacity, is_active")
-      .eq("id", parsed.data.vehicleId)
-      .single();
-
-    if (vehicleError || !vehicle) {
-      return { success: false, error: "Selected vehicle does not exist." };
-    }
-
-    if (!vehicle.is_active) {
-      return { success: false, error: "Selected vehicle is currently marked inactive." };
-    }
-
-    // Check vehicle assignment conflict (30 minutes operational buffer)
-    const { data: conflictData } = await supabase.rpc(
-      "check_vehicle_assignment_conflict",
+    // Call atomic journey creation procedure with exclusive vehicle row locking
+    const { data: rpcResult, error: rpcError } = await supabase.rpc(
+      "admin_create_journey",
       {
+        p_admin_id: user.id,
+        p_route_id: parsed.data.routeId,
         p_vehicle_id: parsed.data.vehicleId,
+        p_driver_id: parsed.data.driverId ?? null,
         p_journey_date: parsed.data.journeyDate,
         p_scheduled_departure: parsed.data.scheduledDeparture,
+        p_proposed_allocation: parsed.data.proposedAllocation,
+        p_schedule_id: parsed.data.scheduleId ?? null,
       }
     );
 
-    const conflict = conflictData as {
-      has_conflict: boolean;
+    const result = rpcResult as {
+      success: boolean;
+      code?: string;
+      journey_id?: string;
       error?: string;
+      message?: string;
     } | null;
 
-    if (conflict?.has_conflict) {
+    if (rpcError || !result?.success) {
       return {
         success: false,
-        error: conflict.error ?? "Vehicle assignment conflict: Overlapping departures are prohibited.",
+        error: result?.error ?? rpcError?.message ?? "Failed to create journey.",
       };
-    }
-
-    // Strict safety check: Proposed allocation must never exceed vehicle's safe approved capacity
-    const effectiveAllocation = Math.min(
-      parsed.data.proposedAllocation,
-      vehicle.safe_capacity
-    );
-
-    const { error: insertError } = await supabase.from("journeys").insert({
-      route_id: parsed.data.routeId,
-      vehicle_id: parsed.data.vehicleId,
-      driver_id: parsed.data.driverId,
-      journey_date: parsed.data.journeyDate,
-      scheduled_departure: parsed.data.scheduledDeparture,
-      proposed_allocation: effectiveAllocation,
-      schedule_id: parsed.data.scheduleId ?? null,
-      status: "scheduled",
-      created_by: user.id,
-    });
-
-    if (insertError) {
-      return { success: false, error: insertError.message };
     }
 
     revalidatePath("/admin");
     revalidatePath("/admin/journeys");
     revalidatePath("/student/journeys");
 
-    return { success: true, message: "Journey scheduled successfully." };
+    return {
+      success: true,
+      message: result.message ?? "Journey scheduled successfully.",
+      data: { id: result.journey_id },
+    };
   } catch (err: unknown) {
     const message = err instanceof Error ? err.message : "Failed to create journey.";
     return { success: false, error: message };

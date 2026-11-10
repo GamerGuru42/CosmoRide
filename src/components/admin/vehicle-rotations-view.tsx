@@ -6,6 +6,7 @@ import {
   authorizeVehicleRotationAction,
   confirmRotatedBusReturnAction,
   cancelVehicleRotationAction,
+  startVehicleRepositioningAction,
 } from "@/actions/rotations";
 import {
   BusIcon,
@@ -217,6 +218,26 @@ export function VehicleRotationsView({
         setFeedback({
           type: "error",
           text: res.error || "Failed to cancel rotation.",
+        });
+      }
+    });
+  }
+
+  // Handle Start Repositioning (Transition planned -> returning)
+  function handleStartRepositioning(movementId: string) {
+    setFeedback(null);
+    startTransition(async () => {
+      const res = await startVehicleRepositioningAction({ movementId });
+
+      if (res.success) {
+        setFeedback({
+          type: "success",
+          text: res.message || "Empty repositioning started. Bus is returning to Main Campus.",
+        });
+      } else {
+        setFeedback({
+          type: "error",
+          text: res.error || "Failed to start vehicle repositioning.",
         });
       }
     });
@@ -540,6 +561,8 @@ export function VehicleRotationsView({
                         ? "border-amber-300 bg-amber-50/40"
                         : m.status === "arrived"
                         ? "border-emerald-200 bg-emerald-50/20"
+                        : m.status === "planned"
+                        ? "border-blue-200 bg-blue-50/30"
                         : "border-slate-200 bg-slate-50/50"
                     }`}
                   >
@@ -554,6 +577,12 @@ export function VehicleRotationsView({
                       </div>
 
                       <div className="flex items-center gap-2">
+                        {m.status === "planned" && (
+                          <span className="inline-flex items-center gap-1.5 rounded-full bg-blue-100 px-2.5 py-0.5 text-[10px] font-bold text-blue-800">
+                            <span className="h-1.5 w-1.5 rounded-full bg-blue-600" />
+                            ROTATION PLANNED (OUTBOUND ACTIVE)
+                          </span>
+                        )}
                         {m.status === "returning" && (
                           <span className="inline-flex items-center gap-1.5 rounded-full bg-amber-100 px-2.5 py-0.5 text-[10px] font-bold text-amber-800 animate-pulse">
                             <span className="h-1.5 w-1.5 rounded-full bg-amber-600" />
@@ -614,6 +643,42 @@ export function VehicleRotationsView({
                       <span className="font-bold text-[#102D4A]">Reason: </span>
                       {m.operationalReason}
                     </div>
+
+                    {/* Planned Movement Action (Start Repositioning or Cancel) */}
+                    {m.status === "planned" && (
+                      <div className="pt-3 flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-2 border-t border-slate-200/80 mt-2">
+                        <div className="text-[11px] text-[#526B82]">
+                          Outbound passenger journey must reach terminal before bus departs empty.
+                        </div>
+
+                        <div className="flex items-center gap-2 shrink-0">
+                          <button
+                            onClick={() => handleStartRepositioning(m.id)}
+                            disabled={isPending}
+                            className="px-3.5 py-1.5 bg-blue-600 hover:bg-blue-700 text-white text-xs font-bold rounded-lg transition-colors shadow-2xs flex items-center gap-1"
+                          >
+                            <BusIcon className="w-3.5 h-3.5" />
+                            <span>Start Empty Return</span>
+                          </button>
+
+                          {isController && (
+                            <button
+                              onClick={() => {
+                                if (cancellingMovementId === m.id) {
+                                  handleCancelRotation(m.id);
+                                } else {
+                                  setCancellingMovementId(m.id);
+                                }
+                              }}
+                              disabled={isPending}
+                              className="px-2.5 py-1.5 border border-rose-300 text-rose-700 hover:bg-rose-50 text-xs font-semibold rounded-lg transition-colors"
+                            >
+                              {cancellingMovementId === m.id ? "Confirm Cancel?" : "Cancel Rotation"}
+                            </button>
+                          )}
+                        </div>
+                      </div>
+                    )}
 
                     {/* Physical Arrival Confirmation Button */}
                     {m.status === "returning" && (

@@ -249,7 +249,6 @@ function getNavItems(
 
       return [
         { href: basePath, label: "Control Centre", icon: "🎛️" },
-        { href: `${basePath}/rotations`, label: "Vehicle Rotations", icon: "🔄" },
         { href: `${basePath}/oversight`, label: "Hostel Oversight", icon: "🛡️" },
         { href: `${basePath}/dispatch`, label: "Bus Dispatch", icon: "🚀" },
         { href: `${basePath}/operations`, label: "Live Operations", icon: "📡" },
