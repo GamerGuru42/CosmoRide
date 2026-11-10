@@ -50,7 +50,7 @@ export const campusSchema = z.object({
 
 export const hostelSchema = z.object({
   name: z.string().min(2, "Hostel name is required"),
-  campusId: z.string().uuid("Invalid campus"),
+  campusId: z.string().uuid("Invalid campus").optional().nullable(),
   transportGroupId: z.string().uuid().optional().nullable(),
   gender: z.enum(["male", "female", "mixed"]),
 });

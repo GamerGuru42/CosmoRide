@@ -12,7 +12,7 @@ export interface RouteStopConfig {
   stopName: string;
   campusName: string | null;
   stopOrder: number;
-  estimatedMinutesFromStart: number;
+  estimatedMinutesFromStart: number | null;
 }
 
 export interface RouteItem {
@@ -324,7 +324,11 @@ export function RoutesManagement({
                               <span>Campus: {stop.campusName || "Main / Kado"}</span>
                               <span>•</span>
                               <span className="font-medium text-slate-700">
-                                +{stop.estimatedMinutesFromStart} min from departure
+                                {stop.estimatedMinutesFromStart != null && stop.estimatedMinutesFromStart > 0
+                                  ? `+${stop.estimatedMinutesFromStart} min from departure`
+                                  : stop.stopOrder === 1
+                                  ? "Terminal departure"
+                                  : "Duration unverified"}
                               </span>
                             </div>
                           </div>

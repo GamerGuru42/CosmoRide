@@ -371,7 +371,7 @@ export async function addStopToRouteAction({
   routeId: string;
   stopId: string;
   stopOrder: number;
-  estimatedMinutesFromStart: number;
+  estimatedMinutesFromStart?: number | null;
 }): Promise<AdminActionResponse> {
   try {
     const { supabase, user } = await verifyAdminCaller();
@@ -380,7 +380,10 @@ export async function addStopToRouteAction({
       route_id: routeId,
       stop_id: stopId,
       stop_order: stopOrder,
-      estimated_minutes_from_start: Math.max(0, estimatedMinutesFromStart),
+      estimated_minutes_from_start:
+        estimatedMinutesFromStart != null && estimatedMinutesFromStart >= 0
+          ? Math.max(0, estimatedMinutesFromStart)
+          : null,
     });
 
     if (error) return { success: false, error: error.message };

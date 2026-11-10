@@ -137,7 +137,7 @@ export type Database = {
         Row: {
           id: string;
           name: string;
-          campus_id: string;
+          campus_id: string | null;
           transport_group_id: string | null;
           gender: Gender;
           is_active: boolean;
@@ -146,7 +146,7 @@ export type Database = {
         Insert: {
           id?: string;
           name: string;
-          campus_id: string;
+          campus_id?: string | null;
           transport_group_id?: string | null;
           gender: Gender;
           is_active?: boolean;
@@ -155,7 +155,7 @@ export type Database = {
         Update: {
           id?: string;
           name?: string;
-          campus_id?: string;
+          campus_id?: string | null;
           transport_group_id?: string | null;
           gender?: Gender;
           is_active?: boolean;
@@ -293,21 +293,21 @@ export type Database = {
           route_id: string;
           stop_id: string;
           stop_order: number;
-          estimated_minutes_from_start: number;
+          estimated_minutes_from_start: number | null;
         };
         Insert: {
           id?: string;
           route_id: string;
           stop_id: string;
           stop_order: number;
-          estimated_minutes_from_start?: number;
+          estimated_minutes_from_start?: number | null;
         };
         Update: {
           id?: string;
           route_id?: string;
           stop_id?: string;
           stop_order?: number;
-          estimated_minutes_from_start?: number;
+          estimated_minutes_from_start?: number | null;
         };
         Relationships: [
           {

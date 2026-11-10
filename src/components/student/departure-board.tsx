@@ -10,7 +10,7 @@ export interface DepartureStop {
   id: string;
   name: string;
   order: number;
-  estimatedMinutesFromStart: number;
+  estimatedMinutesFromStart: number | null;
 }
 
 export interface DepartureJourney {
@@ -346,7 +346,7 @@ export function DepartureBoard({ journeys, currentUserId, onBookingSuccess }: De
                     {j.stops.map((stop, idx) => (
                       <span key={stop.id} className="whitespace-nowrap flex items-center gap-1">
                         <span>{stop.name}</span>
-                        {stop.estimatedMinutesFromStart > 0 && (
+                        {stop.estimatedMinutesFromStart != null && stop.estimatedMinutesFromStart > 0 && (
                           <span className="text-[10px] text-slate-400 font-mono">
                             (+{stop.estimatedMinutesFromStart}m)
                           </span>
@@ -463,12 +463,12 @@ export function DepartureBoard({ journeys, currentUserId, onBookingSuccess }: De
                     >
                       {activeBookingJourney.stops.map((stop) => (
                         <option key={stop.id} value={stop.id}>
-                          {stop.name} {stop.estimatedMinutesFromStart > 0 ? `(+${stop.estimatedMinutesFromStart}m)` : "(Terminal)"}
+                          {stop.name} {stop.order === 1 ? "(Departure Point)" : stop.estimatedMinutesFromStart != null && stop.estimatedMinutesFromStart > 0 ? `(+${stop.estimatedMinutesFromStart}m)` : ""}
                         </option>
                       ))}
                     </select>
                     <p className="text-[10px] text-[#526B82] mt-1">
-                      Expected bus pickup will be calculated from terminal departure.
+                      Bus departure is scheduled from terminal. Intermediate stop arrival times depend on traffic and operational conditions.
                     </p>
                   </div>
 

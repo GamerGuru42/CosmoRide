@@ -116,7 +116,7 @@ export default async function DriverDashboardPage() {
 
     const rawRouteStops = (route?.route_stops || []) as Array<{
       stop_order: number;
-      estimated_minutes_from_start: number;
+      estimated_minutes_from_start: number | null;
       stops: { id: string; name: string } | Array<{ id: string; name: string }>;
     }>;
 

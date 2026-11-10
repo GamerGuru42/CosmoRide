@@ -8,7 +8,7 @@ export interface RouteStopItem {
   id: string; // stop id
   name: string;
   order: number;
-  estimatedMinutesFromStart: number;
+  estimatedMinutesFromStart: number | null;
   lastUpdate?: {
     eventType: "approaching" | "arrived" | "pickup_completed" | "departed";
     timestamp: string;
@@ -105,7 +105,11 @@ export function StopMilestones({
                       {stop.name}
                     </h4>
                     <p className="text-[11px] text-[#526B82]">
-                      Est. +{stop.estimatedMinutesFromStart} min from departure
+                      {stop.estimatedMinutesFromStart != null && stop.estimatedMinutesFromStart > 0
+                        ? `Est. +${stop.estimatedMinutesFromStart} min from departure`
+                        : stop.order === 1
+                        ? "Terminal departure point"
+                        : "Travel duration unverified"}
                     </p>
 
                     {/* Milestone badge */}
