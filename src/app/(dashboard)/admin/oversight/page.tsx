@@ -192,36 +192,6 @@ export default async function HostelManagerOversightPage() {
     };
   });
 
-  // Fetch active empty repositioning movements for fleet situational awareness
-  const { data: rawMovements } = await supabase
-    .from("vehicle_movements")
-    .select(`
-      id,
-      origin_name,
-      destination_name,
-      status,
-      initiated_at,
-      operational_reason,
-      vehicle:vehicles (
-        registration_number
-      )
-    `)
-    .eq("status", "returning")
-    .order("initiated_at", { ascending: false });
-
-  const activeMovements = (rawMovements ?? []).map((m) => {
-    const v = Array.isArray(m.vehicle) ? m.vehicle[0] : m.vehicle;
-    return {
-      id: m.id,
-      vehicleReg: v?.registration_number || "BUS",
-      originName: m.origin_name,
-      destinationName: m.destination_name,
-      status: m.status,
-      initiatedAt: m.initiated_at,
-      operationalReason: m.operational_reason,
-    };
-  });
-
   return (
     <div className="space-y-6">
       <HostelManagerOversightView
@@ -230,7 +200,6 @@ export default async function HostelManagerOversightPage() {
         journeys={journeys}
         incidents={incidents}
         recentAudits={recentAudits}
-        activeMovements={activeMovements}
       />
     </div>
   );

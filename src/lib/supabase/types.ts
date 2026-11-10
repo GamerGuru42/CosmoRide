@@ -27,13 +27,7 @@ export type JourneyStatus =
 export type AdminRoleType =
   | "hostel_manager"
   | "bus_manager"
-  | "super_admin"
-  | "operations_controller";
-export type VehicleMovementStatus =
-  | "planned"
-  | "returning"
-  | "arrived"
-  | "cancelled";
+  | "super_admin";
 export type BookingStatus =
   | "confirmed"
   | "checked_in"
@@ -537,12 +531,6 @@ export type Database = {
           readiness_checked_at: string | null;
           readiness_checked_by: string | null;
           is_assisted_operation: boolean;
-          is_rotated_vehicle: boolean;
-          active_movement_id: string | null;
-          rotation_campus_return_confirmed_at: string | null;
-          rotation_campus_return_confirmed_by: string | null;
-          rotated_from_journey_id: string | null;
-          rotation_previous_vehicle_id: string | null;
           created_by: string | null;
           created_at: string;
           updated_at: string;
@@ -579,12 +567,6 @@ export type Database = {
           readiness_checked_at?: string | null;
           readiness_checked_by?: string | null;
           is_assisted_operation?: boolean;
-          is_rotated_vehicle?: boolean;
-          active_movement_id?: string | null;
-          rotation_campus_return_confirmed_at?: string | null;
-          rotation_campus_return_confirmed_by?: string | null;
-          rotated_from_journey_id?: string | null;
-          rotation_previous_vehicle_id?: string | null;
           created_by?: string | null;
           created_at?: string;
           updated_at?: string;
@@ -621,12 +603,6 @@ export type Database = {
           readiness_checked_at?: string | null;
           readiness_checked_by?: string | null;
           is_assisted_operation?: boolean;
-          is_rotated_vehicle?: boolean;
-          active_movement_id?: string | null;
-          rotation_campus_return_confirmed_at?: string | null;
-          rotation_campus_return_confirmed_by?: string | null;
-          rotated_from_journey_id?: string | null;
-          rotation_previous_vehicle_id?: string | null;
           created_by?: string | null;
           created_at?: string;
           updated_at?: string;
@@ -672,13 +648,6 @@ export type Database = {
             columns: ["created_by"];
             isOneToOne: false;
             referencedRelation: "profiles";
-            referencedColumns: ["id"];
-          },
-          {
-            foreignKeyName: "journeys_rotation_previous_vehicle_id_fkey";
-            columns: ["rotation_previous_vehicle_id"];
-            isOneToOne: false;
-            referencedRelation: "vehicles";
             referencedColumns: ["id"];
           }
         ];
@@ -1350,134 +1319,6 @@ export type Database = {
           }
         ];
       };
-      vehicle_movements: {
-        Row: {
-          id: string;
-          vehicle_id: string;
-          movement_type: string;
-          origin_stop_id: string | null;
-          origin_name: string;
-          destination_stop_id: string | null;
-          destination_name: string;
-          source_journey_id: string;
-          next_journey_id: string | null;
-          driver_record_id: string | null;
-          driver_id: string | null;
-          status: VehicleMovementStatus;
-          initiated_by: string;
-          initiated_at: string;
-          arrived_at: string | null;
-          confirmed_by: string | null;
-          cancelled_at: string | null;
-          cancelled_by: string | null;
-          cancellation_reason: string | null;
-          operational_reason: string;
-          notes: string | null;
-          created_at: string;
-          updated_at: string;
-        };
-        Insert: {
-          id?: string;
-          vehicle_id: string;
-          movement_type?: string;
-          origin_stop_id?: string | null;
-          origin_name: string;
-          destination_stop_id?: string | null;
-          destination_name?: string;
-          source_journey_id: string;
-          next_journey_id?: string | null;
-          driver_record_id?: string | null;
-          driver_id?: string | null;
-          status?: VehicleMovementStatus;
-          initiated_by: string;
-          initiated_at?: string;
-          arrived_at?: string | null;
-          confirmed_by?: string | null;
-          cancelled_at?: string | null;
-          cancelled_by?: string | null;
-          cancellation_reason?: string | null;
-          operational_reason: string;
-          notes?: string | null;
-          created_at?: string;
-          updated_at?: string;
-        };
-        Update: {
-          id?: string;
-          vehicle_id?: string;
-          movement_type?: string;
-          origin_stop_id?: string | null;
-          origin_name?: string;
-          destination_stop_id?: string | null;
-          destination_name?: string;
-          source_journey_id?: string;
-          next_journey_id?: string | null;
-          driver_record_id?: string | null;
-          driver_id?: string | null;
-          status?: VehicleMovementStatus;
-          initiated_by?: string;
-          initiated_at?: string;
-          arrived_at?: string | null;
-          confirmed_by?: string | null;
-          cancelled_at?: string | null;
-          cancelled_by?: string | null;
-          cancellation_reason?: string | null;
-          operational_reason?: string;
-          notes?: string | null;
-          created_at?: string;
-          updated_at?: string;
-        };
-        Relationships: [
-          {
-            foreignKeyName: "vehicle_movements_vehicle_id_fkey";
-            columns: ["vehicle_id"];
-            isOneToOne: false;
-            referencedRelation: "vehicles";
-            referencedColumns: ["id"];
-          },
-          {
-            foreignKeyName: "vehicle_movements_source_journey_id_fkey";
-            columns: ["source_journey_id"];
-            isOneToOne: false;
-            referencedRelation: "journeys";
-            referencedColumns: ["id"];
-          },
-          {
-            foreignKeyName: "vehicle_movements_next_journey_id_fkey";
-            columns: ["next_journey_id"];
-            isOneToOne: false;
-            referencedRelation: "journeys";
-            referencedColumns: ["id"];
-          },
-          {
-            foreignKeyName: "vehicle_movements_driver_record_id_fkey";
-            columns: ["driver_record_id"];
-            isOneToOne: false;
-            referencedRelation: "drivers";
-            referencedColumns: ["id"];
-          },
-          {
-            foreignKeyName: "vehicle_movements_driver_id_fkey";
-            columns: ["driver_id"];
-            isOneToOne: false;
-            referencedRelation: "profiles";
-            referencedColumns: ["id"];
-          },
-          {
-            foreignKeyName: "vehicle_movements_initiated_by_fkey";
-            columns: ["initiated_by"];
-            isOneToOne: false;
-            referencedRelation: "profiles";
-            referencedColumns: ["id"];
-          },
-          {
-            foreignKeyName: "vehicle_movements_confirmed_by_fkey";
-            columns: ["confirmed_by"];
-            isOneToOne: false;
-            referencedRelation: "profiles";
-            referencedColumns: ["id"];
-          }
-        ];
-      };
     };
     Views: {
       [_ in never]: never;
@@ -1660,27 +1501,6 @@ export type Database = {
           p_journey_date: string;
           p_scheduled_departure: string;
           p_exclude_journey_id?: string | null;
-          p_source_journey_id?: string | null;
-        };
-        Returns: Json;
-      };
-      authorize_vehicle_rotation: {
-        Args: {
-          p_source_journey_id: string;
-          p_next_journey_id: string;
-          p_vehicle_id: string;
-          p_driver_record_id?: string | null;
-          p_operational_reason?: string | null;
-          p_origin_name?: string | null;
-          p_destination_name?: string | null;
-        };
-        Returns: Json;
-      };
-      confirm_rotated_bus_campus_arrival: {
-        Args: {
-          p_movement_id: string;
-          p_staff_id?: string | null;
-          p_notes?: string | null;
         };
         Returns: Json;
       };
@@ -1698,20 +1518,6 @@ export type Database = {
         };
         Returns: Json;
       };
-      start_vehicle_repositioning: {
-        Args: {
-          p_movement_id: string;
-          p_staff_id?: string | null;
-        };
-        Returns: Json;
-      };
-      cancel_vehicle_rotation: {
-        Args: {
-          p_movement_id: string;
-          p_cancellation_reason?: string | null;
-        };
-        Returns: Json;
-      };
     };
     Enums: {
       user_role: UserRole;
@@ -1724,7 +1530,6 @@ export type Database = {
       notification_type: NotificationType;
       incident_severity: IncidentSeverity;
       incident_status: IncidentStatus;
-      vehicle_movement_status: VehicleMovementStatus;
     };
     CompositeTypes: {
       [_ in never]: never;
@@ -1736,4 +1541,3 @@ export type Tables<T extends keyof Database["public"]["Tables"]> =
   Database["public"]["Tables"][T]["Row"];
 export type Enums<T extends keyof Database["public"]["Enums"]> =
   Database["public"]["Enums"][T];
-export type VehicleMovement = Database["public"]["Tables"]["vehicle_movements"]["Row"];

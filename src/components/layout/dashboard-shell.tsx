@@ -52,8 +52,6 @@ export function DashboardShell({ user, children }: DashboardShellProps) {
         ? "Hostel Manager"
         : user.adminRole === "bus_manager"
         ? "Bus Manager"
-        : user.adminRole === "operations_controller"
-        ? "Operations Controller"
         : "Transport Administrator"
       : ROLE_LABELS[user.role];
 
@@ -207,18 +205,6 @@ function getNavItems(
         { href: `${basePath}/profile`, label: "Profile", icon: "👤" },
       ];
     case "admin":
-      if (adminRole === "operations_controller") {
-        return [
-          { href: `${basePath}/rotations`, label: "Vehicle Rotations", icon: "🔄" },
-          { href: `${basePath}/dispatch`, label: "Bus Dispatch Console", icon: "🚀" },
-          { href: `${basePath}/oversight`, label: "Hostel Oversight", icon: "🛡️" },
-          { href: basePath, label: "Control Centre", icon: "🎛️" },
-          { href: `${basePath}/operations`, label: "Live Operations", icon: "📡" },
-          { href: `${basePath}/journeys`, label: "Journeys", icon: "🚌" },
-          { href: `${basePath}/vehicles`, label: "Fleet Vehicles", icon: "🚍" },
-          { href: `${basePath}/audit`, label: "Audit Logs", icon: "📜" },
-        ];
-      }
 
       if (adminRole === "bus_manager") {
         return [

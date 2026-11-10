@@ -750,12 +750,12 @@ export async function updateUserRoleAndOperationAction({
 }: {
   userId: string;
   role: "student" | "boarding_officer" | "driver" | "admin";
-  adminRole?: "hostel_manager" | "bus_manager" | "super_admin" | "operations_controller" | null;
+  adminRole?: "hostel_manager" | "bus_manager" | "super_admin" | null;
   assignedTransportGroupId?: string | null;
   hostelId?: string | null;
 }): Promise<AdminActionResponse> {
   try {
-    const { supabase, user, profile } = await verifyAdminCaller();
+    const { supabase, user } = await verifyAdminCaller();
 
     // Check target user
     const { data: targetUser, error: fetchErr } = await supabase
@@ -765,16 +765,6 @@ export async function updateUserRoleAndOperationAction({
       .single();
 
     if (fetchErr || !targetUser) return { success: false, error: "Target user not found." };
-
-    // Privilege escalation protection: Operations Controller assignment and modification is restricted to Super Admin
-    if (adminRole === "operations_controller" || targetUser.admin_role === "operations_controller") {
-      if (profile.admin_role !== "super_admin") {
-        return {
-          success: false,
-          error: "Permission denied: Only a Super Admin can assign or modify the Operations Controller role.",
-        };
-      }
-    }
 
     const updatePayload: Database["public"]["Tables"]["profiles"]["Update"] = {
       role,

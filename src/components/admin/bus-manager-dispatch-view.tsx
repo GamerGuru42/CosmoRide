@@ -7,7 +7,6 @@ import {
   confirmBusArrivalAction,
   confirmDispatchAction,
 } from "@/actions/boarding";
-import { confirmRotatedBusReturnAction } from "@/actions/rotations";
 import {
   BusIcon,
   CheckCircleIcon,
@@ -53,9 +52,6 @@ export interface DispatchJourneyItem {
   seatedBoarded: number;
   standingBoarded: number;
   isOverdue: boolean;
-  isRotatedVehicle?: boolean;
-  activeMovementId?: string | null;
-  rotationCampusReturnConfirmedAt?: string | null;
 }
 
 interface BusManagerDispatchViewProps {
@@ -110,21 +106,6 @@ export function BusManagerDispatchView({
         setFeedback({ type: "success", text: res.message || "Journey rolling dispatch executed. Students notified." });
       } else {
         setFeedback({ type: "error", text: res.error || "Failed to record departure." });
-      }
-    });
-  }
-
-  function handleConfirmRotatedReturn(movementId: string) {
-    setFeedback(null);
-    startTransition(async () => {
-      const res = await confirmRotatedBusReturnAction({
-        movementId,
-        notes: "Campus return confirmed by Bus Manager at dispatch console",
-      });
-      if (res.success) {
-        setFeedback({ type: "success", text: res.message || "Rotated bus campus return confirmed. Boarding lock released." });
-      } else {
-        setFeedback({ type: "error", text: res.error || "Failed to confirm campus return." });
       }
     });
   }
@@ -363,17 +344,6 @@ export function BusManagerDispatchView({
                         OVERDUE
                       </span>
                     )}
-                    {j.isRotatedVehicle && !j.rotationCampusReturnConfirmedAt && (
-                      <span className="inline-flex items-center gap-1.5 rounded-full bg-amber-100 px-2.5 py-0.5 text-[10px] font-bold text-amber-800 animate-pulse">
-                        <span className="h-1.5 w-1.5 rounded-full bg-amber-600" />
-                        ROTATING EMPTY (RETURN PENDING)
-                      </span>
-                    )}
-                    {j.isRotatedVehicle && j.rotationCampusReturnConfirmedAt && (
-                      <span className="inline-flex items-center gap-1 rounded-full bg-emerald-100 px-2 py-0.5 text-[10px] font-bold text-emerald-800">
-                        ✓ ROTATED BUS RETURNED
-                      </span>
-                    )}
                   </div>
 
                   <h3 className="text-base font-extrabold text-[#102D4A]">
@@ -456,18 +426,7 @@ export function BusManagerDispatchView({
 
                   {/* Operational Action Buttons */}
                   <div className="flex items-center gap-2">
-                    {j.isRotatedVehicle && !j.rotationCampusReturnConfirmedAt && j.activeMovementId && (
-                      <button
-                        onClick={() => handleConfirmRotatedReturn(j.activeMovementId!)}
-                        disabled={isPending}
-                        className="px-3.5 py-2 bg-amber-600 hover:bg-amber-700 text-white text-xs font-bold rounded-xl transition-colors shadow-2xs flex items-center gap-1.5"
-                      >
-                        <BusIcon className="w-3.5 h-3.5" />
-                        <span>Confirm Campus Return</span>
-                      </button>
-                    )}
-
-                    {(!j.isRotatedVehicle || j.rotationCampusReturnConfirmedAt) && j.status === "scheduled" && (
+                    {j.status === "scheduled" && (
                       <button
                         onClick={() => handleConfirmArrival(j.id)}
                         disabled={isPending}
