@@ -538,8 +538,10 @@ CREATE POLICY "Drivers can view their journey bookings"
   );
 
 -- ---- F. WAITLISTS & BOARDING RECORDS ----
+-- Waitlist join, promotion, and cancellation occur strictly via atomic RPCs (book_journey_seat / cancel_booking_and_promote / cancel_waitlist_entry).
 DROP POLICY IF EXISTS "Staff can view corridor waitlists" ON public.waitlists;
 DROP POLICY IF EXISTS "Staff can view group waitlists" ON public.waitlists;
+DROP POLICY IF EXISTS "Students can cancel own waitlist entry" ON public.waitlists;
 
 CREATE POLICY "Staff can view group waitlists"
   ON public.waitlists FOR SELECT
@@ -967,7 +969,31 @@ DECLARE
   v_existing_start TIMESTAMPTZ;
   v_existing_end TIMESTAMPTZ;
   v_new_end TIMESTAMPTZ;
+  v_jwt_role TEXT;
+  v_caller_ok BOOLEAN := FALSE;
 BEGIN
+  IF pg_catalog.pg_trigger_depth() = 0 THEN
+    v_jwt_role := NULLIF(current_setting('request.jwt.claim.role', true), '');
+    IF v_jwt_role IS NULL OR v_jwt_role NOT IN ('authenticated', 'service_role') THEN
+      RETURN jsonb_build_object('has_conflict', true, 'code', 'UNAUTHORIZED', 'error', 'Permission denied: Invalid or untrusted execution context.');
+    END IF;
+
+    IF v_jwt_role = 'authenticated' THEN
+      SELECT EXISTS (
+        SELECT 1
+        FROM public.profiles p
+        WHERE p.id = auth.uid()
+          AND p.is_active IS TRUE
+          AND p.role = 'admin'
+          AND p.admin_role IN ('super_admin', 'bus_manager')
+      ) INTO v_caller_ok;
+
+      IF auth.uid() IS NULL OR NOT v_caller_ok THEN
+        RETURN jsonb_build_object('has_conflict', true, 'code', 'FORBIDDEN', 'error', 'Permission denied: Admin scheduling privileges required.');
+      END IF;
+    END IF;
+  END IF;
+
   IF v_resolved_driver_record_id IS NULL AND v_resolved_profile_id IS NULL THEN
     RETURN jsonb_build_object('has_conflict', false, 'code', 'NO_DRIVER_SPECIFIED');
   END IF;
@@ -1149,6 +1175,8 @@ AS $$
 DECLARE
   v_veh_check JSONB;
   v_drv_check JSONB;
+  v_effective_departure TIMESTAMPTZ;
+  v_effective_date DATE;
 BEGIN
   IF NEW.status = 'cancelled' THEN
     RETURN NEW;
@@ -1167,10 +1195,13 @@ BEGIN
     END IF;
   END IF;
 
+  v_effective_departure := NEW.scheduled_departure + (COALESCE(NEW.delay_minutes, 0) * INTERVAL '1 minute');
+  v_effective_date := COALESCE((v_effective_departure AT TIME ZONE 'Africa/Lagos')::DATE, NEW.journey_date);
+
   v_veh_check := public.check_vehicle_assignment_conflict(
     NEW.vehicle_id,
-    NEW.journey_date,
-    NEW.scheduled_departure,
+    v_effective_date,
+    v_effective_departure,
     CASE WHEN TG_OP = 'UPDATE' THEN OLD.id ELSE NULL END,
     NEW.route_id
   );
@@ -1184,8 +1215,8 @@ BEGIN
     v_drv_check := public.check_driver_assignment_conflict(
       NEW.driver_record_id,
       NEW.driver_id,
-      NEW.journey_date,
-      NEW.scheduled_departure,
+      v_effective_date,
+      v_effective_departure,
       CASE WHEN TG_OP = 'UPDATE' THEN OLD.id ELSE NULL END,
       NEW.route_id
     );
@@ -1205,6 +1236,87 @@ CREATE TRIGGER trg_enforce_journey_vehicle_availability
   BEFORE INSERT OR UPDATE OF vehicle_id, route_id, scheduled_departure, delay_minutes, status, driver_id, driver_record_id ON public.journeys
   FOR EACH ROW
   EXECUTE FUNCTION public.enforce_journey_vehicle_availability();
+
+-- Journey lifecycle, safety gate & workflow integrity trigger
+-- Blocks direct PostgREST/client mutation of lifecycle, readiness, or delay fields
+-- while permitting admins to edit non-lifecycle scheduling fields on non-terminal trips.
+CREATE OR REPLACE FUNCTION public.protect_journey_lifecycle()
+RETURNS TRIGGER
+LANGUAGE plpgsql
+SECURITY DEFINER
+SET search_path = ''
+AS $$
+DECLARE
+  v_jwt_role TEXT;
+  v_internal_workflow TEXT;
+BEGIN
+  -- Enforce hard safety gate regardless of execution context
+  IF (NEW.status = 'in_transit' OR (NEW.actual_departure IS NOT NULL AND OLD.actual_departure IS NULL))
+     AND NEW.readiness_status = 'failed_unsafe' THEN
+    RAISE EXCEPTION 'Safety violation: Pre-departure vehicle check was flagged unsafe. Dispatch blocked.'
+      USING ERRCODE = '42501';
+  END IF;
+
+  -- Enforce strict 7-stage lifecycle ordering whenever status changes
+  IF NEW.status IS DISTINCT FROM OLD.status THEN
+    IF NOT (
+      (OLD.status = 'scheduled' AND NEW.status IN ('bus_arrived', 'cancelled'))
+      OR (OLD.status = 'bus_arrived' AND NEW.status IN ('boarding', 'cancelled'))
+      OR (OLD.status = 'boarding' AND NEW.status IN ('boarding_closed', 'cancelled'))
+      OR (OLD.status = 'boarding_closed' AND NEW.status IN ('ready_to_depart', 'cancelled'))
+      OR (OLD.status = 'ready_to_depart' AND NEW.status IN ('in_transit', 'cancelled'))
+      OR (OLD.status = 'in_transit' AND NEW.status = 'completed')
+    ) THEN
+      RAISE EXCEPTION 'Invalid journey status transition from "%" to "%". Use controlled operational workflow RPCs.', OLD.status, NEW.status
+        USING ERRCODE = '42501';
+    END IF;
+  END IF;
+
+  v_jwt_role := NULLIF(current_setting('request.jwt.claim.role', true), '');
+  v_internal_workflow := NULLIF(current_setting('cosmoride.internal_journey_workflow', true), '');
+
+  -- Trusted workflow RPCs, migrations, and service_role maintenance contexts
+  IF v_internal_workflow = 'on' OR v_jwt_role IS NULL OR v_jwt_role = 'service_role' THEN
+    RETURN NEW;
+  END IF;
+
+  -- Direct authenticated updates (e.g., Admins) must not mutate terminal/live journeys or lifecycle/safety/delay columns
+  IF OLD.status IN ('in_transit', 'completed', 'cancelled') THEN
+    RAISE EXCEPTION 'Direct modification of active, completed, or cancelled journeys is prohibited.'
+      USING ERRCODE = '42501';
+  END IF;
+
+  IF NEW.status IS DISTINCT FROM OLD.status
+     OR NEW.bus_arrived_at IS DISTINCT FROM OLD.bus_arrived_at
+     OR NEW.bus_arrived_by IS DISTINCT FROM OLD.bus_arrived_by
+     OR NEW.boarding_opened_at IS DISTINCT FROM OLD.boarding_opened_at
+     OR NEW.boarding_opened_by IS DISTINCT FROM OLD.boarding_opened_by
+     OR NEW.boarding_closed_at IS DISTINCT FROM OLD.boarding_closed_at
+     OR NEW.boarding_closed_by IS DISTINCT FROM OLD.boarding_closed_by
+     OR NEW.departure_authorised_at IS DISTINCT FROM OLD.departure_authorised_at
+     OR NEW.departure_authorised_by IS DISTINCT FROM OLD.departure_authorised_by
+     OR NEW.departure_confirmed_by IS DISTINCT FROM OLD.departure_confirmed_by
+     OR NEW.actual_departure IS DISTINCT FROM OLD.actual_departure
+     OR NEW.actual_arrival IS DISTINCT FROM OLD.actual_arrival
+     OR NEW.readiness_status IS DISTINCT FROM OLD.readiness_status
+     OR NEW.readiness_checked_at IS DISTINCT FROM OLD.readiness_checked_at
+     OR NEW.readiness_checked_by IS DISTINCT FROM OLD.readiness_checked_by
+     OR NEW.is_assisted_operation IS DISTINCT FROM OLD.is_assisted_operation
+     OR NEW.delay_minutes IS DISTINCT FROM OLD.delay_minutes
+     OR NEW.delay_reason IS DISTINCT FROM OLD.delay_reason THEN
+    RAISE EXCEPTION 'Journey lifecycle, readiness, and delay fields can only be modified through authorised operational workflow RPCs.'
+      USING ERRCODE = '42501';
+  END IF;
+
+  RETURN NEW;
+END;
+$$;
+
+DROP TRIGGER IF EXISTS enforce_journey_lifecycle_protection ON public.journeys;
+CREATE TRIGGER enforce_journey_lifecycle_protection
+  BEFORE UPDATE ON public.journeys
+  FOR EACH ROW
+  EXECUTE FUNCTION public.protect_journey_lifecycle();
 
 -- Hardened atomic manual journey creation (bus_manager & super_admin)
 CREATE OR REPLACE FUNCTION public.admin_create_journey(
@@ -1681,11 +1793,13 @@ BEGIN
     );
   END IF;
 
+  PERFORM pg_catalog.set_config('cosmoride.internal_journey_workflow', 'on', true);
   UPDATE public.journeys
   SET status = 'cancelled',
       delay_reason = v_reason,
       updated_at = now()
   WHERE id = p_journey_id;
+  PERFORM pg_catalog.set_config('cosmoride.internal_journey_workflow', 'off', true);
 
   -- Cancel and notify active bookings
   FOR v_booking IN
@@ -2027,7 +2141,7 @@ DECLARE
   v_student RECORD;
   v_journey RECORD;
   v_booking_cutoff_mins INTEGER := 15;
-  v_effective_student_gender public.gender_group;
+  v_effective_student_gender public.gender;
   v_effective_student_group UUID;
   v_effective_capacity INTEGER;
   v_max_seated INTEGER;
@@ -2120,14 +2234,20 @@ BEGIN
     );
   END IF;
 
-  IF p_boarding_stop_id IS NOT NULL THEN
-    IF NOT EXISTS (
-      SELECT 1 FROM public.route_stops
-      WHERE route_id = v_journey.route_id
-        AND stop_id = p_boarding_stop_id
-    ) THEN
-      RETURN jsonb_build_object('success', false, 'code', 'INVALID_BOARDING_STOP', 'error', 'Selected pickup stop is not valid for this route.');
-    END IF;
+  IF p_boarding_stop_id IS NULL THEN
+    RETURN jsonb_build_object(
+      'success', false,
+      'code', 'BOARDING_STOP_REQUIRED',
+      'error', 'Please select a valid boarding pickup stop for this route.'
+    );
+  END IF;
+
+  IF NOT EXISTS (
+    SELECT 1 FROM public.route_stops
+    WHERE route_id = v_journey.route_id
+      AND stop_id = p_boarding_stop_id
+  ) THEN
+    RETURN jsonb_build_object('success', false, 'code', 'INVALID_BOARDING_STOP', 'error', 'Selected pickup stop is not valid for this route.');
   END IF;
 
   -- Fail-closed gender restriction: male/female hostel routes require matching non-null hostel gender
@@ -2380,6 +2500,7 @@ DECLARE
   v_new_booking_id UUID;
   v_new_ticket_token TEXT;
   v_promoted_category public.passenger_category;
+  v_cancel_cutoff_mins INTEGER := 30;
 BEGIN
   v_jwt_role := NULLIF(current_setting('request.jwt.claim.role', true), '');
   IF v_jwt_role IS NULL OR v_jwt_role <> 'authenticated' OR auth.uid() IS NULL THEN
@@ -2412,6 +2533,29 @@ BEGIN
 
   IF v_journey.status IN ('in_transit', 'completed', 'cancelled') THEN
     RETURN jsonb_build_object('success', false, 'error', 'Cannot cancel a trip that is in transit, completed, or cancelled.');
+  END IF;
+
+  BEGIN
+    SELECT COALESCE((value #>> '{}')::INTEGER, 30)
+    INTO v_cancel_cutoff_mins
+    FROM public.system_settings
+    WHERE key = 'cancellation_cutoff_minutes';
+  EXCEPTION WHEN OTHERS THEN
+    v_cancel_cutoff_mins := 30;
+  END;
+
+  IF v_cancel_cutoff_mins IS NULL OR v_cancel_cutoff_mins < 0 THEN
+    v_cancel_cutoff_mins := 30;
+  END IF;
+
+  -- Policy note: evaluated against scheduled_departure (consistent with booking_cutoff_minutes
+  -- in book_journey_seat and system_settings wording "before scheduled departure").
+  IF v_journey.scheduled_departure <= (now() + (v_cancel_cutoff_mins * INTERVAL '1 minute')) THEN
+    RETURN jsonb_build_object(
+      'success', false,
+      'code', 'CANCELLATION_CUTOFF_EXCEEDED',
+      'error', 'Cancellation closed: Self-service cancellations close ' || v_cancel_cutoff_mins || ' minutes before scheduled departure.'
+    );
   END IF;
 
   v_cancelled_category := COALESCE(v_booking.passenger_category, 'seated');
@@ -2642,6 +2786,7 @@ DECLARE
   v_seated_count INTEGER;
   v_standing_count INTEGER;
   v_effective_capacity INTEGER;
+  v_exception_reason TEXT := NULLIF(trim(COALESCE(p_exception_reason, '')), '');
 BEGIN
   v_jwt_role := NULLIF(current_setting('request.jwt.claim.role', true), '');
   IF v_jwt_role IS NULL OR v_jwt_role NOT IN ('authenticated', 'service_role') THEN
@@ -2718,6 +2863,14 @@ BEGIN
     RETURN jsonb_build_object('success', false, 'code', 'INVALID_TICKET', 'error', 'Invalid ticket token format. Please scan a valid boarding pass.');
   END IF;
 
+  IF p_boarding_method = 'manual_override' AND length(COALESCE(v_exception_reason, '')) < 5 THEN
+    RETURN jsonb_build_object(
+      'success', false,
+      'code', 'EXCEPTION_REASON_REQUIRED',
+      'error', 'Manual boarding override requires an auditable exception reason of at least 5 characters.'
+    );
+  END IF;
+
   SELECT b.* INTO v_booking
   FROM public.bookings b
   WHERE b.ticket_token = trim(p_ticket_token)
@@ -2789,7 +2942,7 @@ BEGIN
     v_effective_officer_id,
     now(),
     p_boarding_method,
-    p_exception_reason,
+    v_exception_reason,
     TRUE,
     v_booking.passenger_category,
     now()
@@ -2819,6 +2972,7 @@ BEGIN
       'student_id', v_booking.student_id,
       'passenger_category', v_booking.passenger_category,
       'boarding_method', p_boarding_method,
+      'exception_reason', v_exception_reason,
       'boarded_count', v_boarded_count,
       'seated_count', v_seated_count,
       'standing_count', v_standing_count
@@ -3014,6 +3168,7 @@ BEGIN
     RETURN jsonb_build_object('success', false, 'code', 'INVALID_TRANSITION', 'error', 'Cannot record bus arrival: Journey is currently in ' || v_journey.status || ' status.');
   END IF;
 
+  PERFORM pg_catalog.set_config('cosmoride.internal_journey_workflow', 'on', true);
   UPDATE public.journeys
   SET status = 'bus_arrived',
       bus_arrived_at = v_now,
@@ -3021,6 +3176,7 @@ BEGIN
       boarding_notes = COALESCE(p_notes, boarding_notes),
       updated_at = v_now
   WHERE id = p_journey_id;
+  PERFORM pg_catalog.set_config('cosmoride.internal_journey_workflow', 'off', true);
 
   INSERT INTO public.audit_logs (user_id, action, entity_type, entity_id, details)
   VALUES (
@@ -3138,6 +3294,7 @@ BEGIN
     v_window_mins := COALESCE(v_window_mins, 10);
   END IF;
 
+  PERFORM pg_catalog.set_config('cosmoride.internal_journey_workflow', 'on', true);
   UPDATE public.journeys
   SET status = 'boarding',
       boarding_opened_at = v_now,
@@ -3145,6 +3302,7 @@ BEGIN
       boarding_window_minutes = v_window_mins,
       updated_at = v_now
   WHERE id = p_journey_id;
+  PERFORM pg_catalog.set_config('cosmoride.internal_journey_workflow', 'off', true);
 
   INSERT INTO public.audit_logs (user_id, action, entity_type, entity_id, details)
   VALUES (
@@ -3256,6 +3414,7 @@ BEGIN
 
   v_unboarded_count := GREATEST(0, v_total_booked - v_boarded_count);
 
+  PERFORM pg_catalog.set_config('cosmoride.internal_journey_workflow', 'on', true);
   UPDATE public.journeys
   SET status = 'boarding_closed',
       boarding_closed_at = v_now,
@@ -3263,6 +3422,7 @@ BEGIN
       boarding_notes = COALESCE(p_notes, boarding_notes),
       updated_at = v_now
   WHERE id = p_journey_id;
+  PERFORM pg_catalog.set_config('cosmoride.internal_journey_workflow', 'off', true);
 
   INSERT INTO public.audit_logs (user_id, action, entity_type, entity_id, details)
   VALUES (
@@ -3374,6 +3534,7 @@ BEGIN
   SELECT COUNT(*) INTO v_boarded_count FROM public.boarding_records WHERE journey_id = p_journey_id;
   SELECT COUNT(*) INTO v_unboarded_count FROM public.bookings WHERE journey_id = p_journey_id AND status = 'confirmed';
 
+  PERFORM pg_catalog.set_config('cosmoride.internal_journey_workflow', 'on', true);
   UPDATE public.journeys
   SET status = 'ready_to_depart',
       departure_authorised_at = v_now,
@@ -3381,6 +3542,7 @@ BEGIN
       boarding_notes = COALESCE(p_notes, boarding_notes),
       updated_at = v_now
   WHERE id = p_journey_id;
+  PERFORM pg_catalog.set_config('cosmoride.internal_journey_workflow', 'off', true);
 
   INSERT INTO public.audit_logs (user_id, action, entity_type, entity_id, details)
   VALUES (
@@ -3493,6 +3655,7 @@ BEGIN
     RETURN jsonb_build_object('success', false, 'code', 'SAFETY_BLOCKED', 'error', 'Safety violation: Pre-departure vehicle check was flagged unsafe. Dispatch blocked.');
   END IF;
 
+  PERFORM pg_catalog.set_config('cosmoride.internal_journey_workflow', 'on', true);
   UPDATE public.journeys
   SET status = 'in_transit',
       actual_departure = v_now,
@@ -3500,6 +3663,7 @@ BEGIN
       boarding_notes = COALESCE(p_notes, boarding_notes),
       updated_at = v_now
   WHERE id = p_journey_id;
+  PERFORM pg_catalog.set_config('cosmoride.internal_journey_workflow', 'off', true);
 
   INSERT INTO public.audit_logs (user_id, action, entity_type, entity_id, details)
   VALUES (
@@ -3610,6 +3774,7 @@ BEGIN
 
   SELECT COUNT(*) INTO v_boarded_count FROM public.boarding_records WHERE journey_id = p_journey_id;
 
+  PERFORM pg_catalog.set_config('cosmoride.internal_journey_workflow', 'on', true);
   UPDATE public.journeys
   SET status = 'in_transit',
       actual_departure = v_now,
@@ -3617,6 +3782,7 @@ BEGIN
       boarding_notes = COALESCE(p_closure_notes, boarding_notes),
       updated_at = v_now
   WHERE id = p_journey_id;
+  PERFORM pg_catalog.set_config('cosmoride.internal_journey_workflow', 'off', true);
 
   INSERT INTO public.audit_logs (user_id, action, entity_type, entity_id, details)
   VALUES (
@@ -3750,6 +3916,7 @@ BEGIN
     p_journey_reviewed, p_battery_level, p_tires_and_lights, v_readiness_status, p_notes, now()
   );
 
+  PERFORM pg_catalog.set_config('cosmoride.internal_journey_workflow', 'on', true);
   UPDATE public.journeys
   SET readiness_status = v_readiness_status,
       readiness_checked_at = now(),
@@ -3757,6 +3924,7 @@ BEGIN
       is_assisted_operation = (is_assisted_operation OR p_is_assisted),
       updated_at = now()
   WHERE id = p_journey_id;
+  PERFORM pg_catalog.set_config('cosmoride.internal_journey_workflow', 'off', true);
 
   INSERT INTO public.journey_operational_logs (
     journey_id, driver_id, recorded_by_user_id, action_type, operation_mode, details
@@ -3957,11 +4125,22 @@ BEGIN
     RETURN jsonb_build_object('success', false, 'code', 'UNASSIGNED_DRIVER', 'error', 'You are not the driver assigned to this journey.');
   END IF;
 
-  UPDATE public.journeys
-  SET delay_minutes = p_delay_minutes,
-      delay_reason = v_reason,
-      updated_at = now()
-  WHERE id = p_journey_id;
+  BEGIN
+    PERFORM pg_catalog.set_config('cosmoride.internal_journey_workflow', 'on', true);
+    UPDATE public.journeys
+    SET delay_minutes = p_delay_minutes,
+        delay_reason = v_reason,
+        updated_at = now()
+    WHERE id = p_journey_id;
+    PERFORM pg_catalog.set_config('cosmoride.internal_journey_workflow', 'off', true);
+  EXCEPTION WHEN check_violation THEN
+    PERFORM pg_catalog.set_config('cosmoride.internal_journey_workflow', 'off', true);
+    RETURN jsonb_build_object(
+      'success', false,
+      'code', 'ASSIGNMENT_CONFLICT',
+      'error', SQLERRM
+    );
+  END;
 
   FOR v_passenger IN
     SELECT b.student_id
@@ -4080,6 +4259,7 @@ BEGIN
     RETURN jsonb_build_object('success', false, 'code', 'SAFETY_BLOCKED', 'error', 'Safety violation: Pre-departure check flagged vehicle as unsafe. Departure blocked.');
   END IF;
 
+  PERFORM pg_catalog.set_config('cosmoride.internal_journey_workflow', 'on', true);
   UPDATE public.journeys
   SET status = 'in_transit',
       actual_departure = v_now,
@@ -4087,6 +4267,7 @@ BEGIN
       is_assisted_operation = (is_assisted_operation OR p_is_assisted),
       updated_at = v_now
   WHERE id = p_journey_id;
+  PERFORM pg_catalog.set_config('cosmoride.internal_journey_workflow', 'off', true);
 
   INSERT INTO public.journey_operational_logs (
     journey_id, driver_id, recorded_by_user_id, action_type, operation_mode, details
@@ -4194,12 +4375,14 @@ BEGIN
     RETURN jsonb_build_object('success', false, 'code', 'INVALID_TRANSITION', 'error', 'Cannot record arrival: Trip must be in transit (Current status: ' || v_journey.status || ').');
   END IF;
 
+  PERFORM pg_catalog.set_config('cosmoride.internal_journey_workflow', 'on', true);
   UPDATE public.journeys
   SET status = 'completed',
       actual_arrival = v_now,
       is_assisted_operation = (is_assisted_operation OR p_is_assisted),
       updated_at = v_now
   WHERE id = p_journey_id;
+  PERFORM pg_catalog.set_config('cosmoride.internal_journey_workflow', 'off', true);
 
   INSERT INTO public.journey_operational_logs (
     journey_id, driver_id, recorded_by_user_id, action_type, operation_mode, details
@@ -4290,6 +4473,16 @@ BEGIN
     END;
     IF v_val_int IS NULL OR v_val_int < 1 OR v_val_int > 60 THEN
       RETURN jsonb_build_object('success', false, 'code', 'INVALID_SETTING_VALUE', 'error', 'boarding_window_minutes must be between 1 and 60.');
+    END IF;
+    p_value := to_jsonb(v_val_int);
+  ELSIF p_key = 'cancellation_cutoff_minutes' THEN
+    BEGIN
+      v_val_int := (p_value #>> '{}')::INTEGER;
+    EXCEPTION WHEN OTHERS THEN
+      RETURN jsonb_build_object('success', false, 'code', 'INVALID_SETTING_VALUE', 'error', 'cancellation_cutoff_minutes must be an integer between 0 and 1440.');
+    END;
+    IF v_val_int IS NULL OR v_val_int < 0 OR v_val_int > 1440 THEN
+      RETURN jsonb_build_object('success', false, 'code', 'INVALID_SETTING_VALUE', 'error', 'cancellation_cutoff_minutes must be between 0 and 1440.');
     END IF;
     p_value := to_jsonb(v_val_int);
   END IF;
@@ -4390,6 +4583,7 @@ REVOKE EXECUTE ON FUNCTION public.handle_new_user() FROM PUBLIC, anon, authentic
 REVOKE EXECUTE ON FUNCTION public.protect_profile_privileges() FROM PUBLIC, anon, authenticated, service_role;
 REVOKE EXECUTE ON FUNCTION public.prevent_audit_log_modification() FROM PUBLIC, anon, authenticated, service_role;
 REVOKE EXECUTE ON FUNCTION public.enforce_journey_vehicle_availability() FROM PUBLIC, anon, authenticated, service_role;
+REVOKE EXECUTE ON FUNCTION public.protect_journey_lifecycle() FROM PUBLIC, anon, authenticated, service_role;
 
 -- RLS / availability helpers: authenticated & service_role
 GRANT EXECUTE ON FUNCTION public.rls_user_role() TO authenticated, service_role;
@@ -4401,7 +4595,8 @@ GRANT EXECUTE ON FUNCTION public.rls_assigned_transport_group() TO authenticated
 GRANT EXECUTE ON FUNCTION public.rls_driver_assigned_to_journey(UUID) TO authenticated, service_role;
 GRANT EXECUTE ON FUNCTION public.rls_staff_can_view_profile(UUID) TO authenticated, service_role;
 GRANT EXECUTE ON FUNCTION public.resolve_route_duration_minutes(UUID) TO authenticated, service_role;
-GRANT EXECUTE ON FUNCTION public.check_driver_assignment_conflict(UUID, UUID, DATE, TIMESTAMPTZ, UUID, UUID) TO authenticated, service_role;
+REVOKE EXECUTE ON FUNCTION public.check_driver_assignment_conflict(UUID, UUID, DATE, TIMESTAMPTZ, UUID, UUID) FROM PUBLIC, anon, authenticated;
+GRANT EXECUTE ON FUNCTION public.check_driver_assignment_conflict(UUID, UUID, DATE, TIMESTAMPTZ, UUID, UUID) TO service_role;
 GRANT EXECUTE ON FUNCTION public.check_vehicle_assignment_conflict(UUID, DATE, TIMESTAMPTZ, UUID, UUID) TO authenticated, service_role;
 
 -- Student RPCs (strictly authenticated only; never service_role except profile registration)

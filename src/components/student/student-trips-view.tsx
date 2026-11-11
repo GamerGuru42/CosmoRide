@@ -175,44 +175,40 @@ export function StudentTripsView({
       <div className="flex items-center gap-1.5 p-1 bg-white rounded-xl border border-slate-200 w-full overflow-x-auto shadow-xs">
         <button
           onClick={() => setActiveTab("upcoming")}
-          className={`flex-1 min-w-[100px] py-2 px-3 text-xs font-bold rounded-lg transition-all text-center whitespace-nowrap ${
-            activeTab === "upcoming"
-              ? "bg-[#102D4A] text-white shadow-xs"
-              : "text-[#526B82] hover:text-[#102D4A]"
-          }`}
+          className={`flex-1 min-w-[100px] py-2 px-3 text-xs font-bold rounded-lg transition-all text-center whitespace-nowrap ${activeTab === "upcoming"
+            ? "bg-[#102D4A] text-white shadow-xs"
+            : "text-[#526B82] hover:text-[#102D4A]"
+            }`}
         >
           Upcoming ({upcomingTrips.length})
         </button>
 
         <button
           onClick={() => setActiveTab("waitlist")}
-          className={`flex-1 min-w-[100px] py-2 px-3 text-xs font-bold rounded-lg transition-all text-center whitespace-nowrap ${
-            activeTab === "waitlist"
-              ? "bg-[#102D4A] text-white shadow-xs"
-              : "text-[#526B82] hover:text-[#102D4A]"
-          }`}
+          className={`flex-1 min-w-[100px] py-2 px-3 text-xs font-bold rounded-lg transition-all text-center whitespace-nowrap ${activeTab === "waitlist"
+            ? "bg-[#102D4A] text-white shadow-xs"
+            : "text-[#526B82] hover:text-[#102D4A]"
+            }`}
         >
           Waitlist ({waitlistItems.length})
         </button>
 
         <button
           onClick={() => setActiveTab("completed")}
-          className={`flex-1 min-w-[100px] py-2 px-3 text-xs font-bold rounded-lg transition-all text-center whitespace-nowrap ${
-            activeTab === "completed"
-              ? "bg-[#102D4A] text-white shadow-xs"
-              : "text-[#526B82] hover:text-[#102D4A]"
-          }`}
+          className={`flex-1 min-w-[100px] py-2 px-3 text-xs font-bold rounded-lg transition-all text-center whitespace-nowrap ${activeTab === "completed"
+            ? "bg-[#102D4A] text-white shadow-xs"
+            : "text-[#526B82] hover:text-[#102D4A]"
+            }`}
         >
           Completed ({completedTrips.length})
         </button>
 
         <button
           onClick={() => setActiveTab("cancelled")}
-          className={`flex-1 min-w-[100px] py-2 px-3 text-xs font-bold rounded-lg transition-all text-center whitespace-nowrap ${
-            activeTab === "cancelled"
-              ? "bg-[#102D4A] text-white shadow-xs"
-              : "text-[#526B82] hover:text-[#102D4A]"
-          }`}
+          className={`flex-1 min-w-[100px] py-2 px-3 text-xs font-bold rounded-lg transition-all text-center whitespace-nowrap ${activeTab === "cancelled"
+            ? "bg-[#102D4A] text-white shadow-xs"
+            : "text-[#526B82] hover:text-[#102D4A]"
+            }`}
         >
           Cancelled ({cancelledTrips.length})
         </button>
@@ -252,20 +248,18 @@ export function StudentTripsView({
                           {j.route.code}
                         </span>
                         <span
-                          className={`text-[10px] uppercase font-bold tracking-wider px-2 py-0.5 rounded-full ${
-                            isBoarded
-                              ? "bg-[#20A477]/10 text-[#20A477] border border-[#20A477]/20"
-                              : "bg-[#102D4A]/10 text-[#102D4A] border border-[#102D4A]/20"
-                          }`}
+                          className={`text-[10px] uppercase font-bold tracking-wider px-2 py-0.5 rounded-full ${isBoarded
+                            ? "bg-[#20A477]/10 text-[#20A477] border border-[#20A477]/20"
+                            : "bg-[#102D4A]/10 text-[#102D4A] border border-[#102D4A]/20"
+                            }`}
                         >
                           {isBoarded ? "BOARDED" : "CONFIRMED"}
                         </span>
                         <span
-                          className={`text-[10px] uppercase font-bold tracking-wider px-2 py-0.5 rounded-full ${
-                            trip.passengerCategory === "standing"
-                              ? "bg-amber-100 text-amber-800 border border-amber-300"
-                              : "bg-emerald-100 text-emerald-800 border border-emerald-300"
-                          }`}
+                          className={`text-[10px] uppercase font-bold tracking-wider px-2 py-0.5 rounded-full ${trip.passengerCategory === "standing"
+                            ? "bg-amber-100 text-amber-800 border border-amber-300"
+                            : "bg-emerald-100 text-emerald-800 border border-emerald-300"
+                            }`}
                         >
                           {trip.passengerCategory === "standing" ? "Standing (12 max)" : "Seated (20 max)"}
                         </span>
@@ -302,13 +296,13 @@ export function StudentTripsView({
                         j.status !== "in_transit" &&
                         j.status !== "completed" &&
                         j.status !== "cancelled" && (
-                        <button
-                          onClick={() => setCancelModalBookingId(trip.id)}
-                          className="px-3.5 py-2 rounded-xl text-xs font-bold text-[#D9534F] hover:bg-red-50 border border-transparent hover:border-red-200 transition-colors"
-                        >
-                          Cancel Booking
-                        </button>
-                      )}
+                          <button
+                            onClick={() => setCancelModalBookingId(trip.id)}
+                            className="px-3.5 py-2 rounded-xl text-xs font-bold text-[#D9534F] hover:bg-red-50 border border-transparent hover:border-red-200 transition-colors"
+                          >
+                            Cancel Booking
+                          </button>
+                        )}
 
                       <button
                         onClick={() => handleOpenPass(trip)}
@@ -418,11 +412,10 @@ export function StudentTripsView({
 
                 <div className="text-right">
                   <span
-                    className={`px-2 py-0.5 rounded-full text-[10px] font-bold ${
-                      trip.status === "no_show"
-                        ? "bg-orange-100 text-orange-800"
-                        : "bg-slate-100 text-[#526B82]"
-                    }`}
+                    className={`px-2 py-0.5 rounded-full text-[10px] font-bold ${trip.status === "no_show"
+                      ? "bg-orange-100 text-orange-800"
+                      : "bg-slate-100 text-[#526B82]"
+                      }`}
                   >
                     {trip.status === "no_show" ? "NO-SHOW" : "ARRIVED"}
                   </span>

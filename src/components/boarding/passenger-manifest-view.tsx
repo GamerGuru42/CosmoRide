@@ -12,14 +12,14 @@ export interface ManifestJourney {
   journeyDate: string;
   scheduledDeparture: string;
   status:
-    | "scheduled"
-    | "bus_arrived"
-    | "boarding"
-    | "boarding_closed"
-    | "ready_to_depart"
-    | "in_transit"
-    | "completed"
-    | "cancelled";
+  | "scheduled"
+  | "bus_arrived"
+  | "boarding"
+  | "boarding_closed"
+  | "ready_to_depart"
+  | "in_transit"
+  | "completed"
+  | "cancelled";
   routeCode: string;
   routeName: string;
   vehicleRegistration: string;
@@ -283,66 +283,60 @@ export function PassengerManifestView({
         <div className="flex flex-wrap gap-1.5 pt-1 border-t border-slate-100">
           <button
             onClick={() => setStatusFilter("all")}
-            className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all ${
-              statusFilter === "all"
-                ? "bg-[#102D4A] text-white shadow-2xs"
-                : "bg-slate-100 text-[#526B82] hover:bg-slate-200"
-            }`}
+            className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all ${statusFilter === "all"
+              ? "bg-[#102D4A] text-white shadow-2xs"
+              : "bg-slate-100 text-[#526B82] hover:bg-slate-200"
+              }`}
           >
             All Manifest ({passengers.length})
           </button>
 
           <button
             onClick={() => setStatusFilter("checked_in")}
-            className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all ${
-              statusFilter === "checked_in"
-                ? "bg-[#20A477] text-white shadow-2xs"
-                : "bg-emerald-50 text-emerald-800 hover:bg-emerald-100"
-            }`}
+            className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all ${statusFilter === "checked_in"
+              ? "bg-[#20A477] text-white shadow-2xs"
+              : "bg-emerald-50 text-emerald-800 hover:bg-emerald-100"
+              }`}
           >
             Boarded ({boardedCount})
           </button>
 
           <button
             onClick={() => setStatusFilter("confirmed")}
-            className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all ${
-              statusFilter === "confirmed"
-                ? "bg-[#E5A13B] text-white shadow-2xs"
-                : "bg-amber-50 text-amber-800 hover:bg-amber-100"
-            }`}
+            className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all ${statusFilter === "confirmed"
+              ? "bg-[#E5A13B] text-white shadow-2xs"
+              : "bg-amber-50 text-amber-800 hover:bg-amber-100"
+              }`}
           >
             Awaiting ({pendingCount})
           </button>
 
           <button
             onClick={() => setStatusFilter("no_show")}
-            className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all ${
-              statusFilter === "no_show"
-                ? "bg-[#D9534F] text-white shadow-2xs"
-                : "bg-rose-50 text-rose-800 hover:bg-rose-100"
-            }`}
+            className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all ${statusFilter === "no_show"
+              ? "bg-[#D9534F] text-white shadow-2xs"
+              : "bg-rose-50 text-rose-800 hover:bg-rose-100"
+              }`}
           >
             No-Show ({noShowCount})
           </button>
 
           <button
             onClick={() => setStatusFilter("cancelled")}
-            className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all ${
-              statusFilter === "cancelled"
-                ? "bg-slate-600 text-white shadow-2xs"
-                : "bg-slate-100 text-slate-600 hover:bg-slate-200"
-            }`}
+            className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all ${statusFilter === "cancelled"
+              ? "bg-slate-600 text-white shadow-2xs"
+              : "bg-slate-100 text-slate-600 hover:bg-slate-200"
+              }`}
           >
             Cancelled ({cancelledCount})
           </button>
 
           <button
             onClick={() => setStatusFilter("waitlist")}
-            className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all ${
-              statusFilter === "waitlist"
-                ? "bg-purple-700 text-white shadow-2xs"
-                : "bg-purple-50 text-purple-800 hover:bg-purple-100"
-            }`}
+            className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all ${statusFilter === "waitlist"
+              ? "bg-purple-700 text-white shadow-2xs"
+              : "bg-purple-50 text-purple-800 hover:bg-purple-100"
+              }`}
           >
             Waiting List ({waitlistCount})
           </button>
@@ -438,11 +432,10 @@ export function PassengerManifestView({
                       </td>
                       <td className="py-3 px-4">
                         <span
-                          className={`inline-block px-2 py-0.5 rounded text-[9px] font-bold uppercase tracking-wider ${
-                            p.passengerCategory === "standing"
-                              ? "bg-amber-100 text-amber-900 border border-amber-300"
-                              : "bg-emerald-100 text-emerald-900 border border-emerald-300"
-                          }`}
+                          className={`inline-block px-2 py-0.5 rounded text-[9px] font-bold uppercase tracking-wider ${p.passengerCategory === "standing"
+                            ? "bg-amber-100 text-amber-900 border border-amber-300"
+                            : "bg-emerald-100 text-emerald-900 border border-emerald-300"
+                            }`}
                         >
                           {p.passengerCategory === "standing" ? "Standing" : "Seated"}
                         </span>
@@ -452,21 +445,20 @@ export function PassengerManifestView({
                       </td>
                       <td className="py-3 px-4">
                         <span
-                          className={`inline-block px-2 py-0.5 rounded-full text-[9px] font-bold uppercase tracking-wider ${
-                            p.status === "checked_in"
-                              ? "bg-emerald-100 text-[#20A477]"
-                              : p.status === "no_show"
+                          className={`inline-block px-2 py-0.5 rounded-full text-[9px] font-bold uppercase tracking-wider ${p.status === "checked_in"
+                            ? "bg-emerald-100 text-[#20A477]"
+                            : p.status === "no_show"
                               ? "bg-rose-100 text-[#D9534F]"
                               : p.status === "cancelled"
-                              ? "bg-slate-100 text-slate-600"
-                              : "bg-amber-100 text-[#E5A13B]"
-                          }`}
+                                ? "bg-slate-100 text-slate-600"
+                                : "bg-amber-100 text-[#E5A13B]"
+                            }`}
                         >
                           {p.status === "checked_in"
                             ? "BOARDED"
                             : p.status === "no_show"
-                            ? "NO-SHOW"
-                            : p.status.toUpperCase()}
+                              ? "NO-SHOW"
+                              : p.status.toUpperCase()}
                         </span>
                       </td>
                       <td className="py-3 px-4 text-[11px] text-[#526B82]">

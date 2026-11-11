@@ -7,6 +7,8 @@ import {
   routeSchema,
   scheduleSchema,
   createJourneySchema,
+  createBookingSchema,
+  verifyBoardingPassSchema,
 } from "../src/lib/validators";
 
 const ROOT = process.cwd();
@@ -232,6 +234,229 @@ describe("Consolidated Core System Remediation Verification (00022)", () => {
       const stat = fs.statSync(diskPath);
       assert.ok(stat.size > 100, `Manifest icon unexpectedly small/empty: ${icon.src}`);
     }
+  });
+
+  // Note: The following tests validate SQL migration structure, TypeScript validators,
+  // server action preconditions, and pure-JS delay/capacity invariants locally.
+  // They are NOT live PostgreSQL runtime executions (Postgres/psql/Docker are not installed locally).
+
+  it("fixes the public.gender SQL type typo in 00022 and preserves valid boarding-scanner JSX endings", () => {
+    const sql = readWorkspaceFile(
+      "supabase/migrations/00022_core_system_security_and_workflow_remediation.sql"
+    );
+    assert.strictEqual(
+      sql.includes("public.gender_group"),
+      false,
+      "Migration 00022 must not reference non-existent type public.gender_group"
+    );
+    assert.ok(
+      sql.includes("v_effective_student_gender public.gender;"),
+      "book_journey_seat must use existing enum type public.gender"
+    );
+
+    const scannerView = readWorkspaceFile("src/components/boarding/boarding-scanner-view.tsx");
+    assert.strictEqual(
+      scannerView.includes("journeyId = { currentJourney.id }"),
+      false,
+      "Corrupted duplicate trailing JSX must not appear in boarding-scanner-view.tsx"
+    );
+    assert.ok(
+      scannerView.trimEnd().endsWith(");\n}") || scannerView.trimEnd().endsWith(");}"),
+      "boarding-scanner-view.tsx must end cleanly with component closure"
+    );
+  });
+
+  it("closes direct client waitlist UPDATE bypass and restricts check_driver_assignment_conflict execution", () => {
+    const sql = readWorkspaceFile(
+      "supabase/migrations/00022_core_system_security_and_workflow_remediation.sql"
+    );
+
+    // Waitlist direct UPDATE policy removed; only SELECT policy exists in 00022
+    assert.ok(
+      sql.includes('DROP POLICY IF EXISTS "Students can cancel own waitlist entry" ON public.waitlists;'),
+      "Must drop legacy direct student waitlist UPDATE policy"
+    );
+    assert.strictEqual(
+      /CREATE POLICY[\s\S]{0,120}ON public\.waitlists FOR (?:INSERT|UPDATE|DELETE)/i.test(sql),
+      false,
+      "Must not create direct client INSERT/UPDATE/DELETE policies on public.waitlists"
+    );
+    assert.ok(
+      sql.includes("CREATE OR REPLACE FUNCTION public.cancel_waitlist_entry(") &&
+        sql.includes("ORDER BY w.position ASC, w.created_at ASC"),
+      "Waitlist cancellation and FIFO promotion must remain intact in RPCs"
+    );
+
+    // check_driver_assignment_conflict restricted to internal callers / service_role
+    assert.ok(
+      sql.includes("REVOKE EXECUTE ON FUNCTION public.check_driver_assignment_conflict(UUID, UUID, DATE, TIMESTAMPTZ, UUID, UUID) FROM PUBLIC, anon, authenticated;"),
+      "Direct execute on check_driver_assignment_conflict must be revoked from PUBLIC, anon, authenticated"
+    );
+    assert.ok(
+      sql.includes("GRANT EXECUTE ON FUNCTION public.check_driver_assignment_conflict(UUID, UUID, DATE, TIMESTAMPTZ, UUID, UUID) TO service_role;"),
+      "Execute on check_driver_assignment_conflict must be granted only to service_role"
+    );
+    assert.ok(
+      sql.includes("IF pg_catalog.pg_trigger_depth() = 0 THEN") &&
+        sql.includes("AND p.admin_role IN ('super_admin', 'bus_manager')"),
+      "check_driver_assignment_conflict must validate non-trigger caller privileges"
+    );
+  });
+
+  it("protects public.journeys lifecycle, readiness, and delay columns via trigger while allowing non-lifecycle admin edits", () => {
+    const sql = readWorkspaceFile(
+      "supabase/migrations/00022_core_system_security_and_workflow_remediation.sql"
+    );
+
+    assert.ok(sql.includes("CREATE OR REPLACE FUNCTION public.protect_journey_lifecycle()"));
+    assert.ok(sql.includes("CREATE TRIGGER enforce_journey_lifecycle_protection"));
+    assert.ok(
+      sql.includes(
+        "REVOKE EXECUTE ON FUNCTION public.protect_journey_lifecycle() FROM PUBLIC, anon, authenticated, service_role;"
+      )
+    );
+    assert.ok(
+      sql.includes("AND NEW.readiness_status = 'failed_unsafe' THEN") &&
+        sql.includes("Safety violation: Pre-departure vehicle check was flagged unsafe. Dispatch blocked.")
+    );
+    assert.ok(
+      sql.includes("cosmoride.internal_journey_workflow"),
+      "Workflow RPCs and protection trigger must coordinate via cosmoride.internal_journey_workflow"
+    );
+
+    // Ensure non-lifecycle fields (e.g., vehicle_id, driver_id, scheduled_departure) are NOT blocked by protect_journey_lifecycle
+    const triggerBodyStart = sql.indexOf("CREATE OR REPLACE FUNCTION public.protect_journey_lifecycle()");
+    const triggerBodyEnd = sql.indexOf("CREATE TRIGGER enforce_journey_lifecycle_protection");
+    const triggerSql = sql.slice(triggerBodyStart, triggerBodyEnd);
+    assert.ok(triggerSql.includes("NEW.status IS DISTINCT FROM OLD.status"));
+    assert.ok(triggerSql.includes("NEW.readiness_status IS DISTINCT FROM OLD.readiness_status"));
+    assert.ok(triggerSql.includes("NEW.delay_minutes IS DISTINCT FROM OLD.delay_minutes"));
+    assert.strictEqual(
+      triggerSql.includes("NEW.vehicle_id IS DISTINCT FROM OLD.vehicle_id"),
+      false,
+      "Non-lifecycle admin edits to vehicle_id on pre-dispatch trips must remain permitted"
+    );
+    assert.strictEqual(
+      triggerSql.includes("NEW.scheduled_departure IS DISTINCT FROM OLD.scheduled_departure"),
+      false,
+      "Non-lifecycle admin edits to scheduled_departure on pre-dispatch trips must remain permitted"
+    );
+
+    // Verify all 11 workflow RPC UPDATE sites opt into cosmoride.internal_journey_workflow
+    const updateMatches = sql.match(/\bUPDATE public\.journeys\b/g) ?? [];
+    assert.strictEqual(updateMatches.length, 11, "Expected 11 controlled UPDATE public.journeys blocks in 00022");
+    const optInMatches =
+      sql.match(/set_config\('cosmoride\.internal_journey_workflow',\s*'on',\s*true\)/g) ?? [];
+    assert.strictEqual(
+      optInMatches.length,
+      updateMatches.length,
+      "Every workflow RPC UPDATE on public.journeys must set cosmoride.internal_journey_workflow = on"
+    );
+  });
+
+  it("propagates delay_minutes into effective departure conflict detection and rejects overlapping delays cleanly", () => {
+    const sql = readWorkspaceFile(
+      "supabase/migrations/00022_core_system_security_and_workflow_remediation.sql"
+    );
+
+    assert.ok(
+      sql.includes(
+        "v_effective_departure := NEW.scheduled_departure + (COALESCE(NEW.delay_minutes, 0) * INTERVAL '1 minute');"
+      ),
+      "enforce_journey_vehicle_availability must compute effective delayed departure"
+    );
+    assert.ok(
+      sql.includes("EXCEPTION WHEN check_violation THEN") &&
+        sql.includes("'code', 'ASSIGNMENT_CONFLICT'"),
+      "record_journey_delay_with_notifications must catch check_violation cleanly as ASSIGNMENT_CONFLICT"
+    );
+
+    // Behavioral model check of delayed overlap window
+    function hasWindowOverlap(
+      trip1StartIso: string,
+      trip1DelayMin: number,
+      trip1DurationMin: number,
+      trip2StartIso: string,
+      trip2DelayMin: number,
+      trip2DurationMin: number
+    ): boolean {
+      const start1 = Date.parse(trip1StartIso) + trip1DelayMin * 60_000;
+      const end1 = start1 + trip1DurationMin * 60_000;
+      const start2 = Date.parse(trip2StartIso) + trip2DelayMin * 60_000;
+      const end2 = start2 + trip2DurationMin * 60_000;
+      return start1 < end2 && end1 > start2;
+    }
+
+    assert.strictEqual(
+      hasWindowOverlap("2026-11-12T08:00:00Z", 0, 45, "2026-11-12T09:00:00Z", 0, 45),
+      false,
+      "08:00-08:45 clears 09:00-09:45 before delay"
+    );
+    assert.strictEqual(
+      hasWindowOverlap("2026-11-12T08:00:00Z", 30, 45, "2026-11-12T09:00:00Z", 0, 45),
+      true,
+      "30m delay shifts window to 08:30-09:15 which overlaps 09:00-09:45"
+    );
+  });
+
+  it("enforces boarding stop selection, cancellation cutoff, manual override reason, and 20+12=32 capacity invariants", () => {
+    const sql = readWorkspaceFile(
+      "supabase/migrations/00022_core_system_security_and_workflow_remediation.sql"
+    );
+
+    // 1. Missing boarding stop rejection in SQL + Zod schema
+    assert.ok(
+      sql.includes("IF p_boarding_stop_id IS NULL THEN") &&
+        sql.includes("'code', 'BOARDING_STOP_REQUIRED'"),
+      "book_journey_seat must reject missing boarding stop"
+    );
+    assert.strictEqual(
+      createBookingSchema.safeParse({
+        journeyId: "550e8400-e29b-41d4-a716-446655440000",
+        boardingStopId: "",
+      }).success,
+      false
+    );
+
+    // 2. Cancellation cutoff enforcement in cancel_booking_and_promote + settings validation
+    assert.ok(
+      sql.includes("WHERE key = 'cancellation_cutoff_minutes'") &&
+        sql.includes("CANCELLATION_CUTOFF_EXCEEDED") &&
+        sql.includes("ELSIF p_key = 'cancellation_cutoff_minutes' THEN"),
+      "cancel_booking_and_promote must enforce cancellation_cutoff_minutes setting"
+    );
+
+    // 3. Manual override auditability in SQL + Zod schema + actions
+    assert.ok(
+      sql.includes("IF p_boarding_method = 'manual_override' AND length(COALESCE(v_exception_reason, '')) < 5 THEN") &&
+        sql.includes("'code', 'EXCEPTION_REASON_REQUIRED'") &&
+        sql.includes("'exception_reason', v_exception_reason"),
+      "verify_and_board_passenger must require and audit >=5-char reason for manual_override"
+    );
+    assert.strictEqual(
+      verifyBoardingPassSchema.safeParse({
+        ticketToken: "a1b2c3d4e5f60718293a4b5c6d7e8f90",
+        journeyId: "550e8400-e29b-41d4-a716-446655440000",
+        boardingMethod: "manual_override",
+        exceptionReason: "   ",
+      }).success,
+      false,
+      "verifyBoardingPassSchema must reject blank manual_override reason"
+    );
+    assert.strictEqual(
+      verifyBoardingPassSchema.safeParse({
+        ticketToken: "a1b2c3d4e5f60718293a4b5c6d7e8f90",
+        journeyId: "550e8400-e29b-41d4-a716-446655440000",
+        boardingMethod: "qr_scan",
+      }).success,
+      true,
+      "verifyBoardingPassSchema must still allow qr_scan without exceptionReason"
+    );
+
+    // 4. Preserve 20 seated + 12 standing = 32 capacity ceiling
+    assert.ok(sql.includes("v_seated_cap := 20;") || sql.includes("COALESCE(v_journey.seated_capacity, 20)"));
+    assert.ok(sql.includes("v_standing_cap := 12;") || sql.includes("COALESCE(v_journey.standing_capacity, 12)"));
+    assert.ok(sql.includes("32"), "Total capacity ceiling 32 must remain intact");
   });
 });
 

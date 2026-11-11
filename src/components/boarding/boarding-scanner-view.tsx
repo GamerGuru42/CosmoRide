@@ -49,14 +49,14 @@ export interface ActiveBoardingJourney {
   boardingClosedAt?: string | null;
   departureAuthorisedAt?: string | null;
   status:
-    | "scheduled"
-    | "bus_arrived"
-    | "boarding"
-    | "boarding_closed"
-    | "ready_to_depart"
-    | "in_transit"
-    | "completed"
-    | "cancelled";
+  | "scheduled"
+  | "bus_arrived"
+  | "boarding"
+  | "boarding_closed"
+  | "ready_to_depart"
+  | "in_transit"
+  | "completed"
+  | "cancelled";
   routeCode: string;
   routeName: string;
   vehicleRegistration: string;
@@ -297,11 +297,10 @@ export function BoardingScannerView({ journeys }: BoardingScannerViewProps) {
       {/* Action Feedback Banner */}
       {feedbackMessage && (
         <div
-          className={`rounded-xl p-3.5 text-xs font-semibold flex items-center justify-between border ${
-            feedbackMessage.type === "success"
+          className={`rounded-xl p-3.5 text-xs font-semibold flex items-center justify-between border ${feedbackMessage.type === "success"
               ? "bg-emerald-50 text-emerald-900 border-emerald-200"
               : "bg-rose-50 text-rose-900 border-rose-200"
-          }`}
+            }`}
         >
           <span>{feedbackMessage.text}</span>
           <button
@@ -390,21 +389,20 @@ export function BoardingScannerView({ journeys }: BoardingScannerViewProps) {
           {/* Countdown timer badge if boarding is open */}
           {currentJourney.status === "boarding" && timeLeftSeconds !== null && (
             <div
-              className={`flex items-center gap-2 px-3.5 py-1.5 rounded-xl border text-xs font-mono font-bold ${
-                timeLeftSeconds === 0
+              className={`flex items-center gap-2 px-3.5 py-1.5 rounded-xl border text-xs font-mono font-bold ${timeLeftSeconds === 0
                   ? "bg-rose-100 text-rose-800 border-rose-300"
                   : timeLeftSeconds < 180
-                  ? "bg-amber-100 text-amber-800 border-amber-300 animate-pulse"
-                  : "bg-emerald-100 text-emerald-800 border-emerald-300"
-              }`}
+                    ? "bg-amber-100 text-amber-800 border-amber-300 animate-pulse"
+                    : "bg-emerald-100 text-emerald-800 border-emerald-300"
+                }`}
             >
               <ClockIcon className="w-4 h-4" />
               <span>
                 {timeLeftSeconds === 0
                   ? "BOARDING WINDOW EXPIRED — CLOSE BOARDING"
                   : `WINDOW: ${Math.floor(timeLeftSeconds / 60)
-                      .toString()
-                      .padStart(2, "0")}:${(timeLeftSeconds % 60).toString().padStart(2, "0")}`}
+                    .toString()
+                    .padStart(2, "0")}:${(timeLeftSeconds % 60).toString().padStart(2, "0")}`}
               </span>
             </div>
           )}
@@ -533,13 +531,12 @@ export function BoardingScannerView({ journeys }: BoardingScannerViewProps) {
         <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 text-xs font-bold">
           <div className="flex items-center gap-2">
             <span
-              className={`w-2.5 h-2.5 rounded-full ${
-                currentJourney.status === "boarding"
+              className={`w-2.5 h-2.5 rounded-full ${currentJourney.status === "boarding"
                   ? "bg-[#20A477] animate-pulse"
                   : currentJourney.status === "ready_to_depart"
-                  ? "bg-emerald-500"
-                  : "bg-[#526B82]"
-              }`}
+                    ? "bg-emerald-500"
+                    : "bg-[#526B82]"
+                }`}
             />
             <span className="text-[#102D4A] uppercase tracking-wider font-mono">
               ELECTRIC BUS CAPACITY BREAKDOWN
@@ -593,9 +590,8 @@ export function BoardingScannerView({ journeys }: BoardingScannerViewProps) {
               Total Passengers
             </span>
             <span
-              className={`text-xl font-extrabold font-mono ${
-                boardedCount >= totalSafeCapacity ? "text-rose-600" : "text-[#20A477]"
-              }`}
+              className={`text-xl font-extrabold font-mono ${boardedCount >= totalSafeCapacity ? "text-rose-600" : "text-[#20A477]"
+                }`}
             >
               {boardedCount} / {totalSafeCapacity}
             </span>
@@ -608,13 +604,12 @@ export function BoardingScannerView({ journeys }: BoardingScannerViewProps) {
         {/* Progress bar */}
         <div className="w-full h-3 rounded-full bg-slate-100 overflow-hidden">
           <div
-            className={`h-full transition-all duration-300 ${
-              boardedCount >= totalSafeCapacity
+            className={`h-full transition-all duration-300 ${boardedCount >= totalSafeCapacity
                 ? "bg-[#D9534F]"
                 : boardedCount >= 20
-                ? "bg-[#E5A13B]"
-                : "bg-[#20A477]"
-            }`}
+                  ? "bg-[#E5A13B]"
+                  : "bg-[#20A477]"
+              }`}
             style={{ width: `${Math.min(100, Math.round((boardedCount / totalSafeCapacity) * 100))}%` }}
           />
         </div>
@@ -624,11 +619,10 @@ export function BoardingScannerView({ journeys }: BoardingScannerViewProps) {
       <div className="flex border-b border-slate-200">
         <button
           onClick={() => setActiveTab("camera")}
-          className={`flex items-center gap-2 py-3 px-5 text-xs font-bold border-b-2 transition-colors ${
-            activeTab === "camera"
+          className={`flex items-center gap-2 py-3 px-5 text-xs font-bold border-b-2 transition-colors ${activeTab === "camera"
               ? "border-[#102D4A] text-[#102D4A]"
               : "border-transparent text-[#526B82] hover:text-[#102D4A]"
-          }`}
+            }`}
         >
           <QrCodeIcon className="w-4 h-4" />
           <span>Camera Scanner</span>
@@ -636,11 +630,10 @@ export function BoardingScannerView({ journeys }: BoardingScannerViewProps) {
 
         <button
           onClick={() => setActiveTab("manifest")}
-          className={`flex items-center gap-2 py-3 px-5 text-xs font-bold border-b-2 transition-colors ${
-            activeTab === "manifest"
+          className={`flex items-center gap-2 py-3 px-5 text-xs font-bold border-b-2 transition-colors ${activeTab === "manifest"
               ? "border-[#102D4A] text-[#102D4A]"
               : "border-transparent text-[#526B82] hover:text-[#102D4A]"
-          }`}
+            }`}
         >
           <UserIcon className="w-4 h-4" />
           <span>Passenger Manifest ({activePassengers.length})</span>
@@ -711,11 +704,10 @@ export function BoardingScannerView({ journeys }: BoardingScannerViewProps) {
                       </td>
                       <td className="py-3 px-4">
                         <span
-                          className={`inline-block px-2 py-0.5 rounded-full text-[10px] font-bold uppercase ${
-                            p.passengerCategory === "seated"
+                          className={`inline-block px-2 py-0.5 rounded-full text-[10px] font-bold uppercase ${p.passengerCategory === "seated"
                               ? "bg-emerald-50 text-emerald-700 border border-emerald-200"
                               : "bg-amber-50 text-amber-700 border border-amber-200"
-                          }`}
+                            }`}
                         >
                           {p.passengerCategory || "seated"}
                         </span>

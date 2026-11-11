@@ -163,12 +163,22 @@ export const cancelBookingSchema = z.object({
   bookingId: z.string().uuid(),
 });
 
-export const verifyBoardingPassSchema = z.object({
-  ticketToken: z.string().min(16, "Invalid boarding token length"),
-  journeyId: z.string().uuid(),
-  boardingMethod: z.enum(["qr_scan", "manual_override", "nfc_tap"]).default("qr_scan"),
-  exceptionReason: z.string().optional(),
-});
+export const verifyBoardingPassSchema = z
+  .object({
+    ticketToken: z.string().min(16, "Invalid boarding token length"),
+    journeyId: z.string().uuid(),
+    boardingMethod: z.enum(["qr_scan", "manual_override", "nfc_tap"]).default("qr_scan"),
+    exceptionReason: z.string().optional(),
+  })
+  .refine(
+    (data) =>
+      data.boardingMethod !== "manual_override" ||
+      (data.exceptionReason?.trim().length ?? 0) >= 5,
+    {
+      message: "Manual boarding override requires an exception reason (minimum 5 characters).",
+      path: ["exceptionReason"],
+    }
+  );
 
 // ============================================================
 // Announcements & Incidents

@@ -50,6 +50,13 @@ export async function bookSeat(
   boardingStopId: string
 ): Promise<ActionResponse<BookRpcResult>> {
   try {
+    if (!boardingStopId || boardingStopId.trim() === "") {
+      return {
+        success: false,
+        error: "Please select a valid boarding pickup stop for this route.",
+      };
+    }
+
     const supabase = await createClient();
     const {
       data: { user },
@@ -230,6 +237,14 @@ export async function verifyAndBoardPass(
   exceptionReason?: string
 ): Promise<ActionResponse<BoardingRpcResult>> {
   try {
+    const trimmedReason = exceptionReason?.trim() || null;
+    if (boardingMethod === "manual_override" && (!trimmedReason || trimmedReason.length < 5)) {
+      return {
+        success: false,
+        error: "Manual boarding override requires an exception reason of at least 5 characters.",
+      };
+    }
+
     const supabase = await createClient();
     const {
       data: { user },
@@ -244,7 +259,7 @@ export async function verifyAndBoardPass(
       p_officer_id: user.id,
       p_journey_id: journeyId,
       p_boarding_method: boardingMethod,
-      p_exception_reason: exceptionReason || null,
+      p_exception_reason: trimmedReason,
     });
 
     if (error) {

@@ -17,6 +17,7 @@ export type BoardingStatusCode =
   | "JOURNEY_NOT_BOARDING"
   | "BOARDING_CLOSED"
   | "JOURNEY_CLOSED"
+  | "EXCEPTION_REASON_REQUIRED"
   | "UNAUTHORIZED"
   | "FORBIDDEN"
   | "SERVER_ERROR";
@@ -59,6 +60,15 @@ export async function verifyAndBoardPassAction(
   exceptionReason?: string
 ): Promise<BoardingVerificationResult> {
   try {
+    const trimmedReason = exceptionReason?.trim() || null;
+    if (boardingMethod === "manual_override" && (!trimmedReason || trimmedReason.length < 5)) {
+      return {
+        success: false,
+        code: "EXCEPTION_REASON_REQUIRED",
+        message: "Manual boarding override requires an exception reason of at least 5 characters.",
+      };
+    }
+
     const supabase = await createClient();
     const {
       data: { user },
@@ -77,7 +87,7 @@ export async function verifyAndBoardPassAction(
       p_officer_id: user.id,
       p_journey_id: journeyId,
       p_boarding_method: boardingMethod,
-      p_exception_reason: exceptionReason?.trim() || null,
+      p_exception_reason: trimmedReason,
     });
 
     if (error) {

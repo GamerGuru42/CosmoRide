@@ -86,8 +86,8 @@ export function StudentHomeView({
     currentHour < 12
       ? "Good morning"
       : currentHour < 17
-      ? "Good afternoon"
-      : "Good evening";
+        ? "Good afternoon"
+        : "Good evening";
 
   function openNextBookingPass() {
     if (!nextBooking) return;
@@ -209,11 +209,10 @@ export function StudentHomeView({
                       ROUTE {nextBooking.journey.route.code}
                     </span>
                     <span
-                      className={`text-[10px] uppercase font-bold tracking-wider px-2 py-0.5 rounded-full ${
-                        nextBooking.passengerCategory === "standing"
-                          ? "bg-amber-400/20 text-amber-200 border border-amber-400/30"
-                          : "bg-emerald-400/20 text-emerald-200 border border-emerald-400/30"
-                      }`}
+                      className={`text-[10px] uppercase font-bold tracking-wider px-2 py-0.5 rounded-full ${nextBooking.passengerCategory === "standing"
+                        ? "bg-amber-400/20 text-amber-200 border border-amber-400/30"
+                        : "bg-emerald-400/20 text-emerald-200 border border-emerald-400/30"
+                        }`}
                     >
                       {nextBooking.passengerCategory === "standing" ? "Standing (12 max)" : "Seated (20 max)"}
                     </span>
