@@ -78,6 +78,10 @@ export default async function BoardingPassengersPage({ searchParams }: PageProps
         name,
         safe_capacity
       ),
+      driver_record:drivers!journeys_driver_record_id_fkey (
+        id,
+        full_name
+      ),
       driver:profiles!journeys_driver_id_fkey (
         id,
         full_name
@@ -130,7 +134,9 @@ export default async function BoardingPassengersPage({ searchParams }: PageProps
   const journeys: ManifestJourney[] = (rawJourneys || []).map((j) => {
     const route = Array.isArray(j.routes) ? j.routes[0] : j.routes;
     const vehicle = Array.isArray(j.vehicles) ? j.vehicles[0] : j.vehicles;
+    const driverRec = Array.isArray(j.driver_record) ? j.driver_record[0] : j.driver_record;
     const driver = Array.isArray(j.driver) ? j.driver[0] : j.driver;
+    const driverName = driverRec?.full_name || driver?.full_name || "Assigned Driver";
     const rawBookings = j.bookings || [];
     const rawWaitlists = j.waitlists || [];
 
@@ -179,7 +185,7 @@ export default async function BoardingPassengersPage({ searchParams }: PageProps
       routeCode: route?.code || "ROUTE",
       routeName: route?.name || "University Route",
       vehicleRegistration: vehicle?.registration_number || "Unassigned",
-      driverName: driver?.full_name || "Assigned Driver",
+      driverName,
       proposedAllocation: j.proposed_allocation,
       safeCapacity: vehicle?.safe_capacity ?? j.proposed_allocation ?? 0,
       passengers,

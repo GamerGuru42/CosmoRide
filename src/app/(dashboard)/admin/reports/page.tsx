@@ -1,6 +1,6 @@
 import type { Metadata } from "next";
-import { redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
+import { requireAdminPageAccess } from "@/lib/admin-auth";
 import { PageHeader } from "@/components/ui/page-header";
 import {
   ReportsView,
@@ -17,21 +17,8 @@ export const metadata: Metadata = {
 export const dynamic = "force-dynamic";
 
 export default async function AdminReportsPage() {
+  await requireAdminPageAccess("reports");
   const supabase = await createClient();
-
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
-
-  if (!user) redirect("/login");
-
-  const { data: profile } = await supabase
-    .from("profiles")
-    .select("role")
-    .eq("id", user.id)
-    .single();
-
-  if (!profile || profile.role !== "admin") redirect("/student");
 
   // 1. Fetch journeys history
   const { data: journeysData } = await supabase
@@ -55,6 +42,9 @@ export default async function AdminReportsPage() {
       driver_record:drivers(
         full_name
       ),
+      driver:profiles!journeys_driver_id_fkey(
+        full_name
+      ),
       bookings(id, status),
       boarding_records(id)
     `)
@@ -65,11 +55,12 @@ export default async function AdminReportsPage() {
     const route = Array.isArray(j.route) ? j.route[0] : j.route;
     const vehicle = Array.isArray(j.vehicle) ? j.vehicle[0] : j.vehicle;
     const driver = Array.isArray(j.driver_record) ? j.driver_record[0] : j.driver_record;
+    const directDriver = Array.isArray(j.driver) ? j.driver[0] : j.driver;
     const tg = route?.transport_group;
     const tgName = Array.isArray(tg) ? tg[0]?.name : tg?.name;
 
     const confirmed = (j.bookings ?? []).filter(
-      (b: { status: string }) => b.status === "confirmed" || b.status === "boarded"
+      (b: { status: string }) => b.status === "confirmed" || b.status === "checked_in"
     ).length;
 
     const boarded = (j.boarding_records ?? []).length;
@@ -83,7 +74,7 @@ export default async function AdminReportsPage() {
       routeName: route?.name || "Route",
       transportGroupName: tgName || "General Fleet",
       vehiclePlate: vehicle?.registration_number || "Unassigned",
-      driverName: driver?.full_name || "Unassigned",
+      driverName: driver?.full_name || directDriver?.full_name || "Unassigned",
       safeCapacity: vehicle?.safe_capacity ?? j.proposed_allocation ?? 0,
       bookedCount: confirmed,
       boardedCount: boarded,
@@ -141,7 +132,7 @@ export default async function AdminReportsPage() {
         scanned_at
       )
     `)
-    .order("created_at", { ascending: false })
+    .order("booked_at", { ascending: false })
     .limit(100);
 
   const passengers: PassengerReportRow[] = (passengersData ?? []).map((b) => {

@@ -17,7 +17,15 @@ export interface AdminJourneyOverview {
   scheduledDeparture: string;
   actualDeparture: string | null;
   actualArrival: string | null;
-  status: "scheduled" | "boarding" | "in_transit" | "completed" | "cancelled";
+  status:
+    | "scheduled"
+    | "bus_arrived"
+    | "boarding"
+    | "boarding_closed"
+    | "ready_to_depart"
+    | "in_transit"
+    | "completed"
+    | "cancelled";
   routeCode: string;
   routeName: string;
   transportGroupName: string;
@@ -62,7 +70,10 @@ interface AdminOverviewProps {
 
 const JOURNEY_STATUS_CONFIG: Record<string, { label: string; color: string }> = {
   scheduled: { label: "Scheduled", color: "bg-blue-100 text-blue-800" },
+  bus_arrived: { label: "Bus Arrived", color: "bg-indigo-100 text-indigo-800" },
   boarding: { label: "Boarding", color: "bg-amber-100 text-amber-800" },
+  boarding_closed: { label: "Boarding Closed", color: "bg-orange-100 text-orange-800" },
+  ready_to_depart: { label: "Ready to Depart", color: "bg-teal-100 text-teal-800" },
   in_transit: { label: "In Transit", color: "bg-emerald-100 text-emerald-800" },
   completed: { label: "Completed", color: "bg-slate-100 text-slate-700" },
   cancelled: { label: "Cancelled", color: "bg-rose-100 text-rose-800" },

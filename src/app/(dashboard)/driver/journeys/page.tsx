@@ -158,14 +158,22 @@ export default async function DriverJourneysPage() {
                     className={`rounded-full px-2.5 py-1 text-[10px] font-bold uppercase tracking-wider ${
                       j.status === "in_transit"
                         ? "bg-blue-100 text-blue-800"
+                        : j.status === "bus_arrived"
+                        ? "bg-sky-100 text-sky-800"
                         : j.status === "boarding"
                         ? "bg-emerald-100 text-[#20A477]"
+                        : j.status === "boarding_closed"
+                        ? "bg-amber-100 text-amber-800"
+                        : j.status === "ready_to_depart"
+                        ? "bg-indigo-100 text-indigo-800"
                         : j.status === "completed"
                         ? "bg-slate-100 text-slate-600"
+                        : j.status === "cancelled"
+                        ? "bg-rose-100 text-rose-700"
                         : "bg-amber-100 text-[#E5A13B]"
                     }`}
                   >
-                    {j.status === "in_transit" ? "IN TRANSIT" : j.status.toUpperCase()}
+                    {j.status.replace(/_/g, " ").toUpperCase()}
                   </span>
                 </div>
               </div>

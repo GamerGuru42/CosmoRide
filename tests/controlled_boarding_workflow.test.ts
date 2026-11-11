@@ -608,7 +608,7 @@ describe("Controlled Boarding & Departure Workflow Verification Suite", () => {
     it("INVARIANT: Timer expiry NEVER automatically departs the bus", () => {
       // Simulating timer hitting 0
       const timerExpired = true;
-      let journeyStatus = "boarding";
+      const journeyStatus = "boarding";
 
       // On timer expiry, status must NOT change to 'in_transit' or 'ready_to_depart'
       if (timerExpired) {

@@ -22,6 +22,7 @@ export interface CompleteStudentProfileResponse {
 export async function completeStudentProfileAction(formData: {
   fullName: string;
   studentId: string;
+  hostelId?: string | null;
 }): Promise<CompleteStudentProfileResponse> {
   try {
     const supabase = await createClient();
@@ -75,6 +76,7 @@ export async function completeStudentProfileAction(formData: {
       {
         p_full_name: trimmedName,
         p_student_id: rawStudentId,
+        p_hostel_id: formData.hostelId || null,
       }
     );
 
@@ -104,6 +106,8 @@ export async function completeStudentProfileAction(formData: {
     }
 
     revalidatePath("/student");
+    revalidatePath("/student/departures");
+    revalidatePath("/student/trips");
     revalidatePath("/register");
     revalidatePath("/student/profile");
 
@@ -113,6 +117,85 @@ export async function completeStudentProfileAction(formData: {
       message: parsed.message,
       studentId: parsed.student_id,
       fullName: parsed.full_name,
+    };
+  } catch (err: unknown) {
+    const message = err instanceof Error ? err.message : "An unexpected error occurred.";
+    return {
+      success: false,
+      code: "SERVER_ERROR",
+      error: message,
+    };
+  }
+}
+
+/**
+ * Sets a student's initial hostel assignment safely when no hostel has been linked yet.
+ */
+export async function selectStudentHostelAction(
+  hostelId: string
+): Promise<CompleteStudentProfileResponse> {
+  try {
+    if (!hostelId) {
+      return {
+        success: false,
+        code: "INVALID_HOSTEL",
+        error: "Please select a valid university hostel.",
+      };
+    }
+
+    const supabase = await createClient();
+    const {
+      data: { user },
+      error: userError,
+    } = await supabase.auth.getUser();
+
+    if (userError || !user) {
+      return {
+        success: false,
+        code: "UNAUTHORIZED",
+        error: "Your session has expired. Please sign in again.",
+      };
+    }
+
+    const { data: result, error: rpcError } = await supabase.rpc(
+      "select_student_hostel",
+      {
+        p_hostel_id: hostelId,
+      }
+    );
+
+    if (rpcError) {
+      return {
+        success: false,
+        code: "RPC_ERROR",
+        error: rpcError.message || "Failed to update hostel assignment.",
+      };
+    }
+
+    const parsed = result as {
+      success: boolean;
+      code?: string;
+      error?: string;
+      message?: string;
+    };
+
+    if (!parsed?.success) {
+      return {
+        success: false,
+        code: parsed?.code || "HOSTEL_ASSIGNMENT_FAILED",
+        error: parsed?.error || "Hostel assignment could not be completed.",
+      };
+    }
+
+    revalidatePath("/student");
+    revalidatePath("/student/profile");
+    revalidatePath("/student/departures");
+    revalidatePath("/student/trips");
+
+    return {
+      success: true,
+      code: parsed.code,
+      message: parsed.message || "Hostel assignment confirmed.",
     };
   } catch (err: unknown) {
     const message = err instanceof Error ? err.message : "An unexpected error occurred.";

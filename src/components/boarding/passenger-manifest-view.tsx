@@ -2,10 +2,7 @@
 
 import React, { useState, useTransition, useMemo } from "react";
 import { formatTime, formatDate } from "@/lib/utils";
-import {
-  markPassengerNoShowAction,
-  startBoardingSession,
-} from "@/actions/boarding";
+import { markPassengerNoShowAction } from "@/actions/boarding";
 import { ManualBoardModal } from "./manual-board-modal";
 import { BusIcon, CheckCircleIcon, UserIcon, AlertTriangleIcon } from "@/components/ui/icons";
 import type { BoardingPassenger } from "./boarding-scanner-view";
@@ -14,7 +11,15 @@ export interface ManifestJourney {
   id: string;
   journeyDate: string;
   scheduledDeparture: string;
-  status: "scheduled" | "boarding" | "in_transit" | "completed" | "cancelled";
+  status:
+    | "scheduled"
+    | "bus_arrived"
+    | "boarding"
+    | "boarding_closed"
+    | "ready_to_depart"
+    | "in_transit"
+    | "completed"
+    | "cancelled";
   routeCode: string;
   routeName: string;
   vehicleRegistration: string;

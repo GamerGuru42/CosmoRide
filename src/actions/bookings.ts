@@ -97,8 +97,12 @@ export async function bookSeat(
     }
 
     revalidatePath("/student");
-    revalidatePath("/student/journeys");
-    revalidatePath("/student/bookings");
+    revalidatePath("/student/departures");
+    revalidatePath("/student/trips");
+    revalidatePath("/boarding");
+    revalidatePath("/boarding/boarding");
+    revalidatePath("/boarding/passengers");
+    revalidatePath("/admin/operations");
 
     return {
       success: true,
@@ -146,8 +150,12 @@ export async function cancelBooking(bookingId: string): Promise<ActionResponse> 
     }
 
     revalidatePath("/student");
-    revalidatePath("/student/bookings");
-    revalidatePath("/student/journeys");
+    revalidatePath("/student/departures");
+    revalidatePath("/student/trips");
+    revalidatePath("/boarding");
+    revalidatePath("/boarding/boarding");
+    revalidatePath("/boarding/passengers");
+    revalidatePath("/admin/operations");
 
     return {
       success: true,
@@ -155,6 +163,52 @@ export async function cancelBooking(bookingId: string): Promise<ActionResponse> 
     };
   } catch (err: unknown) {
     const message = err instanceof Error ? err.message : "Failed to cancel booking.";
+    return { success: false, error: message };
+  }
+}
+
+/**
+ * Removes a student from an active waitlist entry cleanly via atomic RPC.
+ */
+export async function cancelWaitlistAction(waitlistId: string): Promise<ActionResponse> {
+  try {
+    const supabase = await createClient();
+    const {
+      data: { user },
+    } = await supabase.auth.getUser();
+
+    if (!user) {
+      return { success: false, error: "Authentication required." };
+    }
+
+    const { data, error } = await supabase.rpc("cancel_waitlist_entry", {
+      p_waitlist_id: waitlistId,
+      p_student_id: user.id,
+    });
+
+    if (error) {
+      return { success: false, error: error.message };
+    }
+
+    const result = data as unknown as CancelRpcResult;
+    if (!result || !result.success) {
+      return {
+        success: false,
+        error: result?.error ?? "Failed to leave waitlist.",
+      };
+    }
+
+    revalidatePath("/student");
+    revalidatePath("/student/departures");
+    revalidatePath("/student/trips");
+    revalidatePath("/admin/operations");
+
+    return {
+      success: true,
+      message: result.message ?? "Waitlist reservation cancelled.",
+    };
+  } catch (err: unknown) {
+    const message = err instanceof Error ? err.message : "Failed to leave waitlist.";
     return { success: false, error: message };
   }
 }

@@ -5,9 +5,17 @@ import { useRouter } from "next/navigation";
 import { completeStudentProfileAction } from "@/actions/student-auth";
 import { createClient } from "@/lib/supabase/client";
 
+export interface RegisterHostelOption {
+  id: string;
+  name: string;
+  gender: string;
+  campusName?: string | null;
+}
+
 interface RegisterFormProps {
   initialEmail: string;
   initialFullName: string;
+  hostelOptions?: RegisterHostelOption[];
 }
 
 /**
@@ -15,10 +23,15 @@ interface RegisterFormProps {
  * Links the verified Google identity to self-declared student identity
  * (full name and matriculation number).
  */
-export function RegisterForm({ initialEmail, initialFullName }: RegisterFormProps) {
+export function RegisterForm({
+  initialEmail,
+  initialFullName,
+  hostelOptions = [],
+}: RegisterFormProps) {
   const router = useRouter();
   const [fullName, setFullName] = useState(initialFullName);
   const [studentId, setStudentId] = useState("");
+  const [hostelId, setHostelId] = useState("");
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
 
@@ -45,6 +58,7 @@ export function RegisterForm({ initialEmail, initialFullName }: RegisterFormProp
       const result = await completeStudentProfileAction({
         fullName: trimmedName,
         studentId: rawMatric,
+        hostelId: hostelId || null,
       });
 
       if (!result.success) {
@@ -158,6 +172,36 @@ export function RegisterForm({ initialEmail, initialFullName }: RegisterFormProp
           Must be unique. Once linked to your Google identity, your matriculation number cannot be altered without administrative approval.
         </p>
       </div>
+
+      {/* Optional Residential Hostel */}
+      {hostelOptions.length > 0 && (
+        <div>
+          <label
+            htmlFor="hostelId"
+            className="block text-xs font-bold text-[#102D4A] uppercase tracking-wider mb-1"
+          >
+            Residential Hostel (Optional)
+          </label>
+          <select
+            id="hostelId"
+            name="hostelId"
+            value={hostelId}
+            onChange={(e) => setHostelId(e.target.value)}
+            className="block w-full rounded-xl border border-slate-300 bg-white px-3.5 py-2.5 text-xs text-slate-800 focus:border-[#102D4A] focus:outline-none focus:ring-1 focus:ring-[#102D4A]"
+          >
+            <option value="">Select later from your profile...</option>
+            {hostelOptions.map((h) => (
+              <option key={h.id} value={h.id}>
+                {h.name}
+                {h.campusName ? ` — ${h.campusName}` : ""}
+              </option>
+            ))}
+          </select>
+          <p className="mt-1 text-[10px] text-[#526B82]">
+            Links your campus and transport group. Once chosen, changes require transport admin approval.
+          </p>
+        </div>
+      )}
 
       {/* Self-Declaration Disclaimer */}
       <div className="rounded-xl bg-blue-50/60 border border-blue-200/80 p-3 text-[11px] text-blue-950 space-y-1">

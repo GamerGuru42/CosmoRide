@@ -163,6 +163,22 @@ export default async function RegisterPage({ searchParams }: RegisterPageProps) 
     (user.user_metadata?.name as string) ||
     "";
 
+  const { data: activeHostels } = await supabase
+    .from("hostels")
+    .select("id, name, gender, campus:campuses ( name )")
+    .eq("is_active", true)
+    .order("name", { ascending: true });
+
+  const hostelOptions = (activeHostels || []).map((h) => {
+    const campusInfo = h.campus as unknown as { name: string } | null;
+    return {
+      id: h.id,
+      name: h.name,
+      gender: h.gender,
+      campusName: campusInfo?.name || null,
+    };
+  });
+
   return (
     <div className="rounded-2xl border border-slate-200 bg-white p-6 sm:p-8 shadow-sm space-y-6">
       {/* Header */}
@@ -209,6 +225,7 @@ export default async function RegisterPage({ searchParams }: RegisterPageProps) 
       <RegisterForm
         initialEmail={user.email ?? ""}
         initialFullName={prepopulatedName}
+        hostelOptions={hostelOptions}
       />
     </div>
   );

@@ -1,6 +1,6 @@
 import type { Metadata } from "next";
-import { redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
+import { requireAdminPageAccess } from "@/lib/admin-auth";
 import { PageHeader } from "@/components/ui/page-header";
 import {
   IncidentsManagement,
@@ -15,21 +15,8 @@ export const metadata: Metadata = {
 export const dynamic = "force-dynamic";
 
 export default async function AdminIncidentsPage() {
+  await requireAdminPageAccess("incidents");
   const supabase = await createClient();
-
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
-
-  if (!user) redirect("/login");
-
-  const { data: profile } = await supabase
-    .from("profiles")
-    .select("role")
-    .eq("id", user.id)
-    .single();
-
-  if (!profile || profile.role !== "admin") redirect("/student");
 
   // Fetch all incident reports
   const { data: incidentsData } = await supabase

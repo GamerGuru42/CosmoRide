@@ -1,7 +1,7 @@
 import type { Metadata } from "next";
 import { redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
-import { StudentProfileView, type StudentProfileData } from "@/components/student/student-profile-view";
+import { StudentProfileView, type StudentProfileData, type StudentHostelOption } from "@/components/student/student-profile-view";
 
 export const metadata: Metadata = {
   title: "Student Profile & Credentials | CosmoRide",
@@ -28,6 +28,7 @@ export default async function StudentProfilePage() {
       student_id,
       phone,
       role,
+      hostel_id,
       created_at,
       hostel:hostels (
         name,
@@ -40,6 +41,25 @@ export default async function StudentProfilePage() {
 
   if (!profile?.student_id || profile.student_id.trim() === "") {
     redirect("/register?reason=incomplete_profile");
+  }
+
+  let hostelOptions: StudentHostelOption[] = [];
+  if (!profile.hostel_id) {
+    const { data: activeHostels } = await supabase
+      .from("hostels")
+      .select("id, name, gender, campus:campuses ( name )")
+      .eq("is_active", true)
+      .order("name", { ascending: true });
+
+    hostelOptions = (activeHostels || []).map((h) => {
+      const campusInfo = h.campus as unknown as { name: string } | null;
+      return {
+        id: h.id,
+        name: h.name,
+        gender: h.gender,
+        campusName: campusInfo?.name || null,
+      };
+    });
   }
 
   const hostelInfo = profile?.hostel as unknown as {
@@ -58,12 +78,13 @@ export default async function StudentProfilePage() {
     studentId: profile?.student_id || null,
     phone: profile?.phone || null,
     role: profile?.role || "student",
+    hostelId: profile?.hostel_id || null,
     hostelName: hostelInfo?.name || null,
     campusName: hostelInfo?.campus?.name || null,
     transportGroupName: transportGroupInfo?.name || null,
     createdAt: profile?.created_at || new Date().toISOString(),
   };
 
-  return <StudentProfileView profile={profileData} />;
+  return <StudentProfileView profile={profileData} hostelOptions={hostelOptions} />;
 }
 

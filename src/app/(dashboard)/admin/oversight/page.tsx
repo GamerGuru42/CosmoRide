@@ -1,6 +1,6 @@
 import type { Metadata } from "next";
-import { redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
+import { requireAdminPageAccess } from "@/lib/admin-auth";
 import { getTodayDateString } from "@/lib/utils";
 import {
   HostelManagerOversightView,
@@ -17,21 +17,8 @@ export const metadata: Metadata = {
 export const dynamic = "force-dynamic";
 
 export default async function HostelManagerOversightPage() {
+  const adminCtx = await requireAdminPageAccess("oversight");
   const supabase = await createClient();
-
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
-
-  if (!user) redirect("/login");
-
-  const { data: profile } = await supabase
-    .from("profiles")
-    .select("role, admin_role, full_name")
-    .eq("id", user.id)
-    .single();
-
-  if (!profile || profile.role !== "admin") redirect("/student");
 
   const todayStr = getTodayDateString();
 
@@ -74,6 +61,9 @@ export default async function HostelManagerOversightPage() {
       driver_record:drivers (
         full_name
       ),
+      driver:profiles!journeys_driver_id_fkey (
+        full_name
+      ),
       bookings (
         id,
         status,
@@ -87,6 +77,7 @@ export default async function HostelManagerOversightPage() {
     const route = Array.isArray(j.routes) ? j.routes[0] : j.routes;
     const vehicle = Array.isArray(j.vehicles) ? j.vehicles[0] : j.vehicles;
     const driver = Array.isArray(j.driver_record) ? j.driver_record[0] : j.driver_record;
+    const directDriver = Array.isArray(j.driver) ? j.driver[0] : j.driver;
     const tg = route?.transport_groups;
     const tgName = Array.isArray(tg) ? tg[0]?.name : tg?.name;
 
@@ -98,7 +89,11 @@ export default async function HostelManagerOversightPage() {
 
     const effectiveLatestDeparture = j.latest_permitted_departure || j.scheduled_departure;
     const isOverdue =
-      (j.status === "scheduled" || j.status === "bus_arrived" || j.status === "boarding") &&
+      (j.status === "scheduled" ||
+        j.status === "bus_arrived" ||
+        j.status === "boarding" ||
+        j.status === "boarding_closed" ||
+        j.status === "ready_to_depart") &&
       !j.actual_departure &&
       new Date() > new Date(effectiveLatestDeparture);
 
@@ -122,7 +117,7 @@ export default async function HostelManagerOversightPage() {
       routeName: route?.name || "University Route",
       transportGroupName: tgName || "General Operation",
       vehicleRegistration: vehicle?.registration_number || "UNASSIGNED",
-      driverName: driver?.full_name || null,
+      driverName: driver?.full_name || directDriver?.full_name || null,
       bookedCount,
       boardedCount,
       seatedBoarded,
@@ -196,7 +191,7 @@ export default async function HostelManagerOversightPage() {
     <div className="space-y-6">
       <HostelManagerOversightView
         currentDate={todayStr}
-        hostelManagerName={profile.full_name}
+        hostelManagerName={adminCtx.fullName}
         journeys={journeys}
         incidents={incidents}
         recentAudits={recentAudits}

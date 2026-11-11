@@ -372,7 +372,7 @@ describe("Phase 6.7: Recurring Schedule Provisioning & Operational Data Integrit
 
       assert.strictEqual(journeys.length, 4, "Must generate exactly 4 journeys for Monday");
 
-      const toIso = (d: any) => (d instanceof Date ? d.toISOString() : String(d));
+      const toIso = (d: unknown) => (d instanceof Date ? d.toISOString() : String(d));
 
       // Pattern 1: 07:30
       assert.strictEqual(journeys[0].route_code, "BOYS_AM_ROUTE");

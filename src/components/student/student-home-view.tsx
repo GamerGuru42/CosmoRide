@@ -6,6 +6,7 @@ import { formatTime, formatDate, calculateAvailableSeats } from "@/lib/utils";
 import { APP_NAME, UNIVERSITY_NAME, DEPARTURE_STATUS_CONFIG } from "@/lib/constants";
 import { BoardingPassModal, type BoardingPassData } from "./boarding-pass-modal";
 import { DepartureBoard, type DepartureJourney } from "./departure-board";
+import type { JourneyStatus } from "@/lib/supabase/types";
 import {
   BusIcon,
   TicketIcon,
@@ -37,9 +38,10 @@ interface StudentHomeViewProps {
     journey: {
       id: string;
       scheduledDeparture: string;
-      status: "scheduled" | "boarding" | "in_transit" | "completed" | "cancelled";
+      status: JourneyStatus;
       delayMinutes: number;
       delayReason: string | null;
+      destinationName?: string;
       route: {
         id: string;
         name: string;
@@ -98,8 +100,8 @@ export function StudentHomeView({
       studentId: student.studentId,
       routeName: j.route.name,
       routeCode: j.route.code,
-      originName: j.boardingStop?.name || "Terminal",
-      destinationName: "Main Campus",
+      originName: j.boardingStop?.name || "Designated Stop",
+      destinationName: j.destinationName || j.route.name,
       pickupStopName: j.boardingStop?.name || "Designated Stop",
       scheduledDeparture: j.scheduledDeparture,
       vehicleName: j.vehicle.name,

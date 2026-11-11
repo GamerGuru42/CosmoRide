@@ -1,6 +1,6 @@
 import type { Metadata } from "next";
-import { redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
+import { requireAdminPageAccess } from "@/lib/admin-auth";
 import { PageHeader } from "@/components/ui/page-header";
 import {
   RoutesManagement,
@@ -17,21 +17,8 @@ export const metadata: Metadata = {
 export const dynamic = "force-dynamic";
 
 export default async function AdminRoutesPage() {
+  await requireAdminPageAccess("routes");
   const supabase = await createClient();
-
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
-
-  if (!user) redirect("/login");
-
-  const { data: profile } = await supabase
-    .from("profiles")
-    .select("role")
-    .eq("id", user.id)
-    .single();
-
-  if (!profile || profile.role !== "admin") redirect("/student");
 
   // Fetch routes with transport group and route stops
   const { data: routesData } = await supabase
@@ -43,6 +30,7 @@ export default async function AdminRoutesPage() {
       description,
       gender_group,
       transport_group_id,
+      estimated_duration_minutes,
       is_active,
       transport_group:transport_groups(
         id,
@@ -85,6 +73,7 @@ export default async function AdminRoutesPage() {
       genderGroup: (r.gender_group || "mixed") as RouteItem["genderGroup"],
       transportGroupId: r.transport_group_id,
       transportGroupName: tg?.name || "General Transport Group",
+      estimatedDurationMinutes: r.estimated_duration_minutes ?? null,
       isActive: r.is_active,
       stops: sortedStops,
     };

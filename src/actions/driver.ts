@@ -192,14 +192,17 @@ export async function reportOperationalDelayAction({
       return { success: false, error: "Authentication required." };
     }
 
+    const combinedReason = notes?.trim()
+      ? `${delayReason.trim()} (${notes.trim()})`
+      : delayReason.trim();
+
     const { data, error } = await supabase.rpc(
       "record_journey_delay_with_notifications",
       {
         p_journey_id: journeyId,
         p_user_id: user.id,
         p_delay_minutes: delayMinutes,
-        p_delay_reason: delayReason.trim(),
-        p_notes: notes?.trim() || null,
+        p_delay_reason: combinedReason,
         p_is_assisted: isAssisted,
       }
     );
@@ -261,9 +264,9 @@ export async function executeJourneyDepartureAction({
 
     const { data, error } = await supabase.rpc("record_journey_departure_safe", {
       p_journey_id: journeyId,
-      p_user_id: user.id,
+      p_actor_id: user.id,
       p_is_assisted: isAssisted,
-      p_closure_notes: closureNotes?.trim() || null,
+      p_notes: closureNotes?.trim() || null,
     });
 
     if (error) {
@@ -322,7 +325,7 @@ export async function executeJourneyArrivalAction({
 
     const { data, error } = await supabase.rpc("record_journey_arrival_safe", {
       p_journey_id: journeyId,
-      p_user_id: user.id,
+      p_actor_id: user.id,
       p_is_assisted: isAssisted,
       p_notes: notes?.trim() || null,
     });

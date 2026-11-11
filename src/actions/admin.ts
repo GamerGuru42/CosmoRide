@@ -2,6 +2,7 @@
 
 import { revalidatePath } from "next/cache";
 import { createClient } from "@/lib/supabase/server";
+import { canAccessAdminDomain, type AdminDomain } from "@/lib/admin-auth";
 import type { Database, Json } from "@/lib/supabase/types";
 
 export interface AdminActionResponse<T = unknown> {
@@ -12,9 +13,9 @@ export interface AdminActionResponse<T = unknown> {
 }
 
 /**
- * Helper to verify caller is an authorized administrator.
+ * Helper to verify caller is an active, authorized administrator for the target domain.
  */
-async function verifyAdminCaller() {
+async function verifyAdminCaller(domain: AdminDomain) {
   const supabase = await createClient();
   const {
     data: { user },
@@ -26,12 +27,16 @@ async function verifyAdminCaller() {
 
   const { data: profile } = await supabase
     .from("profiles")
-    .select("id, role, admin_role, full_name")
+    .select("id, role, admin_role, full_name, is_active")
     .eq("id", user.id)
     .single();
 
-  if (profile?.role !== "admin") {
-    throw new Error("Permission denied: Only transport administrators can perform this action.");
+  if (profile?.is_active === false || profile?.role !== "admin") {
+    throw new Error("Permission denied: Only active transport administrators can perform this action.");
+  }
+
+  if (!canAccessAdminDomain(profile.admin_role, domain)) {
+    throw new Error(`Permission denied: Your administrative sub-role is not authorized for ${domain}.`);
   }
 
   return { supabase, user, profile };
@@ -61,7 +66,7 @@ export async function createVehicleAction({
   maintenanceNotes?: string;
 }): Promise<AdminActionResponse> {
   try {
-    const { supabase, user } = await verifyAdminCaller();
+    const { supabase, user } = await verifyAdminCaller("vehicles");
 
     if (!registrationNumber || registrationNumber.trim().length < 3) {
       return { success: false, error: "Valid vehicle registration number is required." };
@@ -134,7 +139,7 @@ export async function updateVehicleAction({
   maintenanceNotes?: string;
 }): Promise<AdminActionResponse> {
   try {
-    const { supabase, user } = await verifyAdminCaller();
+    const { supabase, user } = await verifyAdminCaller("vehicles");
 
     const updateData: Database["public"]["Tables"]["vehicles"]["Update"] = {};
     if (registrationNumber) updateData.registration_number = registrationNumber.trim().toUpperCase();
@@ -199,7 +204,7 @@ export async function createDriverRecordAction({
   notes?: string;
 }): Promise<AdminActionResponse> {
   try {
-    const { supabase, user } = await verifyAdminCaller();
+    const { supabase, user } = await verifyAdminCaller("drivers");
 
     if (!fullName || fullName.trim().length < 3) {
       return { success: false, error: "Full driver name is required." };
@@ -273,7 +278,7 @@ export async function updateDriverRecordAction({
   notes?: string;
 }): Promise<AdminActionResponse> {
   try {
-    const { supabase, user } = await verifyAdminCaller();
+    const { supabase, user } = await verifyAdminCaller("drivers");
 
     const updateData: Database["public"]["Tables"]["drivers"]["Update"] = {};
     if (fullName) updateData.full_name = fullName.trim();
@@ -317,18 +322,31 @@ export async function createRouteAction({
   description,
   genderGroup = "mixed",
   transportGroupId,
+  estimatedDurationMinutes,
 }: {
   code: string;
   name: string;
   description: string;
   genderGroup?: "male" | "female" | "mixed";
   transportGroupId: string;
+  estimatedDurationMinutes?: number | null;
 }): Promise<AdminActionResponse> {
   try {
-    const { supabase, user } = await verifyAdminCaller();
+    const { supabase, user } = await verifyAdminCaller("routes");
 
     if (!code || code.trim().length < 2) return { success: false, error: "Route code is required." };
     if (!name || name.trim().length < 3) return { success: false, error: "Route name is required." };
+    if (
+      estimatedDurationMinutes != null &&
+      (!Number.isInteger(estimatedDurationMinutes) ||
+        estimatedDurationMinutes < 1 ||
+        estimatedDurationMinutes > 360)
+    ) {
+      return {
+        success: false,
+        error: "Estimated route duration must be an integer between 1 and 360 minutes.",
+      };
+    }
 
     const { data: route, error } = await supabase
       .from("routes")
@@ -338,6 +356,7 @@ export async function createRouteAction({
         description: description.trim(),
         gender_group: genderGroup,
         transport_group_id: transportGroupId,
+        estimated_duration_minutes: estimatedDurationMinutes ?? null,
         is_active: true,
       })
       .select()
@@ -351,13 +370,69 @@ export async function createRouteAction({
       action: "ROUTE_CREATED",
       entity_type: "route",
       entity_id: route.id,
-      details: { code, name, transport_group_id: transportGroupId },
+      details: {
+        code,
+        name,
+        transport_group_id: transportGroupId,
+        estimated_duration_minutes: estimatedDurationMinutes ?? null,
+      },
     });
 
     revalidatePath("/admin/routes");
+    revalidatePath("/admin/schedules");
+    revalidatePath("/admin/journeys");
     return { success: true, message: `Route ${code} (${name}) created successfully.` };
   } catch (err: unknown) {
     const message = err instanceof Error ? err.message : "Failed to create route.";
+    return { success: false, error: message };
+  }
+}
+
+export async function updateRouteDurationAction({
+  routeId,
+  estimatedDurationMinutes,
+}: {
+  routeId: string;
+  estimatedDurationMinutes: number;
+}): Promise<AdminActionResponse> {
+  try {
+    const { supabase, user } = await verifyAdminCaller("routes");
+
+    if (
+      !Number.isInteger(estimatedDurationMinutes) ||
+      estimatedDurationMinutes < 1 ||
+      estimatedDurationMinutes > 360
+    ) {
+      return {
+        success: false,
+        error: "Estimated route duration must be an integer between 1 and 360 minutes.",
+      };
+    }
+
+    const { error } = await supabase
+      .from("routes")
+      .update({ estimated_duration_minutes: estimatedDurationMinutes })
+      .eq("id", routeId);
+
+    if (error) return { success: false, error: error.message };
+
+    await supabase.from("audit_logs").insert({
+      user_id: user.id,
+      action: "ROUTE_DURATION_UPDATED",
+      entity_type: "route",
+      entity_id: routeId,
+      details: { estimated_duration_minutes: estimatedDurationMinutes },
+    });
+
+    revalidatePath("/admin/routes");
+    revalidatePath("/admin/schedules");
+    revalidatePath("/admin/journeys");
+    return {
+      success: true,
+      message: `Route turnaround duration updated to ${estimatedDurationMinutes} minutes.`,
+    };
+  } catch (err: unknown) {
+    const message = err instanceof Error ? err.message : "Failed to update route duration.";
     return { success: false, error: message };
   }
 }
@@ -374,7 +449,7 @@ export async function addStopToRouteAction({
   estimatedMinutesFromStart?: number | null;
 }): Promise<AdminActionResponse> {
   try {
-    const { supabase, user } = await verifyAdminCaller();
+    const { supabase, user } = await verifyAdminCaller("routes");
 
     const { error } = await supabase.from("route_stops").upsert({
       route_id: routeId,
@@ -409,7 +484,7 @@ export async function removeStopFromRouteAction(
   stopId: string
 ): Promise<AdminActionResponse> {
   try {
-    const { supabase, user } = await verifyAdminCaller();
+    const { supabase, user } = await verifyAdminCaller("routes");
 
     const { error } = await supabase
       .from("route_stops")
@@ -450,16 +525,36 @@ export async function createScheduleTemplateAction({
 }: {
   routeId: string;
   dayOfWeek: number; // 0=Sun, 1=Mon, ..., 6=Sat
-  departureTime: string; // HH:MI:SS
-  latestDepartureTime?: string | null; // HH:MI:SS
+  departureTime: string; // HH:MI or HH:MI:SS
+  latestDepartureTime?: string | null; // HH:MI or HH:MI:SS
   direction?: "outbound" | "inbound";
   proposedAllocation?: number;
   notes?: string;
 }): Promise<AdminActionResponse> {
   try {
-    const { supabase, user } = await verifyAdminCaller();
+    const { supabase, user } = await verifyAdminCaller("schedules");
 
-    if (latestDepartureTime && latestDepartureTime < departureTime) {
+    const normalizeTime = (raw: string): string | null => {
+      const trimmed = raw.trim();
+      if (/^\d{2}:\d{2}$/.test(trimmed)) return `${trimmed}:00`;
+      if (/^\d{2}:\d{2}:\d{2}$/.test(trimmed)) return trimmed;
+      return null;
+    };
+
+    const normalizedDeparture = normalizeTime(departureTime);
+    if (!normalizedDeparture) {
+      return { success: false, error: "Departure time must use HH:MM or HH:MM:SS format." };
+    }
+
+    const normalizedLatest = latestDepartureTime?.trim()
+      ? normalizeTime(latestDepartureTime)
+      : null;
+
+    if (latestDepartureTime?.trim() && !normalizedLatest) {
+      return { success: false, error: "Latest departure time must use HH:MM or HH:MM:SS format." };
+    }
+
+    if (normalizedLatest && normalizedLatest < normalizedDeparture) {
       return {
         success: false,
         error: "Latest permitted departure time cannot be earlier than planned departure time.",
@@ -471,8 +566,8 @@ export async function createScheduleTemplateAction({
       .insert({
         route_id: routeId,
         day_of_week: dayOfWeek,
-        departure_time: departureTime,
-        latest_departure_time: latestDepartureTime || null,
+        departure_time: normalizedDeparture,
+        latest_departure_time: normalizedLatest,
         direction,
         proposed_allocation: proposedAllocation,
         notes: notes?.trim() || null,
@@ -491,8 +586,8 @@ export async function createScheduleTemplateAction({
       details: {
         route_id: routeId,
         day_of_week: dayOfWeek,
-        departure_time: departureTime,
-        latest_departure_time: latestDepartureTime || null,
+        departure_time: normalizedDeparture,
+        latest_departure_time: normalizedLatest,
       },
     });
 
@@ -509,7 +604,7 @@ export async function generateJourneysFromSchedulesAction(
   routeId?: string
 ): Promise<AdminActionResponse> {
   try {
-    const { supabase, user } = await verifyAdminCaller();
+    const { supabase, user } = await verifyAdminCaller("schedules");
 
     const { data, error } = await supabase.rpc("admin_generate_journeys_from_schedules", {
       p_admin_id: user.id,
@@ -525,6 +620,8 @@ export async function generateJourneysFromSchedulesAction(
     }
 
     revalidatePath("/admin/journeys");
+    revalidatePath("/admin/dispatch");
+    revalidatePath("/admin/operations");
     revalidatePath("/admin");
     revalidatePath("/student/departures");
 
@@ -548,7 +645,7 @@ export async function cancelJourneyAction(
       return { success: false, error: "Please enter a valid cancellation justification (min 5 characters)." };
     }
 
-    const { supabase, user } = await verifyAdminCaller();
+    const { supabase, user } = await verifyAdminCaller("journeys");
 
     const { data, error } = await supabase.rpc("admin_cancel_journey", {
       p_admin_id: user.id,
@@ -564,8 +661,11 @@ export async function cancelJourneyAction(
     }
 
     revalidatePath("/admin/journeys");
+    revalidatePath("/admin/dispatch");
+    revalidatePath("/admin/operations");
     revalidatePath("/admin");
     revalidatePath("/student/departures");
+    revalidatePath("/student/trips");
 
     return {
       success: true,
@@ -596,7 +696,7 @@ export async function updateIncidentStatusAction({
       return { success: false, error: "Resolution notes are required (min 5 characters)." };
     }
 
-    const { supabase, user } = await verifyAdminCaller();
+    const { supabase, user } = await verifyAdminCaller("incidents");
 
     const { data, error } = await supabase.rpc("admin_update_incident_status", {
       p_admin_id: user.id,
@@ -607,9 +707,17 @@ export async function updateIncidentStatusAction({
 
     if (error) return { success: false, error: error.message };
 
+    const result = data as Record<string, unknown> | null;
+    if (result && result.success === false) {
+      return {
+        success: false,
+        error: (result.error as string) || "Failed to update incident status.",
+      };
+    }
+
     revalidatePath("/admin/incidents");
     revalidatePath("/admin");
-    return { success: true, message: `Incident updated to ${status}.` };
+    return { success: true, message: (result?.message as string) || `Incident updated to ${status}.` };
   } catch (err: unknown) {
     const message = err instanceof Error ? err.message : "Failed to update incident.";
     return { success: false, error: message };
@@ -641,7 +749,7 @@ export async function createAnnouncementAction({
     if (!title || title.trim().length < 4) return { success: false, error: "Title must be at least 4 characters." };
     if (!content || content.trim().length < 10) return { success: false, error: "Content must be at least 10 characters." };
 
-    const { supabase, user } = await verifyAdminCaller();
+    const { supabase, user } = await verifyAdminCaller("announcements");
 
     const { data: announcement, error } = await supabase
       .from("announcements")
@@ -690,7 +798,7 @@ export async function updateSystemSettingAction(
   description?: string
 ): Promise<AdminActionResponse> {
   try {
-    const { supabase, user } = await verifyAdminCaller();
+    const { supabase, user } = await verifyAdminCaller("settings");
 
     // Client/action-level validation for critical operational parameters
     let validatedValue = value;
@@ -755,7 +863,7 @@ export async function updateUserRoleAndOperationAction({
   hostelId?: string | null;
 }): Promise<AdminActionResponse> {
   try {
-    const { supabase, user } = await verifyAdminCaller();
+    const { supabase, user } = await verifyAdminCaller("users");
 
     // Check target user
     const { data: targetUser, error: fetchErr } = await supabase

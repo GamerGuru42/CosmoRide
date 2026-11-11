@@ -191,8 +191,11 @@ export function CameraScanner({ onScan, isPaused = false }: CameraScannerProps) 
 
   // Initial mount: start camera
   useEffect(() => {
-    startCamera();
+    const initTimer = setTimeout(() => {
+      void startCamera();
+    }, 0);
     return () => {
+      clearTimeout(initTimer);
       stopCamera();
     };
   }, [startCamera, stopCamera]);

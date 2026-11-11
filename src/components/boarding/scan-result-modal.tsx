@@ -31,26 +31,29 @@ export function ScanResultModal({
   const [secondsRemaining, setSecondsRemaining] = useState<number>(3);
 
   useEffect(() => {
-    if (!result) return;
-
-    // Only auto-advance on successful verification
-    if (result.code !== "VALID" || !autoAdvance) {
+    if (!result || result.code !== "VALID" || !autoAdvance) {
       return;
     }
 
-    setSecondsRemaining(3);
+    let remaining = 3;
+    const initTimer = setTimeout(() => {
+      setSecondsRemaining(remaining);
+    }, 0);
+
     const interval = setInterval(() => {
-      setSecondsRemaining((prev) => {
-        if (prev <= 1) {
-          clearInterval(interval);
-          onClose();
-          return 0;
-        }
-        return prev - 1;
-      });
+      remaining -= 1;
+      if (remaining <= 0) {
+        clearInterval(interval);
+        onClose();
+      } else {
+        setSecondsRemaining(remaining);
+      }
     }, 1000);
 
-    return () => clearInterval(interval);
+    return () => {
+      clearTimeout(initTimer);
+      clearInterval(interval);
+    };
   }, [result, autoAdvance, onClose]);
 
   // Keyboard shortcut: Escape or Enter closes

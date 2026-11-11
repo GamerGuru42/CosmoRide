@@ -75,6 +75,10 @@ export default async function BoardingOfficerDashboardPage() {
         name,
         safe_capacity
       ),
+      driver_record:drivers!journeys_driver_record_id_fkey (
+        id,
+        full_name
+      ),
       driver:profiles!journeys_driver_id_fkey (
         id,
         full_name
@@ -268,7 +272,9 @@ export default async function BoardingOfficerDashboardPage() {
             {journeys.map((journey) => {
               const route = Array.isArray(journey.routes) ? journey.routes[0] : journey.routes;
               const vehicle = Array.isArray(journey.vehicles) ? journey.vehicles[0] : journey.vehicles;
+              const driverRec = Array.isArray(journey.driver_record) ? journey.driver_record[0] : journey.driver_record;
               const driver = Array.isArray(journey.driver) ? journey.driver[0] : journey.driver;
+              const driverName = driverRec?.full_name || driver?.full_name || "Assigned Driver";
               const bookings = journey.bookings || [];
 
               const journeyBoarded = bookings.filter((b) => b.status === "checked_in").length;
@@ -297,14 +303,22 @@ export default async function BoardingOfficerDashboardPage() {
                         className={`rounded-full px-2.5 py-0.5 text-[10px] font-bold uppercase tracking-wider ${
                           journey.status === "boarding"
                             ? "bg-emerald-100 text-[#20A477] animate-pulse"
+                            : journey.status === "bus_arrived"
+                            ? "bg-sky-100 text-sky-800"
+                            : journey.status === "boarding_closed"
+                            ? "bg-amber-100 text-amber-800"
+                            : journey.status === "ready_to_depart"
+                            ? "bg-indigo-100 text-indigo-800"
                             : journey.status === "in_transit"
                             ? "bg-blue-100 text-blue-700"
                             : journey.status === "completed"
                             ? "bg-slate-100 text-slate-600"
+                            : journey.status === "cancelled"
+                            ? "bg-rose-100 text-rose-700"
                             : "bg-amber-100 text-[#E5A13B]"
                         }`}
                       >
-                        {journey.status === "in_transit" ? "IN TRANSIT" : journey.status.toUpperCase()}
+                        {journey.status.replace(/_/g, " ").toUpperCase()}
                       </span>
                     </div>
 
@@ -331,7 +345,7 @@ export default async function BoardingOfficerDashboardPage() {
                           Driver
                         </span>
                         <span className="font-semibold text-[#102D4A]">
-                          {driver?.full_name || "Assigned Driver"}
+                          {driverName}
                         </span>
                       </div>
                       <div>

@@ -407,7 +407,7 @@ export async function confirmDispatchAction(
  */
 export async function closeAndDepartJourneyAction(
   journeyId: string,
-  markUnboardedAsNoShow: boolean = false,
+  closureNotesOrLegacyFlag?: boolean | string,
   closureNotes?: string
 ): Promise<BoardingActionResponse> {
   try {
@@ -420,10 +420,15 @@ export async function closeAndDepartJourneyAction(
       return { success: false, error: "Authentication required." };
     }
 
+    const resolvedNotes =
+      typeof closureNotesOrLegacyFlag === "string"
+        ? closureNotesOrLegacyFlag
+        : closureNotes;
+
     const { data, error } = await supabase.rpc("close_and_depart_journey", {
       p_journey_id: journeyId,
       p_officer_id: user.id,
-      p_closure_notes: closureNotes || null,
+      p_closure_notes: resolvedNotes?.trim() || null,
     });
 
     if (error) {
@@ -530,9 +535,13 @@ export async function boardPassengerManualOverride(
 }
 
 /**
- * Marks a single passenger as no-show.
+ * Marks a single passenger as no-show via audited RPC (enforces active rep/admin authorization,
+ * hostel transport group isolation, and blocks invalid state transitions).
  */
-export async function markPassengerNoShowAction(bookingId: string): Promise<BoardingActionResponse> {
+export async function markPassengerNoShowAction(
+  bookingId: string,
+  notes?: string
+): Promise<BoardingActionResponse> {
   try {
     const supabase = await createClient();
     const {
@@ -543,20 +552,37 @@ export async function markPassengerNoShowAction(bookingId: string): Promise<Boar
       return { success: false, error: "Authentication required." };
     }
 
-    const { error } = await supabase
-      .from("bookings")
-      .update({ status: "no_show" })
-      .eq("id", bookingId);
+    const { data, error } = await supabase.rpc("mark_passenger_no_show", {
+      p_booking_id: bookingId,
+      p_officer_id: user.id,
+      p_notes: notes?.trim() || null,
+    });
 
     if (error) {
       return { success: false, error: error.message };
     }
 
+    const result = data as Record<string, unknown> | null;
+    if (!result?.success) {
+      return {
+        success: false,
+        error: (result?.error as string) || "Failed to mark passenger as no-show.",
+        code: result?.code as string | undefined,
+      };
+    }
+
     revalidatePath("/boarding");
     revalidatePath("/boarding/passengers");
     revalidatePath("/boarding/boarding");
+    revalidatePath("/admin/operations");
+    revalidatePath("/student/departures");
+    revalidatePath("/student/trips");
 
-    return { success: true, message: "Passenger marked as no-show." };
+    return {
+      success: true,
+      message: (result.message as string) || "Passenger marked as no-show.",
+      data: result,
+    };
   } catch (err: unknown) {
     const message = err instanceof Error ? err.message : "Failed to update status.";
     return { success: false, error: message };

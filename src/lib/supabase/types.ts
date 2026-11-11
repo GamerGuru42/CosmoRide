@@ -42,7 +42,8 @@ export type NotificationType =
   | "booking_cancelled"
   | "waitlist_promoted"
   | "schedule_change"
-  | "announcement";
+  | "announcement"
+  | "journey_update";
 export type IncidentSeverity = "low" | "medium" | "high" | "critical";
 export type IncidentStatus =
   | "reported"
@@ -227,6 +228,7 @@ export type Database = {
           description: string | null;
           gender_group: Gender;
           transport_group_id: string | null;
+          estimated_duration_minutes: number | null;
           is_active: boolean;
           created_at: string;
         };
@@ -237,6 +239,7 @@ export type Database = {
           description?: string | null;
           gender_group?: Gender;
           transport_group_id?: string | null;
+          estimated_duration_minutes?: number | null;
           is_active?: boolean;
           created_at?: string;
         };
@@ -247,6 +250,7 @@ export type Database = {
           description?: string | null;
           gender_group?: Gender;
           transport_group_id?: string | null;
+          estimated_duration_minutes?: number | null;
           is_active?: boolean;
           created_at?: string;
         };
@@ -1328,6 +1332,13 @@ export type Database = {
         Args: {
           p_full_name: string;
           p_student_id: string;
+          p_hostel_id?: string | null;
+        };
+        Returns: Json;
+      };
+      select_student_hostel: {
+        Args: {
+          p_hostel_id: string;
         };
         Returns: Json;
       };
@@ -1335,14 +1346,22 @@ export type Database = {
         Args: {
           p_journey_id: string;
           p_student_id: string;
-          p_boarding_stop_id: string;
+          p_boarding_stop_id: string | null;
         };
         Returns: Json;
       };
       cancel_booking_and_promote: {
         Args: {
           p_booking_id: string;
-          p_student_id: string;
+          p_student_id?: string | null;
+          p_reason?: string;
+        };
+        Returns: Json;
+      };
+      cancel_waitlist_entry: {
+        Args: {
+          p_waitlist_id: string;
+          p_student_id?: string | null;
         };
         Returns: Json;
       };
@@ -1356,11 +1375,18 @@ export type Database = {
         };
         Returns: Json;
       };
+      mark_passenger_no_show: {
+        Args: {
+          p_booking_id: string;
+          p_officer_id?: string | null;
+          p_notes?: string | null;
+        };
+        Returns: Json;
+      };
       close_and_depart_journey: {
         Args: {
           p_journey_id: string;
           p_officer_id: string;
-          p_mark_unboarded_as_noshow?: boolean;
           p_closure_notes?: string | null;
         };
         Returns: Json;
@@ -1438,7 +1464,6 @@ export type Database = {
           p_user_id: string;
           p_delay_minutes: number;
           p_delay_reason: string;
-          p_notes?: string | null;
           p_is_assisted?: boolean;
         };
         Returns: Json;
@@ -1446,16 +1471,16 @@ export type Database = {
       record_journey_departure_safe: {
         Args: {
           p_journey_id: string;
-          p_user_id: string;
+          p_actor_id: string;
           p_is_assisted?: boolean;
-          p_closure_notes?: string | null;
+          p_notes?: string | null;
         };
         Returns: Json;
       };
       record_journey_arrival_safe: {
         Args: {
           p_journey_id: string;
-          p_user_id: string;
+          p_actor_id: string;
           p_is_assisted?: boolean;
           p_notes?: string | null;
         };
@@ -1501,6 +1526,7 @@ export type Database = {
           p_journey_date: string;
           p_scheduled_departure: string;
           p_exclude_journey_id?: string | null;
+          p_route_id?: string | null;
         };
         Returns: Json;
       };

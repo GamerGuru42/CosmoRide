@@ -25,7 +25,7 @@ export interface LivePassenger {
   id: string;
   studentName: string;
   matricNumber: string | null;
-  status: "confirmed" | "boarded" | "cancelled" | "no_show";
+  status: "confirmed" | "checked_in" | "cancelled" | "no_show";
   passengerCategory?: "seated" | "standing" | null;
   boardingStopName: string;
   boardedAt: string | null;
@@ -37,7 +37,15 @@ export interface LiveJourneyOperation {
   latestPermittedDeparture?: string | null;
   actualDeparture: string | null;
   actualArrival: string | null;
-  status: "scheduled" | "boarding" | "in_transit" | "completed" | "cancelled";
+  status:
+    | "scheduled"
+    | "bus_arrived"
+    | "boarding"
+    | "boarding_closed"
+    | "ready_to_depart"
+    | "in_transit"
+    | "completed"
+    | "cancelled";
   isOverdue?: boolean;
   routeCode: string;
   routeName: string;
@@ -65,7 +73,10 @@ interface LiveOperationsViewProps {
 
 const STATUS_CONFIG: Record<string, { label: string; color: string }> = {
   scheduled: { label: "Scheduled", color: "bg-blue-100 text-blue-800" },
+  bus_arrived: { label: "Bus Arrived", color: "bg-indigo-100 text-indigo-800" },
   boarding: { label: "Boarding", color: "bg-amber-100 text-amber-800" },
+  boarding_closed: { label: "Boarding Closed", color: "bg-orange-100 text-orange-800" },
+  ready_to_depart: { label: "Ready to Depart", color: "bg-teal-100 text-teal-800" },
   in_transit: { label: "In Transit", color: "bg-emerald-100 text-emerald-800" },
   completed: { label: "Completed", color: "bg-slate-100 text-slate-700" },
   cancelled: { label: "Cancelled", color: "bg-rose-100 text-rose-800" },
@@ -418,14 +429,14 @@ export function LiveOperationsView({
                         <td className="px-3 py-2 text-slate-700">{p.boardingStopName}</td>
                         <td className="px-3 py-2">
                           <span
-                            className={`rounded-full px-2 py-0.5 text-[10px] font-semibold ${p.status === "boarded"
+                            className={`rounded-full px-2 py-0.5 text-[10px] font-semibold ${p.status === "checked_in"
                                 ? "bg-emerald-100 text-emerald-800"
                                 : p.status === "confirmed"
                                   ? "bg-blue-100 text-blue-800"
                                   : "bg-slate-100 text-slate-700"
                               }`}
                           >
-                            {p.status.toUpperCase()}
+                            {p.status === "checked_in" ? "BOARDED" : p.status.toUpperCase()}
                           </span>
                         </td>
                         <td className="px-3 py-2 font-mono text-[11px] text-slate-500">

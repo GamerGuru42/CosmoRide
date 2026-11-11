@@ -14,7 +14,15 @@ export interface JourneyListItem {
   latestPermittedDeparture?: string | null;
   actualDeparture: string | null;
   actualArrival: string | null;
-  status: "scheduled" | "boarding" | "in_transit" | "completed" | "cancelled";
+  status:
+    | "scheduled"
+    | "bus_arrived"
+    | "boarding"
+    | "boarding_closed"
+    | "ready_to_depart"
+    | "in_transit"
+    | "completed"
+    | "cancelled";
   proposedAllocation: number;
   safeCapacity: number;
   routeCode: string;
@@ -41,7 +49,10 @@ interface JourneysManagementProps {
 
 const JOURNEY_STATUS_CONFIG: Record<string, { label: string; color: string }> = {
   scheduled: { label: "Scheduled", color: "bg-blue-100 text-blue-800" },
+  bus_arrived: { label: "Bus Arrived", color: "bg-indigo-100 text-indigo-800" },
   boarding: { label: "Boarding", color: "bg-amber-100 text-amber-800" },
+  boarding_closed: { label: "Boarding Closed", color: "bg-orange-100 text-orange-800" },
+  ready_to_depart: { label: "Ready to Depart", color: "bg-teal-100 text-teal-800" },
   in_transit: { label: "In Transit", color: "bg-emerald-100 text-emerald-800" },
   completed: { label: "Completed", color: "bg-slate-100 text-slate-700" },
   cancelled: { label: "Cancelled", color: "bg-rose-100 text-rose-800" },
@@ -125,7 +136,10 @@ export function JourneysManagement({
           >
             <option value="all">All Statuses</option>
             <option value="scheduled">Scheduled</option>
+            <option value="bus_arrived">Bus Arrived</option>
             <option value="boarding">Boarding</option>
+            <option value="boarding_closed">Boarding Closed</option>
+            <option value="ready_to_depart">Ready to Depart</option>
             <option value="in_transit">In Transit</option>
             <option value="completed">Completed</option>
             <option value="cancelled">Cancelled</option>
@@ -285,7 +299,9 @@ export function JourneysManagement({
                         >
                           Monitor
                         </Link>
-                        {j.status !== "completed" && j.status !== "cancelled" && (
+                        {j.status !== "in_transit" &&
+                          j.status !== "completed" &&
+                          j.status !== "cancelled" && (
                           <button
                             onClick={() => handleOpenCancel(j)}
                             className="rounded px-2 py-1 text-xs font-semibold text-[#D9534F] hover:bg-rose-50"

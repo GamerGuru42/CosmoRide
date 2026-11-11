@@ -3,7 +3,8 @@
 import React, { useState, useTransition } from "react";
 import Link from "next/link";
 import { formatTime, formatDate } from "@/lib/utils";
-import { cancelBooking } from "@/actions/bookings";
+import { cancelBooking, cancelWaitlistAction } from "@/actions/bookings";
+import type { JourneyStatus } from "@/lib/supabase/types";
 import { BoardingPassModal, type BoardingPassData } from "./boarding-pass-modal";
 import {
   BusIcon,
@@ -27,9 +28,10 @@ export interface TripItem {
   journey: {
     id: string;
     scheduledDeparture: string;
-    status: "scheduled" | "boarding" | "in_transit" | "completed" | "cancelled";
+    status: JourneyStatus;
     delayMinutes: number;
     delayReason: string | null;
+    destinationName?: string;
     route: {
       name: string;
       code: string;
@@ -97,8 +99,8 @@ export function StudentTripsView({
       studentId: trip.studentId,
       routeName: j.route.name,
       routeCode: j.route.code,
-      originName: j.boardingStop?.name || "Terminal",
-      destinationName: "Main Campus",
+      originName: j.boardingStop?.name || "Designated Stop",
+      destinationName: j.destinationName || j.route.name,
       pickupStopName: j.boardingStop?.name || "Designated Stop",
       scheduledDeparture: j.scheduledDeparture,
       vehicleName: j.vehicle.name,
@@ -121,6 +123,20 @@ export function StudentTripsView({
         setCancelModalBookingId(null);
       } else {
         setActionError(res.error || "Failed to cancel booking.");
+      }
+    });
+  }
+
+  function handleLeaveWaitlist(waitlistId: string) {
+    setActionError(null);
+    setActionSuccess(null);
+
+    startTransition(async () => {
+      const res = await cancelWaitlistAction(waitlistId);
+      if (res.success) {
+        setActionSuccess(res.message || "Removed from waitlist successfully.");
+      } else {
+        setActionError(res.error || "Failed to cancel waitlist reservation.");
       }
     });
   }
@@ -282,7 +298,10 @@ export function StudentTripsView({
                     </div>
 
                     <div className="flex items-center gap-3">
-                      {!isBoarded && (
+                      {!isBoarded &&
+                        j.status !== "in_transit" &&
+                        j.status !== "completed" &&
+                        j.status !== "cancelled" && (
                         <button
                           onClick={() => setCancelModalBookingId(trip.id)}
                           className="px-3.5 py-2 rounded-xl text-xs font-bold text-[#D9534F] hover:bg-red-50 border border-transparent hover:border-red-200 transition-colors"
@@ -353,10 +372,18 @@ export function StudentTripsView({
                   </div>
                 </div>
 
-                <div className="mt-4 pt-3 border-t border-purple-100 bg-purple-50/50 -mx-5 -mb-5 px-5 py-3 text-xs text-purple-800 flex items-center justify-between">
+                <div className="mt-4 pt-3 border-t border-purple-100 bg-purple-50/50 -mx-5 -mb-5 px-5 py-3 text-xs text-purple-800 flex flex-col sm:flex-row sm:items-center justify-between gap-2">
                   <span>
                     <strong>Automatic Promotion:</strong> You will be issued a confirmed seat automatically if another passenger cancels.
                   </span>
+                  <button
+                    type="button"
+                    disabled={isPending}
+                    onClick={() => handleLeaveWaitlist(item.id)}
+                    className="self-start sm:self-auto px-3 py-1.5 rounded-lg text-[11px] font-bold text-[#D9534F] hover:bg-red-50 border border-red-200 transition-colors disabled:opacity-50"
+                  >
+                    {isPending ? "Leaving..." : "Leave Waitlist"}
+                  </button>
                 </div>
               </div>
             ))
@@ -390,8 +417,14 @@ export function StudentTripsView({
                 </div>
 
                 <div className="text-right">
-                  <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-slate-100 text-[#526B82]">
-                    ARRIVED
+                  <span
+                    className={`px-2 py-0.5 rounded-full text-[10px] font-bold ${
+                      trip.status === "no_show"
+                        ? "bg-orange-100 text-orange-800"
+                        : "bg-slate-100 text-[#526B82]"
+                    }`}
+                  >
+                    {trip.status === "no_show" ? "NO-SHOW" : "ARRIVED"}
                   </span>
                   <p className="text-[10px] font-mono text-slate-400 mt-1">
                     {trip.journey.vehicle.registrationNumber}

@@ -6,7 +6,7 @@ import {
   executeJourneyDepartureAction,
   executeJourneyArrivalAction,
 } from "@/actions/driver";
-import { startBoardingSession } from "@/actions/boarding";
+import { confirmBusArrivalAction } from "@/actions/boarding";
 import { BusIcon, CheckCircleIcon, AlertTriangleIcon } from "@/components/ui/icons";
 import { ReadinessModal } from "./readiness-modal";
 import { DelayModal } from "./delay-modal";
@@ -19,7 +19,15 @@ export interface DriverJourneyData {
   scheduledDeparture: string;
   actualDeparture: string | null;
   actualArrival: string | null;
-  status: "scheduled" | "boarding" | "in_transit" | "completed" | "cancelled";
+  status:
+    | "scheduled"
+    | "bus_arrived"
+    | "boarding"
+    | "boarding_closed"
+    | "ready_to_depart"
+    | "in_transit"
+    | "completed"
+    | "cancelled";
   routeCode: string;
   routeName: string;
   vehicleRegistration: string;
@@ -65,16 +73,18 @@ export function DriverDashboardView({
 
   const currentJourney = journeys.find((j) => j.id === selectedJourneyId) || journeys[0];
 
-  function handleStartBoarding() {
+  function handleConfirmArrival() {
     if (!currentJourney) return;
     setActionError(null);
     startTransition(async () => {
-      const res = await startBoardingSession(currentJourney.id);
+      const res = await confirmBusArrivalAction(currentJourney.id);
       if (res.success) {
-        setActionSuccess("Boarding gate opened. Students can now board.");
-        setTimeout(() => setActionSuccess(null), 3000);
+        setActionSuccess(
+          "Bus arrival confirmed at pickup. Boarding remains closed until opened by the Hostel Boarding Officer."
+        );
+        setTimeout(() => setActionSuccess(null), 4000);
       } else {
-        setActionError(res.error || "Failed to start boarding session.");
+        setActionError(res.error || "Failed to confirm bus arrival.");
       }
     });
   }
@@ -227,7 +237,7 @@ export function DriverDashboardView({
           >
             {journeys.map((j) => (
               <option key={j.id} value={j.id}>
-                {j.routeCode} • {formatTime(j.scheduledDeparture)} — {j.vehicleRegistration} ({j.status.toUpperCase()})
+                {j.routeCode} • {formatTime(j.scheduledDeparture)} — {j.vehicleRegistration} ({j.status.replace(/_/g, " ").toUpperCase()})
               </option>
             ))}
           </select>
@@ -255,14 +265,22 @@ export function DriverDashboardView({
               className={`rounded-full px-3 py-1 text-xs font-bold uppercase tracking-wider ${
                 currentJourney.status === "boarding"
                   ? "bg-emerald-100 text-[#20A477] animate-pulse"
+                  : currentJourney.status === "bus_arrived"
+                  ? "bg-sky-100 text-sky-800"
+                  : currentJourney.status === "boarding_closed"
+                  ? "bg-amber-100 text-amber-800"
+                  : currentJourney.status === "ready_to_depart"
+                  ? "bg-indigo-100 text-indigo-800 animate-pulse"
                   : currentJourney.status === "in_transit"
                   ? "bg-blue-100 text-blue-800"
                   : currentJourney.status === "completed"
                   ? "bg-slate-100 text-slate-600"
+                  : currentJourney.status === "cancelled"
+                  ? "bg-rose-100 text-rose-700"
                   : "bg-amber-100 text-[#E5A13B]"
               }`}
             >
-              {currentJourney.status === "in_transit" ? "IN TRANSIT" : currentJourney.status.toUpperCase()}
+              {currentJourney.status.replace(/_/g, " ").toUpperCase()}
             </span>
           </div>
         </div>
@@ -364,16 +382,34 @@ export function DriverDashboardView({
             {currentJourney.status === "scheduled" && (
               <button
                 type="button"
-                onClick={handleStartBoarding}
+                onClick={handleConfirmArrival}
                 disabled={isPending}
-                className="w-full py-3.5 px-4 rounded-xl text-sm font-bold text-white bg-[#E5A13B] hover:bg-[#d49028] shadow-xs transition-colors flex items-center justify-center gap-2"
+                className="w-full py-3.5 px-4 rounded-xl text-sm font-bold text-white bg-blue-600 hover:bg-blue-700 shadow-xs transition-colors flex items-center justify-center gap-2"
               >
-                <span>📋</span>
-                <span>Open Boarding Gate for Passengers</span>
+                <BusIcon className="w-5 h-5" />
+                <span>Confirm Bus Arrival at Pickup</span>
               </button>
             )}
 
+            {currentJourney.status === "bus_arrived" && (
+              <div className="p-4 rounded-xl bg-sky-50 border border-sky-200 text-center text-xs font-semibold text-sky-900">
+                Bus arrival logged. Keep doors closed until the Hostel Boarding Officer opens the boarding gate.
+              </div>
+            )}
+
             {currentJourney.status === "boarding" && (
+              <div className="p-4 rounded-xl bg-emerald-50 border border-emerald-200 text-center text-xs font-semibold text-emerald-900">
+                Boarding in progress. The Hostel Boarding Officer is verifying passenger tickets ({currentJourney.boardedCount} boarded).
+              </div>
+            )}
+
+            {currentJourney.status === "boarding_closed" && (
+              <div className="p-4 rounded-xl bg-amber-50 border border-amber-200 text-center text-xs font-semibold text-amber-900">
+                Boarding gate closed. Waiting for final departure authorisation before rolling out.
+              </div>
+            )}
+
+            {currentJourney.status === "ready_to_depart" && (
               <button
                 type="button"
                 onClick={handleDepart}

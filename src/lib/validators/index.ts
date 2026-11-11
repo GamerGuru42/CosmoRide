@@ -70,8 +70,9 @@ export const routeSchema = z.object({
   name: z.string().min(2, "Route name is required"),
   code: z.string().min(2, "Route code is required").max(20).toUpperCase(),
   description: z.string().optional(),
-  genderGroup: z.enum(["male", "female", "all"]),
+  genderGroup: z.enum(["male", "female", "mixed"]),
   transportGroupId: z.string().uuid().optional().nullable(),
+  estimatedDurationMinutes: z.number().int().min(1).max(360).optional().nullable(),
 });
 
 export const stopSchema = z.object({
@@ -104,7 +105,7 @@ export const vehicleSchema = z.object({
 export const scheduleSchema = z.object({
   routeId: z.string().uuid("Invalid route"),
   dayOfWeek: z.number().int().min(0).max(6),
-  departureTime: z.string().regex(/^\d{2}:\d{2}$/, "Use HH:MM format"),
+  departureTime: z.string().regex(/^\d{2}:\d{2}(:\d{2})?$/, "Use HH:MM or HH:MM:SS format"),
   direction: z.enum(["outbound", "inbound"]),
   proposedAllocation: z
     .number()
@@ -117,15 +118,21 @@ export const scheduleSchema = z.object({
 // Journeys
 // ============================================================
 
-export const createJourneySchema = z.object({
-  routeId: z.string().uuid(),
-  vehicleId: z.string().uuid(),
-  driverId: z.string().uuid(),
-  journeyDate: z.string().regex(/^\d{4}-\d{2}-\d{2}$/, "Use YYYY-MM-DD format"),
-  scheduledDeparture: z.string().datetime(),
-  proposedAllocation: z.number().int().min(1),
-  scheduleId: z.string().uuid().optional().nullable(),
-});
+export const createJourneySchema = z
+  .object({
+    routeId: z.string().uuid(),
+    vehicleId: z.string().uuid(),
+    driverId: z.string().uuid().optional().nullable(),
+    driverRecordId: z.string().uuid().optional().nullable(),
+    journeyDate: z.string().regex(/^\d{4}-\d{2}-\d{2}$/, "Use YYYY-MM-DD format"),
+    scheduledDeparture: z.string().datetime(),
+    proposedAllocation: z.number().int().min(1),
+    scheduleId: z.string().uuid().optional().nullable(),
+  })
+  .refine((data) => Boolean(data.driverId || data.driverRecordId), {
+    message: "Driver assignment is required",
+    path: ["driverId"],
+  });
 
 export const updateJourneyStatusSchema = z.object({
   journeyId: z.string().uuid(),

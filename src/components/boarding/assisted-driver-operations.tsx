@@ -6,7 +6,12 @@ import {
   executeJourneyDepartureAction,
   executeJourneyArrivalAction,
 } from "@/actions/driver";
-import { startBoardingSession } from "@/actions/boarding";
+import {
+  confirmBusArrivalAction,
+  openBoardingSessionAction,
+  closeBoardingSessionAction,
+  authoriseDepartureAction,
+} from "@/actions/boarding";
 import { ReadinessModal } from "@/components/driver/readiness-modal";
 import { DelayModal } from "@/components/driver/delay-modal";
 import { StopMilestones, type RouteStopItem } from "@/components/driver/stop-milestones";
@@ -19,7 +24,15 @@ export interface AssistedJourneyData {
   scheduledDeparture: string;
   actualDeparture: string | null;
   actualArrival: string | null;
-  status: "scheduled" | "boarding" | "in_transit" | "completed" | "cancelled";
+  status:
+    | "scheduled"
+    | "bus_arrived"
+    | "boarding"
+    | "boarding_closed"
+    | "ready_to_depart"
+    | "in_transit"
+    | "completed"
+    | "cancelled";
   routeCode: string;
   routeName: string;
   vehicleRegistration: string;
@@ -68,16 +81,58 @@ export function AssistedDriverOperations({
 
   const currentJourney = journeys.find((j) => j.id === selectedJourneyId) || journeys[0];
 
-  function handleStartBoarding() {
+  function handleConfirmArrival() {
     if (!currentJourney) return;
     setActionError(null);
     startTransition(async () => {
-      const res = await startBoardingSession(currentJourney.id);
+      const res = await confirmBusArrivalAction(currentJourney.id);
+      if (res.success) {
+        setActionSuccess("Bus arrival confirmed at pickup.");
+        setTimeout(() => setActionSuccess(null), 3000);
+      } else {
+        setActionError(res.error || "Failed to confirm bus arrival.");
+      }
+    });
+  }
+
+  function handleOpenBoarding() {
+    if (!currentJourney) return;
+    setActionError(null);
+    startTransition(async () => {
+      const res = await openBoardingSessionAction(currentJourney.id, 10);
       if (res.success) {
         setActionSuccess("Boarding gate opened.");
         setTimeout(() => setActionSuccess(null), 3000);
       } else {
-        setActionError(res.error || "Failed to start boarding session.");
+        setActionError(res.error || "Failed to open boarding session.");
+      }
+    });
+  }
+
+  function handleCloseBoarding() {
+    if (!currentJourney) return;
+    setActionError(null);
+    startTransition(async () => {
+      const res = await closeBoardingSessionAction(currentJourney.id);
+      if (res.success) {
+        setActionSuccess("Boarding gate closed for final manifest verification.");
+        setTimeout(() => setActionSuccess(null), 3000);
+      } else {
+        setActionError(res.error || "Failed to close boarding session.");
+      }
+    });
+  }
+
+  function handleAuthoriseDeparture() {
+    if (!currentJourney) return;
+    setActionError(null);
+    startTransition(async () => {
+      const res = await authoriseDepartureAction(currentJourney.id);
+      if (res.success) {
+        setActionSuccess("Departure authorised. Bus is ready for dispatch.");
+        setTimeout(() => setActionSuccess(null), 3000);
+      } else {
+        setActionError(res.error || "Failed to authorise departure.");
       }
     });
   }
@@ -276,14 +331,22 @@ export function AssistedDriverOperations({
             className={`rounded-full px-2.5 py-0.5 text-[10px] font-bold uppercase tracking-wider ${
               currentJourney.status === "boarding"
                 ? "bg-emerald-100 text-[#20A477] animate-pulse"
+                : currentJourney.status === "bus_arrived"
+                ? "bg-sky-100 text-sky-800"
+                : currentJourney.status === "boarding_closed"
+                ? "bg-amber-100 text-amber-800"
+                : currentJourney.status === "ready_to_depart"
+                ? "bg-indigo-100 text-indigo-800 animate-pulse"
                 : currentJourney.status === "in_transit"
                 ? "bg-blue-100 text-blue-800"
                 : currentJourney.status === "completed"
                 ? "bg-slate-100 text-slate-600"
+                : currentJourney.status === "cancelled"
+                ? "bg-rose-100 text-rose-700"
                 : "bg-amber-100 text-[#E5A13B]"
             }`}
           >
-            {currentJourney.status === "in_transit" ? "IN TRANSIT" : currentJourney.status.toUpperCase()}
+            {currentJourney.status.replace(/_/g, " ").toUpperCase()}
           </span>
         </div>
 
@@ -367,11 +430,23 @@ export function AssistedDriverOperations({
             {currentJourney.status === "scheduled" && (
               <button
                 type="button"
-                onClick={handleStartBoarding}
+                onClick={handleConfirmArrival}
                 disabled={isPending}
-                className="w-full py-3 px-4 rounded-xl text-xs font-bold text-[#102D4A] bg-[#E5A13B] hover:bg-[#d49028] shadow-xs transition-colors flex items-center justify-center gap-2"
+                className="w-full py-3 px-4 rounded-xl text-xs font-bold text-white bg-blue-600 hover:bg-blue-700 shadow-xs transition-colors flex items-center justify-center gap-2"
               >
-                <span>📋</span>
+                <BusIcon className="w-4 h-4" />
+                <span>Confirm Bus Arrival at Pickup (Assisted)</span>
+              </button>
+            )}
+
+            {currentJourney.status === "bus_arrived" && (
+              <button
+                type="button"
+                onClick={handleOpenBoarding}
+                disabled={isPending}
+                className="w-full py-3 px-4 rounded-xl text-xs font-bold text-white bg-[#20A477] hover:bg-[#1a8560] shadow-xs transition-colors flex items-center justify-center gap-2"
+              >
+                <span>🚪</span>
                 <span>Open Boarding Session (Assisted)</span>
               </button>
             )}
@@ -379,9 +454,33 @@ export function AssistedDriverOperations({
             {currentJourney.status === "boarding" && (
               <button
                 type="button"
+                onClick={handleCloseBoarding}
+                disabled={isPending}
+                className="w-full py-3 px-4 rounded-xl text-xs font-bold text-[#102D4A] bg-[#E5A13B] hover:bg-[#d49028] shadow-xs transition-colors flex items-center justify-center gap-2"
+              >
+                <span>🔒</span>
+                <span>Close Boarding Gate &amp; Review Manifest (Assisted)</span>
+              </button>
+            )}
+
+            {currentJourney.status === "boarding_closed" && (
+              <button
+                type="button"
+                onClick={handleAuthoriseDeparture}
+                disabled={isPending}
+                className="w-full py-3 px-4 rounded-xl text-xs font-bold text-white bg-[#102D4A] hover:bg-[#0c233a] shadow-xs transition-colors flex items-center justify-center gap-2"
+              >
+                <span>✅</span>
+                <span>Authorise Departure (Ready to Depart)</span>
+              </button>
+            )}
+
+            {currentJourney.status === "ready_to_depart" && (
+              <button
+                type="button"
                 onClick={handleDepart}
                 disabled={isPending || currentJourney.readinessStatus === "failed_unsafe"}
-                className="w-full py-3.5 px-4 rounded-xl text-xs font-bold text-white bg-[#20A477] hover:bg-[#1a8560] shadow-xs transition-colors flex items-center justify-center gap-2 disabled:opacity-50"
+                className="w-full py-3.5 px-4 rounded-xl text-xs font-bold text-white bg-emerald-600 hover:bg-emerald-700 shadow-xs transition-colors flex items-center justify-center gap-2 disabled:opacity-50"
               >
                 <BusIcon className="w-4 h-4" />
                 <span>Confirm Bus Departure (Driver Departing Now)</span>

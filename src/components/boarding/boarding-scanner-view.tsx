@@ -98,28 +98,35 @@ export function BoardingScannerView({ journeys }: BoardingScannerViewProps) {
   const currentJourney = journeys.find((j) => j.id === selectedJourneyId) || journeys[0];
 
   // Live countdown timer for active boarding sessions
-  const [timeLeftSeconds, setTimeLeftSeconds] = useState<number | null>(null);
+  const [rawTimeLeftSeconds, setRawTimeLeftSeconds] = useState<number | null>(null);
+  const journeyStatus = currentJourney?.status;
+  const boardingOpenedAt = currentJourney?.boardingOpenedAt;
+  const boardingWindowMinutes = currentJourney?.boardingWindowMinutes || 10;
 
   useEffect(() => {
-    if (!currentJourney || currentJourney.status !== "boarding" || !currentJourney.boardingOpenedAt) {
-      setTimeLeftSeconds(null);
+    if (journeyStatus !== "boarding" || !boardingOpenedAt) {
       return;
     }
 
-    const windowMinutes = currentJourney.boardingWindowMinutes || 10;
-    const openedTime = new Date(currentJourney.boardingOpenedAt).getTime();
-    const expiryTime = openedTime + windowMinutes * 60 * 1000;
+    const openedTime = new Date(boardingOpenedAt).getTime();
+    const expiryTime = openedTime + boardingWindowMinutes * 60 * 1000;
 
     const updateTimer = () => {
       const now = Date.now();
       const diffSecs = Math.max(0, Math.floor((expiryTime - now) / 1000));
-      setTimeLeftSeconds(diffSecs);
+      setRawTimeLeftSeconds(diffSecs);
     };
 
-    updateTimer();
+    const initTimer = setTimeout(updateTimer, 0);
     const interval = setInterval(updateTimer, 1000);
-    return () => clearInterval(interval);
-  }, [currentJourney?.id, currentJourney?.status, currentJourney?.boardingOpenedAt, currentJourney?.boardingWindowMinutes]);
+    return () => {
+      clearTimeout(initTimer);
+      clearInterval(interval);
+    };
+  }, [journeyStatus, boardingOpenedAt, boardingWindowMinutes]);
+
+  const timeLeftSeconds =
+    journeyStatus === "boarding" && boardingOpenedAt ? rawTimeLeftSeconds : null;
 
   // Derived passenger metrics
   const activePassengers = currentJourney?.passengers || [];
@@ -423,7 +430,7 @@ export function BoardingScannerView({ journeys }: BoardingScannerViewProps) {
           )}
 
           {/* Stage 2 -> Stage 3: Open Boarding */}
-          {(currentJourney.status === "scheduled" || currentJourney.status === "bus_arrived") && (
+          {currentJourney.status === "bus_arrived" && (
             <div className="flex items-center gap-3 flex-wrap">
               <div className="flex items-center gap-1.5 text-xs text-slate-700">
                 <label htmlFor="window-input" className="font-semibold">

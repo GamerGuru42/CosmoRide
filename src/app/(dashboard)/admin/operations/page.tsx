@@ -1,6 +1,6 @@
 import type { Metadata } from "next";
-import { redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
+import { requireAdminPageAccess } from "@/lib/admin-auth";
 import { getTodayDateString } from "@/lib/utils";
 import { PageHeader } from "@/components/ui/page-header";
 import {
@@ -24,25 +24,12 @@ interface AdminOperationsPageProps {
 export default async function AdminOperationsPage({
   searchParams,
 }: AdminOperationsPageProps) {
+  await requireAdminPageAccess("operations");
   const resolvedParams = await searchParams;
   const targetJourneyId = resolvedParams.journey;
   const todayStr = getTodayDateString();
 
   const supabase = await createClient();
-
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
-
-  if (!user) redirect("/login");
-
-  const { data: profile } = await supabase
-    .from("profiles")
-    .select("role")
-    .eq("id", user.id)
-    .single();
-
-  if (!profile || profile.role !== "admin") redirect("/student");
 
   // Fetch today's journeys with full operational telemetry
   const { data: journeysData } = await supabase
@@ -70,6 +57,9 @@ export default async function AdminOperationsPage({
       driver_record:drivers(
         full_name,
         has_app_access
+      ),
+      driver:profiles!journeys_driver_id_fkey(
+        full_name
       ),
       bookings(
         id,
@@ -106,6 +96,7 @@ export default async function AdminOperationsPage({
     const route = Array.isArray(j.route) ? j.route[0] : j.route;
     const vehicle = Array.isArray(j.vehicle) ? j.vehicle[0] : j.vehicle;
     const driver = Array.isArray(j.driver_record) ? j.driver_record[0] : j.driver_record;
+    const directDriver = Array.isArray(j.driver) ? j.driver[0] : j.driver;
     const tg = route?.transport_group;
     const tgName = Array.isArray(tg) ? tg[0]?.name : tg?.name;
 
@@ -147,11 +138,11 @@ export default async function AdminOperationsPage({
 
     // Bookings & Passengers
     const confirmedList = (j.bookings ?? []).filter(
-      (b: { status: string }) => b.status === "confirmed" || b.status === "boarded"
+      (b: { status: string }) => b.status === "confirmed" || b.status === "checked_in"
     );
 
     const boardedList = (j.bookings ?? []).filter(
-      (b: { status: string }) => b.status === "boarded"
+      (b: { status: string }) => b.status === "checked_in"
     );
 
     const passengers: LivePassenger[] = (j.bookings ?? []).map((b: Record<string, unknown>) => {
@@ -174,11 +165,17 @@ export default async function AdminOperationsPage({
     let driverMode: "app" | "assisted" | "unassigned" = "unassigned";
     if (driver) {
       driverMode = driver.has_app_access ? "app" : "assisted";
+    } else if (directDriver) {
+      driverMode = "app";
     }
 
     const effectiveLatestDeparture = j.latest_permitted_departure || j.scheduled_departure;
     const isOverdue =
-      (j.status === "scheduled" || j.status === "boarding") &&
+      (j.status === "scheduled" ||
+        j.status === "bus_arrived" ||
+        j.status === "boarding" ||
+        j.status === "boarding_closed" ||
+        j.status === "ready_to_depart") &&
       !j.actual_departure &&
       new Date() > new Date(effectiveLatestDeparture);
 
@@ -196,7 +193,7 @@ export default async function AdminOperationsPage({
       vehiclePlate: vehicle?.registration_number || null,
       vehicleName: vehicle?.name || null,
       safeCapacity: vehicle?.safe_capacity ?? j.proposed_allocation ?? 0,
-      driverName: driver?.full_name || null,
+      driverName: driver?.full_name || directDriver?.full_name || null,
       driverMode,
       bookedCount: confirmedList.length,
       boardedCount: boardedList.length,

@@ -3,6 +3,7 @@
 import React, { useState, useTransition } from "react";
 import {
   createRouteAction,
+  updateRouteDurationAction,
   addStopToRouteAction,
   removeStopFromRouteAction,
 } from "@/actions/admin";
@@ -23,6 +24,7 @@ export interface RouteItem {
   genderGroup: "male" | "female" | "mixed";
   transportGroupId: string | null;
   transportGroupName: string;
+  estimatedDurationMinutes: number | null;
   isActive: boolean;
   stops: RouteStopConfig[];
 }
@@ -50,7 +52,7 @@ export function RoutesManagement({
   transportGroups,
   availableStops,
 }: RoutesManagementProps) {
-  const [routes, setRoutes] = useState<RouteItem[]>(initialRoutes);
+  const [routes] = useState<RouteItem[]>(initialRoutes);
   const [selectedRouteId, setSelectedRouteId] = useState<string>(
     initialRoutes[0]?.id || ""
   );
@@ -70,6 +72,16 @@ export function RoutesManagement({
   const [newTransportGroupId, setNewTransportGroupId] = useState(
     transportGroups[0]?.id || ""
   );
+  const [newEstimatedDuration, setNewEstimatedDuration] = useState<string>("");
+  const [durationDraft, setDurationDraft] = useState<string>(
+    initialRoutes[0]?.estimatedDurationMinutes != null
+      ? String(initialRoutes[0].estimatedDurationMinutes)
+      : ""
+  );
+  const [durationStatus, setDurationStatus] = useState<{
+    error?: string;
+    success?: string;
+  } | null>(null);
 
   // Add stop form
   const [addStopId, setAddStopId] = useState(availableStops[0]?.id || "");
@@ -78,12 +90,21 @@ export function RoutesManagement({
 
   const selectedRoute = routes.find((r) => r.id === selectedRouteId) || routes[0];
 
+  const handleSelectRoute = (route: RouteItem) => {
+    setSelectedRouteId(route.id);
+    setDurationDraft(
+      route.estimatedDurationMinutes != null ? String(route.estimatedDurationMinutes) : ""
+    );
+    setDurationStatus(null);
+  };
+
   const handleOpenCreateRoute = () => {
     setNewCode("");
     setNewName("");
     setNewDesc("");
     setNewGender("mixed");
     setNewTransportGroupId(transportGroups[0]?.id || "");
+    setNewEstimatedDuration("");
     setActionError(null);
     setActionSuccess(null);
     setShowCreateRouteModal(true);
@@ -105,12 +126,16 @@ export function RoutesManagement({
     setActionSuccess(null);
 
     startTransition(async () => {
+      const trimmedDuration = newEstimatedDuration.trim();
+      const parsedDuration = trimmedDuration ? Number(trimmedDuration) : null;
+
       const res = await createRouteAction({
         code: newCode,
         name: newName,
         description: newDesc,
         genderGroup: newGender,
         transportGroupId: newTransportGroupId,
+        estimatedDurationMinutes: parsedDuration,
       });
 
       if (!res.success) {
@@ -123,6 +148,32 @@ export function RoutesManagement({
         setShowCreateRouteModal(false);
         window.location.reload();
       }, 1000);
+    });
+  };
+
+  const handleSaveDuration = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!selectedRoute) return;
+    setDurationStatus(null);
+    const parsed = Number(durationDraft.trim());
+    if (!Number.isInteger(parsed) || parsed < 1 || parsed > 360) {
+      setDurationStatus({
+        error: "Enter a whole number between 1 and 360 minutes.",
+      });
+      return;
+    }
+
+    startTransition(async () => {
+      const res = await updateRouteDurationAction({
+        routeId: selectedRoute.id,
+        estimatedDurationMinutes: parsed,
+      });
+      if (!res.success) {
+        setDurationStatus({ error: res.error || "Failed to update route duration." });
+        return;
+      }
+      setDurationStatus({ success: res.message || "Duration updated." });
+      setTimeout(() => window.location.reload(), 600);
     });
   };
 
@@ -201,7 +252,7 @@ export function RoutesManagement({
               return (
                 <div
                   key={r.id}
-                  onClick={() => setSelectedRouteId(r.id)}
+                  onClick={() => handleSelectRoute(r)}
                   className={`cursor-pointer rounded-xl border p-4 transition-all ${
                     isSelected
                       ? "border-[#102D4A] bg-[#102D4A]/5 shadow-sm ring-1 ring-[#102D4A]"
@@ -237,7 +288,10 @@ export function RoutesManagement({
                   <div className="mt-3 flex items-center justify-between border-t border-slate-100 pt-2 text-[11px] text-slate-500">
                     <span>Fleet: {r.transportGroupName}</span>
                     <span className="font-medium text-[#102D4A]">
-                      {r.stops.length} stop(s)
+                      {r.estimatedDurationMinutes != null
+                        ? `${r.estimatedDurationMinutes} min`
+                        : "Duration unconfigured"}{" "}
+                      · {r.stops.length} stop(s)
                     </span>
                   </div>
                 </div>
@@ -264,6 +318,49 @@ export function RoutesManagement({
                   <p className="mt-0.5 text-xs text-[#526B82]">
                     Fleet: <span className="font-semibold">{selectedRoute.transportGroupName}</span> • {selectedRoute.stops.length} Ordered Transit Stop(s)
                   </p>
+                  <form
+                    onSubmit={handleSaveDuration}
+                    className="mt-2 flex flex-wrap items-center gap-2 text-xs"
+                  >
+                    <label className="font-semibold text-[#102D4A]">
+                      Turnaround Duration (mins):
+                    </label>
+                    <input
+                      type="number"
+                      min={1}
+                      max={360}
+                      placeholder="e.g. 45"
+                      value={durationDraft}
+                      onChange={(e) => setDurationDraft(e.target.value)}
+                      className="w-24 rounded-md border border-slate-300 px-2 py-1 text-xs focus:border-[#102D4A] focus:outline-none"
+                    />
+                    <button
+                      type="submit"
+                      disabled={isPending}
+                      className="rounded-md bg-[#102D4A] px-2.5 py-1 text-[11px] font-semibold text-white hover:bg-[#0c233a] disabled:opacity-50"
+                    >
+                      Save Duration
+                    </button>
+                    {selectedRoute.estimatedDurationMinutes == null ? (
+                      <span className="rounded bg-amber-50 px-2 py-0.5 text-[11px] font-medium text-amber-800 border border-amber-200">
+                        Unconfigured (blocks automated vehicle conflict window checks)
+                      </span>
+                    ) : (
+                      <span className="text-[11px] text-emerald-700 font-medium">
+                        Active: {selectedRoute.estimatedDurationMinutes} mins
+                      </span>
+                    )}
+                    {durationStatus?.error && (
+                      <span className="text-[11px] text-[#D9534F] font-medium">
+                        {durationStatus.error}
+                      </span>
+                    )}
+                    {durationStatus?.success && (
+                      <span className="text-[11px] text-emerald-700 font-medium">
+                        {durationStatus.success}
+                      </span>
+                    )}
+                  </form>
                 </div>
 
                 <button
@@ -429,6 +526,21 @@ export function RoutesManagement({
                     </option>
                   ))}
                 </select>
+              </div>
+
+              <div>
+                <label className="block font-semibold text-[#102D4A] mb-1">
+                  Estimated Turnaround Duration (Minutes)
+                </label>
+                <input
+                  type="number"
+                  min={1}
+                  max={360}
+                  placeholder="Required before scheduling/generation (e.g. 45)"
+                  value={newEstimatedDuration}
+                  onChange={(e) => setNewEstimatedDuration(e.target.value)}
+                  className="w-full rounded-lg border border-slate-300 p-2 focus:border-[#102D4A] focus:outline-none"
+                />
               </div>
 
               <div>

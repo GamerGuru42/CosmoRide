@@ -1,6 +1,6 @@
 import type { Metadata } from "next";
-import { redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
+import { requireAdminPageAccess } from "@/lib/admin-auth";
 import { PageHeader } from "@/components/ui/page-header";
 import {
   UsersManagement,
@@ -17,21 +17,8 @@ export const metadata: Metadata = {
 export const dynamic = "force-dynamic";
 
 export default async function AdminUsersPage() {
+  await requireAdminPageAccess("users");
   const supabase = await createClient();
-
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
-
-  if (!user) redirect("/login");
-
-  const { data: profile } = await supabase
-    .from("profiles")
-    .select("role")
-    .eq("id", user.id)
-    .single();
-
-  if (!profile || profile.role !== "admin") redirect("/student");
 
   // Fetch profiles with transport group and hostel
   const { data: profilesData } = await supabase

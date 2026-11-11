@@ -1,6 +1,6 @@
 import type { Metadata } from "next";
-import { redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
+import { requireAdminPageAccess } from "@/lib/admin-auth";
 import { getTodayDateString } from "@/lib/utils";
 import { PageHeader } from "@/components/ui/page-header";
 import {
@@ -22,25 +22,12 @@ interface AdminJourneysPageProps {
 export default async function AdminJourneysPage({
   searchParams,
 }: AdminJourneysPageProps) {
+  await requireAdminPageAccess("journeys");
   const resolvedParams = await searchParams;
   const todayStr = getTodayDateString();
   const targetDate = resolvedParams.date || todayStr;
 
   const supabase = await createClient();
-
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
-
-  if (!user) redirect("/login");
-
-  const { data: profile } = await supabase
-    .from("profiles")
-    .select("role")
-    .eq("id", user.id)
-    .single();
-
-  if (!profile || profile.role !== "admin") redirect("/student");
 
   // Fetch journeys for target date
   const { data: journeysData } = await supabase
@@ -71,6 +58,9 @@ export default async function AdminJourneysPage({
         driver_reference,
         has_app_access
       ),
+      driver:profiles!journeys_driver_id_fkey(
+        full_name
+      ),
       bookings(id, status, passenger_category),
       boarding_records(id)
     `)
@@ -81,12 +71,13 @@ export default async function AdminJourneysPage({
     const route = Array.isArray(j.route) ? j.route[0] : j.route;
     const vehicle = Array.isArray(j.vehicle) ? j.vehicle[0] : j.vehicle;
     const driver = Array.isArray(j.driver_record) ? j.driver_record[0] : j.driver_record;
+    const directDriver = Array.isArray(j.driver) ? j.driver[0] : j.driver;
     const tg = route?.transport_group;
     const tgName = Array.isArray(tg) ? tg[0]?.name : tg?.name;
 
     const activeBookings = (j.bookings ?? []).filter(
       (b: { id: string; status: string; passenger_category?: string }) =>
-        b.status === "confirmed" || b.status === "checked_in" || b.status === "boarded"
+        b.status === "confirmed" || b.status === "checked_in"
     );
     const confirmedCount = activeBookings.length;
     const seatedCount = activeBookings.filter(
@@ -105,6 +96,8 @@ export default async function AdminJourneysPage({
     let driverMode: "app" | "assisted" | "unassigned" = "unassigned";
     if (driver) {
       driverMode = driver.has_app_access ? "app" : "assisted";
+    } else if (directDriver) {
+      driverMode = "app";
     }
 
     return {
@@ -122,7 +115,7 @@ export default async function AdminJourneysPage({
       transportGroupName: tgName || "General Fleet",
       vehicleRegistration: vehicle?.registration_number || null,
       vehicleName: vehicle?.name || null,
-      driverName: driver?.full_name || null,
+      driverName: driver?.full_name || directDriver?.full_name || null,
       driverReference: driver?.driver_reference || null,
       driverMode,
       bookedCount: confirmedCount,

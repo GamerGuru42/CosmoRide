@@ -2,12 +2,13 @@
 
 import { revalidatePath } from "next/cache";
 import { createClient } from "@/lib/supabase/server";
+import { canAccessAdminDomain } from "@/lib/admin-auth";
 import { createJourneySchema, updateJourneyStatusSchema } from "@/lib/validators";
 import type { ActionResponse } from "./bookings";
 import type { JourneyStatus } from "@/lib/supabase/types";
 
 /**
- * Creates a journey instance (Admin only).
+ * Creates a journey instance (Super Admin or Bus Manager only).
  * Enforces rule: Proposed allocation must not override vehicle safe capacity.
  */
 export async function createJourney(formData: unknown): Promise<ActionResponse> {
@@ -29,15 +30,22 @@ export async function createJourney(formData: unknown): Promise<ActionResponse> 
       return { success: false, error: "Authentication required." };
     }
 
-    // Check admin role
+    // Check admin role & domain authority (Super Admin or Bus Manager)
     const { data: profile } = await supabase
       .from("profiles")
-      .select("role")
+      .select("role, admin_role, is_active")
       .eq("id", user.id)
       .single();
 
-    if (profile?.role !== "admin") {
-      return { success: false, error: "Only administrators can create journeys." };
+    if (
+      profile?.is_active === false ||
+      profile?.role !== "admin" ||
+      !canAccessAdminDomain(profile?.admin_role, "journey_create")
+    ) {
+      return {
+        success: false,
+        error: "Permission denied: Only Super Administrators or Bus Managers can create journeys.",
+      };
     }
 
     // Call atomic journey creation procedure with exclusive vehicle row locking
@@ -48,6 +56,7 @@ export async function createJourney(formData: unknown): Promise<ActionResponse> 
         p_route_id: parsed.data.routeId,
         p_vehicle_id: parsed.data.vehicleId,
         p_driver_id: parsed.data.driverId ?? null,
+        p_driver_record_id: parsed.data.driverRecordId ?? null,
         p_journey_date: parsed.data.journeyDate,
         p_scheduled_departure: parsed.data.scheduledDeparture,
         p_proposed_allocation: parsed.data.proposedAllocation,
@@ -72,7 +81,9 @@ export async function createJourney(formData: unknown): Promise<ActionResponse> 
 
     revalidatePath("/admin");
     revalidatePath("/admin/journeys");
-    revalidatePath("/student/journeys");
+    revalidatePath("/admin/dispatch");
+    revalidatePath("/admin/operations");
+    revalidatePath("/student/departures");
 
     return {
       success: true,
@@ -86,14 +97,22 @@ export async function createJourney(formData: unknown): Promise<ActionResponse> 
 }
 
 /**
- * Updates journey status (Driver assigned to the journey, or Admin).
- * Transitions: scheduled -> boarding -> in_transit -> completed (or cancelled)
+ * Updates journey lifecycle status through audited PostgreSQL stage RPCs.
+ * Strictly enforces the 7-stage departure progression.
  */
 export async function updateJourneyStatus(
   journeyId: string,
   newStatus: JourneyStatus
 ): Promise<ActionResponse> {
   try {
+    const parsed = updateJourneyStatusSchema.safeParse({ journeyId, status: newStatus });
+    if (!parsed.success) {
+      return {
+        success: false,
+        error: parsed.error.issues.map((i) => i.message).join(", "),
+      };
+    }
+
     const supabase = await createClient();
     const {
       data: { user },
@@ -103,61 +122,95 @@ export async function updateJourneyStatus(
       return { success: false, error: "Authentication required." };
     }
 
-    // Fetch journey and check permissions
-    const { data: journey, error: journeyError } = await supabase
-      .from("journeys")
-      .select("driver_id, status")
-      .eq("id", journeyId)
-      .single();
-
-    if (journeyError || !journey) {
-      return { success: false, error: "Journey not found." };
-    }
-
-    const { data: profile } = await supabase
-      .from("profiles")
-      .select("role")
-      .eq("id", user.id)
-      .single();
-
-    const isDriver = journey.driver_id === user.id;
-    const isAdmin = profile?.role === "admin";
-
-    if (!isDriver && !isAdmin) {
+    if (newStatus === "scheduled") {
       return {
         success: false,
-        error: "Permission denied. Only the assigned driver or an administrator can update journey status.",
+        error: "Cannot revert a journey back to scheduled status.",
       };
     }
 
-    const updatePayload: {
-      status: JourneyStatus;
-      actual_departure?: string;
-    } = {
-      status: newStatus,
-    };
-
-    if (newStatus === "in_transit") {
-      updatePayload.actual_departure = new Date().toISOString();
+    if (newStatus === "cancelled") {
+      return {
+        success: false,
+        error: "Please use cancelJourneyAction with an explicit cancellation reason.",
+      };
     }
 
-    const { error: updateError } = await supabase
-      .from("journeys")
-      .update(updatePayload)
-      .eq("id", journeyId);
+    let rpcResult: unknown = null;
+    let rpcError: { message: string } | null = null;
 
-    if (updateError) {
-      return { success: false, error: updateError.message };
+    if (newStatus === "bus_arrived") {
+      const res = await supabase.rpc("confirm_bus_arrival", {
+        p_journey_id: journeyId,
+        p_user_id: user.id,
+      });
+      rpcResult = res.data;
+      rpcError = res.error;
+    } else if (newStatus === "boarding") {
+      const res = await supabase.rpc("open_journey_boarding", {
+        p_journey_id: journeyId,
+        p_officer_id: user.id,
+      });
+      rpcResult = res.data;
+      rpcError = res.error;
+    } else if (newStatus === "boarding_closed") {
+      const res = await supabase.rpc("close_journey_boarding", {
+        p_journey_id: journeyId,
+        p_officer_id: user.id,
+      });
+      rpcResult = res.data;
+      rpcError = res.error;
+    } else if (newStatus === "ready_to_depart") {
+      const res = await supabase.rpc("authorise_journey_departure", {
+        p_journey_id: journeyId,
+        p_officer_id: user.id,
+      });
+      rpcResult = res.data;
+      rpcError = res.error;
+    } else if (newStatus === "in_transit") {
+      const res = await supabase.rpc("record_journey_departure_safe", {
+        p_journey_id: journeyId,
+        p_actor_id: user.id,
+        p_is_assisted: false,
+      });
+      rpcResult = res.data;
+      rpcError = res.error;
+    } else if (newStatus === "completed") {
+      const res = await supabase.rpc("record_journey_arrival_safe", {
+        p_journey_id: journeyId,
+        p_actor_id: user.id,
+        p_is_assisted: false,
+      });
+      rpcResult = res.data;
+      rpcError = res.error;
+    }
+
+    if (rpcError) {
+      return { success: false, error: rpcError.message };
+    }
+
+    const parsedRpc = rpcResult as { success?: boolean; error?: string; message?: string } | null;
+    if (!parsedRpc?.success) {
+      return {
+        success: false,
+        error: parsedRpc?.error ?? `Failed to transition journey to ${newStatus}.`,
+      };
     }
 
     revalidatePath("/driver");
     revalidatePath("/driver/journeys");
+    revalidatePath("/boarding");
+    revalidatePath("/boarding/boarding");
+    revalidatePath("/boarding/passengers");
     revalidatePath("/admin/journeys");
-    revalidatePath("/student/journeys");
+    revalidatePath("/admin/operations");
+    revalidatePath("/admin/dispatch");
+    revalidatePath("/student/departures");
+    revalidatePath("/student/trips");
 
     return {
       success: true,
-      message: `Journey status updated to ${newStatus}.`,
+      message: parsedRpc.message ?? `Journey status updated to ${newStatus}.`,
     };
   } catch (err: unknown) {
     const message = err instanceof Error ? err.message : "Failed to update status.";
@@ -166,8 +219,8 @@ export async function updateJourneyStatus(
 }
 
 /**
- * Driver reports a manual delay update (minutes + optional reason).
- * Fulfills operating rule: No live GPS; drivers post manual delay updates.
+ * Driver or operations staff reports a manual delay update (minutes + reason)
+ * via audited atomic RPC that notifies affected confirmed/checked-in passengers.
  */
 export async function reportJourneyDelay(
   journeyId: string,
@@ -175,8 +228,12 @@ export async function reportJourneyDelay(
   delayReason: string
 ): Promise<ActionResponse> {
   try {
-    if (delayMinutes < 0) {
-      return { success: false, error: "Delay minutes cannot be negative." };
+    if (!Number.isInteger(delayMinutes) || delayMinutes < 1 || delayMinutes > 360) {
+      return { success: false, error: "Delay duration must be between 1 and 360 minutes." };
+    }
+
+    if (!delayReason || delayReason.trim().length < 3) {
+      return { success: false, error: "A valid delay reason (minimum 3 characters) is required." };
     }
 
     const supabase = await createClient();
@@ -188,49 +245,43 @@ export async function reportJourneyDelay(
       return { success: false, error: "Authentication required." };
     }
 
-    const { data: journey } = await supabase
-      .from("journeys")
-      .select("driver_id")
-      .eq("id", journeyId)
-      .single();
+    const { data: rpcResult, error: rpcError } = await supabase.rpc(
+      "record_journey_delay_with_notifications",
+      {
+        p_journey_id: journeyId,
+        p_user_id: user.id,
+        p_delay_minutes: delayMinutes,
+        p_delay_reason: delayReason.trim(),
+        p_is_assisted: false,
+      }
+    );
 
-    if (!journey) {
-      return { success: false, error: "Journey not found." };
+    if (rpcError) {
+      return { success: false, error: rpcError.message };
     }
 
-    const { data: profile } = await supabase
-      .from("profiles")
-      .select("role")
-      .eq("id", user.id)
-      .single();
-
-    if (journey.driver_id !== user.id && profile?.role !== "admin") {
+    const parsedRpc = rpcResult as { success?: boolean; error?: string; message?: string } | null;
+    if (!parsedRpc?.success) {
       return {
         success: false,
-        error: "Only the assigned driver or an administrator can post delay updates.",
+        error: parsedRpc?.error ?? "Failed to report operational delay.",
       };
-    }
-
-    const { error: updateError } = await supabase
-      .from("journeys")
-      .update({
-        delay_minutes: delayMinutes,
-        delay_reason: delayReason.trim() || null,
-      })
-      .eq("id", journeyId);
-
-    if (updateError) {
-      return { success: false, error: updateError.message };
     }
 
     revalidatePath("/driver");
     revalidatePath("/driver/journeys");
+    revalidatePath("/boarding");
+    revalidatePath("/admin/journeys");
+    revalidatePath("/admin/operations");
     revalidatePath("/student");
-    revalidatePath("/student/journeys");
+    revalidatePath("/student/departures");
+    revalidatePath("/student/notifications");
 
     return {
       success: true,
-      message: `Delay of ${delayMinutes} mins reported. Passengers will see the updated departure notice.`,
+      message:
+        parsedRpc.message ??
+        `Delay of ${delayMinutes} mins reported. Passengers have been notified.`,
     };
   } catch (err: unknown) {
     const message = err instanceof Error ? err.message : "Failed to report delay.";

@@ -1,6 +1,6 @@
 import type { Metadata } from "next";
-import { redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
+import { requireAdminPageAccess } from "@/lib/admin-auth";
 import { getTodayDateString } from "@/lib/utils";
 import {
   BusManagerDispatchView,
@@ -15,21 +15,8 @@ export const metadata: Metadata = {
 export const dynamic = "force-dynamic";
 
 export default async function BusManagerDispatchPage() {
+  await requireAdminPageAccess("dispatch");
   const supabase = await createClient();
-
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
-
-  if (!user) redirect("/login");
-
-  const { data: profile } = await supabase
-    .from("profiles")
-    .select("role, admin_role, full_name")
-    .eq("id", user.id)
-    .single();
-
-  if (!profile || profile.role !== "admin") redirect("/student");
 
   const todayStr = getTodayDateString();
 
@@ -73,6 +60,11 @@ export default async function BusManagerDispatchPage() {
         phone,
         has_app_access
       ),
+      driver:profiles!journeys_driver_id_fkey (
+        id,
+        full_name,
+        phone
+      ),
       bookings (
         id,
         status,
@@ -91,6 +83,7 @@ export default async function BusManagerDispatchPage() {
     const route = Array.isArray(j.routes) ? j.routes[0] : j.routes;
     const vehicle = Array.isArray(j.vehicles) ? j.vehicles[0] : j.vehicles;
     const driver = Array.isArray(j.driver_record) ? j.driver_record[0] : j.driver_record;
+    const directDriver = Array.isArray(j.driver) ? j.driver[0] : j.driver;
     const tg = route?.transport_groups;
     const tgName = Array.isArray(tg) ? tg[0]?.name : tg?.name;
 
@@ -113,7 +106,11 @@ export default async function BusManagerDispatchPage() {
 
     const effectiveLatestDeparture = j.latest_permitted_departure || j.scheduled_departure;
     const isOverdue =
-      (j.status === "scheduled" || j.status === "bus_arrived" || j.status === "boarding") &&
+      (j.status === "scheduled" ||
+        j.status === "bus_arrived" ||
+        j.status === "boarding" ||
+        j.status === "boarding_closed" ||
+        j.status === "ready_to_depart") &&
       !j.actual_departure &&
       new Date() > new Date(effectiveLatestDeparture);
 
@@ -133,9 +130,9 @@ export default async function BusManagerDispatchPage() {
       transportGroupName: tgName || "General Fleet",
       vehicleRegistration: vehicle?.registration_number || "UNASSIGNED",
       vehicleName: vehicle?.name || null,
-      driverName: driver?.full_name || null,
-      driverPhone: driver?.phone || null,
-      driverHasAppAccess: Boolean(driver?.has_app_access),
+      driverName: driver?.full_name || directDriver?.full_name || null,
+      driverPhone: driver?.phone || directDriver?.phone || null,
+      driverHasAppAccess: driver ? Boolean(driver.has_app_access) : Boolean(directDriver),
       safeCapacity: vehicle?.safe_capacity ?? j.proposed_allocation ?? 32,
       seatedCapacity: vehicle?.seated_capacity ?? 20,
       standingCapacity: vehicle?.standing_capacity ?? 12,

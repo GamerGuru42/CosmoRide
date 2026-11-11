@@ -233,22 +233,27 @@ function getNavItems(
         ];
       }
 
-      return [
-        { href: basePath, label: "Control Centre", icon: "🎛️" },
-        { href: `${basePath}/oversight`, label: "Hostel Oversight", icon: "🛡️" },
-        { href: `${basePath}/dispatch`, label: "Bus Dispatch", icon: "🚀" },
-        { href: `${basePath}/operations`, label: "Live Operations", icon: "📡" },
-        { href: `${basePath}/journeys`, label: "Journeys", icon: "🚌" },
-        { href: `${basePath}/schedules`, label: "Schedules", icon: "📅" },
-        { href: `${basePath}/vehicles`, label: "Fleet", icon: "🚍" },
-        { href: `${basePath}/drivers`, label: "Drivers", icon: "👨‍✈️" },
-        { href: `${basePath}/routes`, label: "Routes & Stops", icon: "🗺️" },
-        { href: `${basePath}/incidents`, label: "Incidents", icon: "⚠️" },
-        { href: `${basePath}/announcements`, label: "Announcements", icon: "📢" },
-        { href: `${basePath}/users`, label: "Users & Roles", icon: "👥" },
-        { href: `${basePath}/reports`, label: "Reports", icon: "📊" },
-        { href: `${basePath}/settings`, label: "Policies & Settings", icon: "⚙️" },
-        { href: `${basePath}/audit`, label: "Audit Logs", icon: "📜" },
-      ];
+      if (adminRole === "super_admin") {
+        return [
+          { href: basePath, label: "Control Centre", icon: "🎛️" },
+          { href: `${basePath}/oversight`, label: "Hostel Oversight", icon: "🛡️" },
+          { href: `${basePath}/dispatch`, label: "Bus Dispatch", icon: "🚀" },
+          { href: `${basePath}/operations`, label: "Live Operations", icon: "📡" },
+          { href: `${basePath}/journeys`, label: "Journeys", icon: "🚌" },
+          { href: `${basePath}/schedules`, label: "Schedules", icon: "📅" },
+          { href: `${basePath}/vehicles`, label: "Fleet", icon: "🚍" },
+          { href: `${basePath}/drivers`, label: "Drivers", icon: "👨‍✈️" },
+          { href: `${basePath}/routes`, label: "Routes & Stops", icon: "🗺️" },
+          { href: `${basePath}/incidents`, label: "Incidents", icon: "⚠️" },
+          { href: `${basePath}/announcements`, label: "Announcements", icon: "📢" },
+          { href: `${basePath}/users`, label: "Users & Roles", icon: "👥" },
+          { href: `${basePath}/reports`, label: "Reports", icon: "📊" },
+          { href: `${basePath}/settings`, label: "Policies & Settings", icon: "⚙️" },
+          { href: `${basePath}/audit`, label: "Audit Logs", icon: "📜" },
+        ];
+      }
+
+      // Fail-closed: unassigned admin_role receives no privileged administrative navigation
+      return [{ href: basePath, label: "Role Assignment Pending", icon: "⏳" }];
   }
 }

@@ -1,6 +1,6 @@
 import type { Metadata } from "next";
-import { redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
+import { requireAdminPageAccess } from "@/lib/admin-auth";
 import { getTodayDateString } from "@/lib/utils";
 import { PageHeader } from "@/components/ui/page-header";
 import {
@@ -18,27 +18,30 @@ export const metadata: Metadata = {
 export const dynamic = "force-dynamic";
 
 export default async function AdminDashboardPage() {
+  const adminAccess = await requireAdminPageAccess("overview");
+
+  if (adminAccess.unassignedAdminRole) {
+    return (
+      <div className="space-y-6">
+        <PageHeader
+          title="Administrative Role Assignment Pending"
+          description="Your administrator account has not yet been assigned an operational role scope."
+        />
+        <div className="rounded-xl border border-amber-200 bg-amber-50 p-6 text-sm text-amber-900 shadow-sm">
+          <p className="font-semibold">Access Restricted (Fail-Closed Governance)</p>
+          <p className="mt-1 text-xs text-amber-800">
+            Please contact a Super Administrator to assign your operational role (
+            <span className="font-mono">bus_manager</span>,{" "}
+            <span className="font-mono">hostel_manager</span>, or{" "}
+            <span className="font-mono">super_admin</span>) in Users &amp; Roles before accessing
+            CosmoRide administrative dashboards or operations.
+          </p>
+        </div>
+      </div>
+    );
+  }
+
   const supabase = await createClient();
-
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
-
-  if (!user) {
-    redirect("/login");
-  }
-
-  // Authorize admin caller
-  const { data: profile } = await supabase
-    .from("profiles")
-    .select("role, full_name")
-    .eq("id", user.id)
-    .single();
-
-  if (!profile || profile.role !== "admin") {
-    redirect("/student");
-  }
-
   const todayStr = getTodayDateString();
 
   // 1. Fetch today's journeys
@@ -68,6 +71,9 @@ export default async function AdminDashboardPage() {
         full_name,
         has_app_access
       ),
+      driver:profiles!journeys_driver_id_fkey(
+        full_name
+      ),
       bookings(id, status, passenger_category),
       boarding_records(id)
     `)
@@ -78,6 +84,7 @@ export default async function AdminDashboardPage() {
     const route = Array.isArray(j.route) ? j.route[0] : j.route;
     const vehicle = Array.isArray(j.vehicle) ? j.vehicle[0] : j.vehicle;
     const driver = Array.isArray(j.driver_record) ? j.driver_record[0] : j.driver_record;
+    const directDriver = Array.isArray(j.driver) ? j.driver[0] : j.driver;
     const transportGroup = route?.transport_group;
     const tgName = Array.isArray(transportGroup)
       ? transportGroup[0]?.name
@@ -85,7 +92,7 @@ export default async function AdminDashboardPage() {
 
     const activeBookings = (j.bookings ?? []).filter(
       (b: { id: string; status: string; passenger_category?: string }) =>
-        b.status === "confirmed" || b.status === "checked_in" || b.status === "boarded"
+        b.status === "confirmed" || b.status === "checked_in"
     );
     const confirmedBookings = activeBookings.length;
     const seatedCount = activeBookings.filter(
@@ -104,6 +111,8 @@ export default async function AdminDashboardPage() {
     let driverMode: "app" | "assisted" | "unassigned" = "unassigned";
     if (driver) {
       driverMode = driver.has_app_access ? "app" : "assisted";
+    } else if (directDriver) {
+      driverMode = "app";
     }
 
     return {
@@ -119,7 +128,7 @@ export default async function AdminDashboardPage() {
       vehicleRegistration: vehicle?.registration_number || null,
       vehicleName: vehicle?.name || null,
       safeCapacity: vehicle?.safe_capacity ?? j.proposed_allocation ?? 0,
-      driverName: driver?.full_name || null,
+      driverName: driver?.full_name || directDriver?.full_name || null,
       driverMode,
       bookedCount: confirmedBookings,
       seatedCount,

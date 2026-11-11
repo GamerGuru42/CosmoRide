@@ -4,9 +4,17 @@ import React, { useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
 import { updateStudentContactPhone } from "@/actions/users";
+import { selectStudentHostelAction } from "@/actions/student-auth";
 import { formatDate } from "@/lib/utils";
 import { APP_NAME, UNIVERSITY_NAME, DEVELOPER_ATTRIBUTION } from "@/lib/constants";
 import { UserIcon, CheckCircleIcon, AlertTriangleIcon } from "@/components/ui/icons";
+
+export interface StudentHostelOption {
+  id: string;
+  name: string;
+  gender: string;
+  campusName: string | null;
+}
 
 export interface StudentProfileData {
   id: string;
@@ -15,6 +23,7 @@ export interface StudentProfileData {
   studentId: string | null;
   phone: string | null;
   role: string;
+  hostelId?: string | null;
   hostelName: string | null;
   campusName: string | null;
   transportGroupName: string | null;
@@ -23,14 +32,36 @@ export interface StudentProfileData {
 
 interface StudentProfileViewProps {
   profile: StudentProfileData;
+  hostelOptions?: StudentHostelOption[];
 }
 
-export function StudentProfileView({ profile }: StudentProfileViewProps) {
+export function StudentProfileView({ profile, hostelOptions = [] }: StudentProfileViewProps) {
   const router = useRouter();
   const [phone, setPhone] = useState(profile.phone || "");
+  const [selectedHostelId, setSelectedHostelId] = useState("");
   const [successMsg, setSuccessMsg] = useState<string | null>(null);
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
   const [isPending, startTransition] = useTransition();
+
+  function handleHostelSubmit(e: React.FormEvent) {
+    e.preventDefault();
+    if (!selectedHostelId) {
+      setErrorMsg("Please select your residential hostel before confirming.");
+      return;
+    }
+    setSuccessMsg(null);
+    setErrorMsg(null);
+
+    startTransition(async () => {
+      const res = await selectStudentHostelAction(selectedHostelId);
+      if (res.success) {
+        setSuccessMsg("Residential hostel assigned successfully.");
+        router.refresh();
+      } else {
+        setErrorMsg(res.error || "Failed to assign residential hostel.");
+      }
+    });
+  }
 
   async function handleSignOut() {
     const supabase = createClient();
@@ -123,7 +154,7 @@ export function StudentProfileView({ profile }: StudentProfileViewProps) {
               PRIMARY CAMPUS
             </span>
             <p className="text-xs font-bold text-[#102D4A] mt-0.5">
-              {profile.campusName || "Main Campus"}
+              {profile.campusName || "Pending Assignment"}
             </p>
           </div>
 
@@ -132,8 +163,34 @@ export function StudentProfileView({ profile }: StudentProfileViewProps) {
               RESIDENTIAL HOSTEL
             </span>
             <p className="text-xs font-bold text-[#102D4A] mt-0.5">
-              {profile.hostelName || "University Residence"}
+              {profile.hostelName || "Not Assigned"}
             </p>
+            {!profile.hostelId && !profile.hostelName && hostelOptions.length > 0 && (
+              <form onSubmit={handleHostelSubmit} className="mt-2 space-y-2">
+                <select
+                  aria-label="Select residential hostel"
+                  value={selectedHostelId}
+                  onChange={(e) => setSelectedHostelId(e.target.value)}
+                  disabled={isPending}
+                  className="w-full px-2.5 py-1.5 rounded-lg border border-slate-300 bg-white text-[11px] font-medium text-[#102D4A] focus:outline-none focus:ring-2 focus:ring-slate-900"
+                >
+                  <option value="">Select hostel (one-time setup)...</option>
+                  {hostelOptions.map((h) => (
+                    <option key={h.id} value={h.id}>
+                      {h.name}
+                      {h.campusName ? ` — ${h.campusName}` : ""}
+                    </option>
+                  ))}
+                </select>
+                <button
+                  type="submit"
+                  disabled={isPending || !selectedHostelId}
+                  className="w-full py-1.5 px-3 rounded-lg bg-[#102D4A] text-white text-[11px] font-semibold hover:bg-slate-800 disabled:opacity-50 cursor-pointer"
+                >
+                  {isPending ? "Assigning..." : "Confirm Hostel"}
+                </button>
+              </form>
+            )}
           </div>
 
           <div className="p-3.5 rounded-xl bg-[#F6F8FA] border border-slate-200">
@@ -141,7 +198,7 @@ export function StudentProfileView({ profile }: StudentProfileViewProps) {
               AUTHORIZED TRANSPORT FLEET
             </span>
             <p className="text-xs font-bold text-[#102D4A] mt-0.5">
-              {profile.transportGroupName || "Standard Student Fleet"}
+              {profile.transportGroupName || "Not Assigned"}
             </p>
           </div>
 

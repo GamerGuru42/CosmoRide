@@ -4,6 +4,7 @@ import { createClient } from "@/lib/supabase/server";
 import { getTodayDateString } from "@/lib/utils";
 import { StudentHomeView, type AnnouncementItem } from "@/components/student/student-home-view";
 import type { DepartureJourney } from "@/components/student/departure-board";
+import type { JourneyStatus } from "@/lib/supabase/types";
 
 export const metadata: Metadata = {
   title: "Student Hub | CosmoRide",
@@ -38,8 +39,7 @@ export default async function StudentHomePage() {
     studentId: profile?.student_id || null,
   };
 
-  // 2. Fetch the student's next upcoming active booking
-  const nowIso = new Date(Date.now() - 3600 * 1000).toISOString(); // within last hour or future
+  // 2. Fetch the student's next upcoming active booking (sorted by earliest upcoming journey)
   const { data: rawBookings } = await supabase
     .from("bookings")
     .select(`
@@ -48,42 +48,80 @@ export default async function StudentHomePage() {
       status,
       passenger_category,
       booked_at,
+      boarding_stop:stops ( name ),
       journey:journeys (
         id,
         scheduled_departure,
         status,
         delay_minutes,
         delay_reason,
-        route:routes ( id, name, code ),
-        vehicle:vehicles ( name, registration_number ),
-        stops:stops ( name )
+        route:routes (
+          id,
+          name,
+          code,
+          route_stops (
+            stop_order,
+            stop:stops ( name )
+          )
+        ),
+        vehicle:vehicles ( name, registration_number )
       )
     `)
     .eq("student_id", user.id)
     .in("status", ["confirmed", "checked_in"])
     .order("booked_at", { ascending: false })
-    .limit(1);
+    .limit(20);
 
   let nextBooking = null;
   if (rawBookings && rawBookings.length > 0) {
-    const b = rawBookings[0];
-    const j = b.journey as unknown as {
+    type RawBookingJourney = {
       id: string;
       scheduled_departure: string;
-      status: "scheduled" | "boarding" | "in_transit" | "completed" | "cancelled";
+      status: JourneyStatus;
       delay_minutes: number;
       delay_reason: string | null;
-      route: { id: string; name: string; code: string };
-      vehicle: { name: string | null; registration_number: string };
-      stops?: { name: string };
-    } | null;
+      route: {
+        id: string;
+        name: string;
+        code: string;
+        route_stops?: { stop_order: number; stop?: { name: string } | null }[];
+      } | null;
+      vehicle: { name: string | null; registration_number: string } | null;
+    };
 
-    if (j) {
+    const activeCandidates = rawBookings
+      .map((b) => {
+        const j = (Array.isArray(b.journey) ? b.journey[0] : b.journey) as unknown as RawBookingJourney | null;
+        const stop = (Array.isArray(b.boarding_stop) ? b.boarding_stop[0] : b.boarding_stop) as unknown as { name: string } | null;
+        return { b, j, stop };
+      })
+      .filter(
+        (entry): entry is { b: (typeof rawBookings)[number]; j: RawBookingJourney; stop: { name: string } | null } =>
+          Boolean(entry.j && entry.j.status !== "completed" && entry.j.status !== "cancelled")
+      )
+      .sort(
+        (a, b) =>
+          new Date(a.j.scheduled_departure).getTime() -
+          new Date(b.j.scheduled_departure).getTime()
+      );
+
+    const picked = activeCandidates[0];
+    if (picked) {
+      const { b, j, stop } = picked;
+      const orderedRouteStops = [...(j.route?.route_stops ?? [])].sort(
+        (a, c) => a.stop_order - c.stop_order
+      );
+      const destinationName =
+        orderedRouteStops[orderedRouteStops.length - 1]?.stop?.name ||
+        j.route?.name ||
+        "Destination Stop";
+
       nextBooking = {
         id: b.id,
         ticketToken: b.ticket_token,
         status: b.status as "confirmed" | "checked_in",
-        passengerCategory: (b as unknown as { passenger_category?: "seated" | "standing" }).passenger_category || "seated",
+        passengerCategory:
+          (b as unknown as { passenger_category?: "seated" | "standing" }).passenger_category || "seated",
         bookedAt: b.booked_at,
         journey: {
           id: j.id,
@@ -91,17 +129,18 @@ export default async function StudentHomePage() {
           status: j.status,
           delayMinutes: j.delay_minutes ?? 0,
           delayReason: j.delay_reason,
+          destinationName,
           route: {
-            id: j.route.id,
-            name: j.route.name,
-            code: j.route.code,
+            id: j.route?.id || "",
+            name: j.route?.name || "Transit Route",
+            code: j.route?.code || "CR",
           },
           vehicle: {
-            name: j.vehicle.name,
-            registrationNumber: j.vehicle.registration_number,
+            name: j.vehicle?.name ?? null,
+            registrationNumber: j.vehicle?.registration_number || "TBD",
           },
           boardingStop: {
-            name: j.stops?.name || "Terminal Entrance",
+            name: stop?.name || "Designated Pickup Stop",
           },
         },
       };
@@ -148,7 +187,14 @@ export default async function StudentHomePage() {
       )
     `)
     .gte("journey_date", today)
-    .in("status", ["scheduled", "boarding", "in_transit"])
+    .in("status", [
+      "scheduled",
+      "bus_arrived",
+      "boarding",
+      "boarding_closed",
+      "ready_to_depart",
+      "in_transit",
+    ])
     .order("scheduled_departure", { ascending: true })
     .limit(8);
 

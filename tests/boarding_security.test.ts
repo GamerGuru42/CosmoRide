@@ -144,7 +144,7 @@ describe("Phase 4: Hostel Representative & Boarding Officer Security Validation"
     const proposedAllocation = 30;
     const safeCapacity = 28; // Physical vehicle capacity is 28
     const effectiveCeiling = Math.min(proposedAllocation, safeCapacity); // 28
-    let currentBoarded = 28;
+    const currentBoarded = 28;
 
     function attemptBoarding(boarded: number, ceiling: number) {
       if (boarded >= ceiling) {
