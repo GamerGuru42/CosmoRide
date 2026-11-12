@@ -44,7 +44,7 @@ describe("CosmoRide Consolidated Release-Blocker Remediation (00023)", () => {
     assert.ok(sql23.includes("REVOKE ALL ON ALL FUNCTIONS IN SCHEMA public FROM PUBLIC, anon;"));
     assert.ok(
       sql23.includes("ALTER DEFAULT PRIVILEGES IN SCHEMA public") &&
-        sql23.includes("REVOKE EXECUTE ON FUNCTIONS FROM PUBLIC, anon, authenticated;")
+      sql23.includes("REVOKE EXECUTE ON FUNCTIONS FROM PUBLIC, anon, authenticated;")
     );
 
     for (const triggerFn of [
@@ -70,7 +70,7 @@ describe("CosmoRide Consolidated Release-Blocker Remediation (00023)", () => {
     ]) {
       assert.ok(
         sql23.includes(`REVOKE EXECUTE ON FUNCTION ${studentRpc} FROM PUBLIC, anon, service_role;`) &&
-          sql23.includes(`GRANT EXECUTE ON FUNCTION ${studentRpc} TO authenticated;`),
+        sql23.includes(`GRANT EXECUTE ON FUNCTION ${studentRpc} TO authenticated;`),
         `Student RPC ${studentRpc} must execute only as authenticated`
       );
     }
@@ -116,7 +116,13 @@ describe("CosmoRide Consolidated Release-Blocker Remediation (00023)", () => {
     for (const content of [middleware, callback, dashboardLayout, adminAuth]) {
       assert.ok(content.includes("account_inactive"), "Route guards must route deactivated users to account_inactive");
     }
-    assert.ok(loginForm.includes("is_active === false") && loginForm.includes("signOut()"), "Login form must sign out and reject deactivated accounts");
+    assert.ok(
+      loginForm.includes("!profile || profile.is_active === false") &&
+        loginForm.includes("await supabase.auth.signOut()") &&
+        loginForm.includes("setError(") &&
+        loginForm.includes("deactivated"),
+      "Login form must sign out and show an inline deactivation message for inactive accounts"
+    );
     assert.ok(loginPage.includes("account_inactive"), "Login page must render suspension banner for account_inactive");
     assert.ok(middleware.includes("profile.is_active === false") && middleware.includes("await supabase.auth.signOut()"));
 
@@ -144,9 +150,9 @@ describe("CosmoRide Consolidated Release-Blocker Remediation (00023)", () => {
 
     assert.ok(
       sql23.includes("CREATE OR REPLACE FUNCTION public.report_operational_incident(") &&
-        sql23.includes("CROSS_GROUP_DENIED") &&
-        sql23.includes("UNASSIGNED_DRIVER") &&
-        sql23.includes("INCIDENT_REPORTED")
+      sql23.includes("CROSS_GROUP_DENIED") &&
+      sql23.includes("UNASSIGNED_DRIVER") &&
+      sql23.includes("INCIDENT_REPORTED")
     );
 
     const driverAction = readRel("src/actions/driver.ts");
@@ -160,8 +166,8 @@ describe("CosmoRide Consolidated Release-Blocker Remediation (00023)", () => {
   it("4. enforces explicit admin_role checks and positive capacity in admin_create_journey", () => {
     assert.ok(
       sql23.includes("v_admin.admin_role NOT IN ('super_admin', 'bus_manager')") &&
-        sql23.includes("'UNVERIFIED_VEHICLE_CAPACITY'") &&
-        sql23.includes("v_safe_capacity <= 0")
+      sql23.includes("'UNVERIFIED_VEHICLE_CAPACITY'") &&
+      sql23.includes("v_safe_capacity <= 0")
     );
   });
 
@@ -196,8 +202,8 @@ describe("CosmoRide Consolidated Release-Blocker Remediation (00023)", () => {
 
     assert.ok(
       sql23.includes("v_journey.safe_capacity IS NULL OR v_journey.safe_capacity <= 0") &&
-        sql23.includes("LEAST(COALESCE(v_journey.seated_capacity, 20), 20, v_effective_capacity)") &&
-        sql23.includes("LEAST(COALESCE(v_journey.standing_capacity, 12), 12, GREATEST(0, v_effective_capacity - v_max_seated))")
+      sql23.includes("LEAST(COALESCE(v_journey.seated_capacity, 20), 20, v_effective_capacity)") &&
+      sql23.includes("LEAST(COALESCE(v_journey.standing_capacity, 12), 12, GREATEST(0, v_effective_capacity - v_max_seated))")
     );
   });
 
@@ -237,11 +243,11 @@ describe("CosmoRide Consolidated Release-Blocker Remediation (00023)", () => {
     assert.ok(dispatchPage.includes('isReadOnlySupervisory = adminRole === "hostel_manager"'));
     assert.ok(dispatchView.includes("Supervisory Read-Only View (Hostel Manager)"));
     assert.ok(dispatchView.includes("!isReadOnlySupervisory && j.status === \"ready_to_depart\""));
-    assert.ok(
-      journeysPage.includes("const canCancelJourneys") &&
-        journeysPage.includes('adminRole === "super_admin" || adminRole === "bus_manager"') &&
-        journeysPage.includes("canCancelJourneys={canCancelJourneys}")
+    assert.match(
+      journeysPage,
+      /\bconst\s+canCancelJourneys\s*=\s*adminRole\s*===\s*"super_admin"\s*\|\|\s*adminRole\s*===\s*"bus_manager"\s*;/
     );
+    assert.ok(journeysPage.includes("canCancelJourneys={canCancelJourneys}"));
     assert.ok(journeysView.includes("canCancelJourneys &&"));
   });
 
@@ -285,14 +291,14 @@ describe("CosmoRide Consolidated Release-Blocker Remediation (00023)", () => {
     const schedulesView = readRel("src/components/admin/schedules-management.tsx");
     assert.ok(
       schedulesView.includes("updateScheduleTemplateAction") &&
-        schedulesView.includes("toggleScheduleStatusAction") &&
-        schedulesView.includes("Existing generated journeys remain preserved")
+      schedulesView.includes("toggleScheduleStatusAction") &&
+      schedulesView.includes("Existing generated journeys remain preserved")
     );
 
     const routesView = readRel("src/components/admin/routes-management.tsx");
     assert.ok(
       routesView.includes("updateRouteDurationAction") &&
-        routesView.includes("Unconfigured (blocks automated vehicle conflict window checks)")
+      routesView.includes("Unconfigured (blocks automated vehicle conflict window checks)")
     );
   });
 
