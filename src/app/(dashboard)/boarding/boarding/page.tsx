@@ -1,7 +1,7 @@
 import type { Metadata } from "next";
-import { redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
-import { getTodayDateString } from "@/lib/utils";
+import { requireOperationalStaffPageAccess } from "@/lib/admin-auth";
+import { calculateCapacityBreakdown, getTodayDateString } from "@/lib/utils";
 import {
   BoardingScannerView,
   type ActiveBoardingJourney,
@@ -16,33 +16,21 @@ export const metadata: Metadata = {
 export const dynamic = "force-dynamic";
 
 export default async function BoardingScannerPage() {
+  const { profile } = await requireOperationalStaffPageAccess("boarding_officer");
   const supabase = await createClient();
 
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
-
-  if (!user) {
-    redirect("/login");
-  }
-
-  // Verify officer role and group
-  const { data: profile } = await supabase
-    .from("profiles")
-    .select("id, role, assigned_transport_group_id")
-    .eq("id", user.id)
-    .single();
-
-  if (!profile || (profile.role !== "boarding_officer" && profile.role !== "admin")) {
-    redirect("/student");
-  }
+  const isUnassignedBoardingOfficer =
+    profile.role === "boarding_officer" && !profile.assigned_transport_group_id;
 
   const todayStr = getTodayDateString();
 
   // Fetch active journeys (scheduled, bus_arrived, boarding, boarding_closed, ready_to_depart, in_transit) for today
-  let journeysQuery = supabase
-    .from("journeys")
-    .select(`
+  let journeys: ActiveBoardingJourney[] = [];
+
+  if (!isUnassignedBoardingOfficer) {
+    let journeysQuery = supabase
+      .from("journeys")
+      .select(`
       id,
       journey_date,
       scheduled_departure,
@@ -54,6 +42,7 @@ export default async function BoardingScannerPage() {
       boarding_closed_at,
       departure_authorised_at,
       status,
+      readiness_status,
       proposed_allocation,
       routes!inner (
         id,
@@ -85,67 +74,79 @@ export default async function BoardingScannerPage() {
         )
       )
     `)
-    .eq("journey_date", todayStr)
-    .in("status", ["scheduled", "bus_arrived", "boarding", "boarding_closed", "ready_to_depart", "in_transit"])
-    .order("scheduled_departure", { ascending: true });
+      .eq("journey_date", todayStr)
+      .in("status", ["scheduled", "bus_arrived", "boarding", "boarding_closed", "ready_to_depart", "in_transit"])
+      .order("scheduled_departure", { ascending: true });
 
-  // Enforce transport group isolation
-  if (profile.role === "boarding_officer" && profile.assigned_transport_group_id) {
-    journeysQuery = journeysQuery.eq("routes.transport_group_id", profile.assigned_transport_group_id);
-  }
+    // Enforce transport group isolation
+    if (profile.role === "boarding_officer" && profile.assigned_transport_group_id) {
+      journeysQuery = journeysQuery.eq("routes.transport_group_id", profile.assigned_transport_group_id);
+    }
 
-  const { data: rawJourneys } = await journeysQuery;
+    const { data: rawJourneys } = await journeysQuery;
 
-  const journeys: ActiveBoardingJourney[] = (rawJourneys || []).map((j) => {
-    const route = Array.isArray(j.routes) ? j.routes[0] : j.routes;
-    const vehicle = Array.isArray(j.vehicles) ? j.vehicles[0] : j.vehicles;
-    const rawBookings = j.bookings || [];
+    journeys = (rawJourneys || []).map((j) => {
+      const route = Array.isArray(j.routes) ? j.routes[0] : j.routes;
+      const vehicle = Array.isArray(j.vehicles) ? j.vehicles[0] : j.vehicles;
+      const rawBookings = j.bookings || [];
 
-    const passengers: BoardingPassenger[] = rawBookings.map((b) => {
-      const student = Array.isArray(b.profiles) ? b.profiles[0] : b.profiles;
-      const pickup = Array.isArray(b.pickup_stop) ? b.pickup_stop[0] : b.pickup_stop;
+      const passengers: BoardingPassenger[] = rawBookings.map((b) => {
+        const student = Array.isArray(b.profiles) ? b.profiles[0] : b.profiles;
+        const pickup = Array.isArray(b.pickup_stop) ? b.pickup_stop[0] : b.pickup_stop;
+
+        return {
+          bookingId: b.id,
+          studentId: student?.id || "",
+          studentName: student?.full_name || "Student Passenger",
+          studentMatric: student?.student_id || null,
+          boardingStopName: pickup?.name || "Designated Stop",
+          status: b.status as BoardingPassenger["status"],
+          passengerCategory: b.passenger_category as "seated" | "standing" | undefined,
+          checkedInAt: b.checked_in_at,
+          ticketToken: b.ticket_token,
+        };
+      });
+
+      const capacityBreakdown = calculateCapacityBreakdown({
+        proposedAllocation: j.proposed_allocation,
+        safeCapacity: vehicle?.safe_capacity ?? null,
+        seatedLimit: vehicle?.seated_capacity ?? null,
+        standingLimit: vehicle?.standing_capacity ?? null,
+      });
 
       return {
-        bookingId: b.id,
-        studentId: student?.id || "",
-        studentName: student?.full_name || "Student Passenger",
-        studentMatric: student?.student_id || null,
-        boardingStopName: pickup?.name || "Designated Stop",
-        status: b.status as BoardingPassenger["status"],
-        passengerCategory: b.passenger_category as "seated" | "standing" | undefined,
-        checkedInAt: b.checked_in_at,
-        ticketToken: b.ticket_token,
+        id: j.id,
+        journeyDate: j.journey_date,
+        scheduledDeparture: j.scheduled_departure,
+        latestPermittedDeparture: j.latest_permitted_departure,
+        actualDeparture: j.actual_departure,
+        busArrivedAt: j.bus_arrived_at,
+        boardingOpenedAt: j.boarding_opened_at,
+        boardingWindowMinutes: j.boarding_window_minutes,
+        boardingClosedAt: j.boarding_closed_at,
+        departureAuthorisedAt: j.departure_authorised_at,
+        status: j.status as ActiveBoardingJourney["status"],
+        readinessStatus: (j.readiness_status as ActiveBoardingJourney["readinessStatus"]) || "pending",
+        routeCode: route?.code || "ROUTE",
+        routeName: route?.name || "University Route",
+        vehicleRegistration: vehicle?.registration_number || "UNASSIGNED",
+        vehicleName: vehicle?.name || null,
+        vehicleId: vehicle?.id || null,
+        safeCapacity: capacityBreakdown.effectiveCapacity,
+        seatedCapacity: capacityBreakdown.seatedLimit,
+        standingCapacity: capacityBreakdown.standingLimit,
+        proposedAllocation: j.proposed_allocation,
+        passengers,
       };
     });
-
-    return {
-      id: j.id,
-      journeyDate: j.journey_date,
-      scheduledDeparture: j.scheduled_departure,
-      latestPermittedDeparture: j.latest_permitted_departure,
-      actualDeparture: j.actual_departure,
-      busArrivedAt: j.bus_arrived_at,
-      boardingOpenedAt: j.boarding_opened_at,
-      boardingWindowMinutes: j.boarding_window_minutes,
-      boardingClosedAt: j.boarding_closed_at,
-      departureAuthorisedAt: j.departure_authorised_at,
-      status: j.status as ActiveBoardingJourney["status"],
-      routeCode: route?.code || "ROUTE",
-      routeName: route?.name || "University Route",
-      vehicleRegistration: vehicle?.registration_number || "UNASSIGNED",
-      vehicleName: vehicle?.name || null,
-      vehicleId: vehicle?.id || null,
-      safeCapacity: vehicle?.safe_capacity ?? j.proposed_allocation ?? 32,
-      seatedCapacity: vehicle?.seated_capacity ?? 20,
-      standingCapacity: vehicle?.standing_capacity ?? 12,
-      proposedAllocation: j.proposed_allocation,
-      passengers,
-    };
-  });
+  }
 
   return (
     <div className="space-y-6">
-      <BoardingScannerView journeys={journeys} />
+      <BoardingScannerView
+        journeys={journeys}
+        unassignedTransportGroup={isUnassignedBoardingOfficer}
+      />
     </div>
   );
 }

@@ -2,6 +2,7 @@
 
 import React, { useState, useTransition } from "react";
 import { createVehicleAction, updateVehicleAction } from "@/actions/admin";
+import { calculateCapacityBreakdown } from "@/lib/utils";
 import { StatusBadge } from "@/components/ui/status-badge";
 import { BusIcon, AlertTriangleIcon, CheckCircleIcon } from "@/components/ui/icons";
 
@@ -247,7 +248,13 @@ export function VehiclesManagement({ initialVehicles }: VehiclesManagementProps)
                     </td>
                     <td className="px-4 py-3 text-center whitespace-nowrap">
                       <span className="inline-flex items-center rounded-md bg-slate-100 px-2 py-0.5 font-mono font-bold text-slate-800 text-xs">
-                        {v.safeCapacity} cap. (20 seated, 12 standing)
+                        {(() => {
+                          const cap = calculateCapacityBreakdown({
+                            proposedAllocation: v.safeCapacity,
+                            safeCapacity: v.safeCapacity,
+                          });
+                          return `${cap.effectiveCapacity} cap. (${cap.seatedLimit} seated, ${cap.standingLimit} standing)`;
+                        })()}
                       </span>
                     </td>
                     <td className="px-4 py-3 whitespace-nowrap capitalize text-[#526B82]">

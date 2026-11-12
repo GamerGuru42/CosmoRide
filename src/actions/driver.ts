@@ -10,6 +10,23 @@ export interface DriverActionResponse<T = unknown> {
   data?: T;
 }
 
+async function ensureActiveDriverActor(
+  supabase: Awaited<ReturnType<typeof createClient>>,
+  userId: string
+): Promise<string | null> {
+  const { data: profile } = await supabase
+    .from("profiles")
+    .select("is_active")
+    .eq("id", userId)
+    .single();
+
+  if (!profile || profile.is_active === false) {
+    return "Your account is currently deactivated. Contact a CosmoRide administrator.";
+  }
+
+  return null;
+}
+
 /**
  * Records pre-departure vehicle readiness checklist.
  * Can be executed directly by an assigned driver (Mode A)
@@ -47,6 +64,11 @@ export async function recordVehicleReadinessAction({
 
     if (!user) {
       return { success: false, error: "Authentication required to perform readiness inspection." };
+    }
+
+    const inactiveError = await ensureActiveDriverActor(supabase, user.id);
+    if (inactiveError) {
+      return { success: false, error: inactiveError };
     }
 
     const { data, error } = await supabase.rpc("record_vehicle_readiness", {
@@ -118,6 +140,11 @@ export async function recordStopMilestoneAction({
 
     if (!user) {
       return { success: false, error: "Authentication required." };
+    }
+
+    const inactiveError = await ensureActiveDriverActor(supabase, user.id);
+    if (inactiveError) {
+      return { success: false, error: inactiveError };
     }
 
     const { data, error } = await supabase.rpc("record_journey_stop_update", {
@@ -192,6 +219,11 @@ export async function reportOperationalDelayAction({
       return { success: false, error: "Authentication required." };
     }
 
+    const inactiveError = await ensureActiveDriverActor(supabase, user.id);
+    if (inactiveError) {
+      return { success: false, error: inactiveError };
+    }
+
     const combinedReason = notes?.trim()
       ? `${delayReason.trim()} (${notes.trim()})`
       : delayReason.trim();
@@ -262,6 +294,11 @@ export async function executeJourneyDepartureAction({
       return { success: false, error: "Authentication required to depart journey." };
     }
 
+    const inactiveError = await ensureActiveDriverActor(supabase, user.id);
+    if (inactiveError) {
+      return { success: false, error: inactiveError };
+    }
+
     const { data, error } = await supabase.rpc("record_journey_departure_safe", {
       p_journey_id: journeyId,
       p_actor_id: user.id,
@@ -323,6 +360,11 @@ export async function executeJourneyArrivalAction({
       return { success: false, error: "Authentication required to record destination arrival." };
     }
 
+    const inactiveError = await ensureActiveDriverActor(supabase, user.id);
+    if (inactiveError) {
+      return { success: false, error: inactiveError };
+    }
+
     const { data, error } = await supabase.rpc("record_journey_arrival_safe", {
       p_journey_id: journeyId,
       p_actor_id: user.id,
@@ -365,7 +407,7 @@ export async function executeJourneyArrivalAction({
  */
 export async function reportDriverIncidentAction({
   journeyId,
-  vehicleId,
+  vehicleId: _vehicleId,
   category,
   severity,
   description,
@@ -378,6 +420,7 @@ export async function reportDriverIncidentAction({
   description: string;
   isAssisted?: boolean;
 }): Promise<DriverActionResponse> {
+  void _vehicleId;
   try {
     if (!description || description.trim().length < 10) {
       return { success: false, error: "Please enter at least 10 characters describing the incident." };
@@ -392,43 +435,43 @@ export async function reportDriverIncidentAction({
       return { success: false, error: "Authentication required." };
     }
 
-    // Insert incident report
-    const { error: incError } = await supabase.from("incident_reports").insert({
-      journey_id: journeyId || null,
-      vehicle_id: vehicleId || null,
-      reported_by: user.id,
-      category: category.trim(),
-      severity,
-      description: description.trim(),
-      status: "reported",
-    });
-
-    if (incError) {
-      return { success: false, error: incError.message };
+    const inactiveError = await ensureActiveDriverActor(supabase, user.id);
+    if (inactiveError) {
+      return { success: false, error: inactiveError };
     }
 
-    // Log to journey_operational_logs if journey is provided
-    if (journeyId) {
-      await supabase.from("journey_operational_logs").insert({
-        journey_id: journeyId,
-        recorded_by_user_id: user.id,
-        action_type: "INCIDENT_REPORTED",
-        operation_mode: isAssisted ? "assisted" : "direct",
-        details: {
-          category,
-          severity,
-          description: description.trim(),
-        },
-      });
+    const { data, error: rpcError } = await supabase.rpc("report_operational_incident", {
+      p_journey_id: journeyId || null,
+      p_actor_id: user.id,
+      p_category: category.trim(),
+      p_severity: severity,
+      p_description: description.trim(),
+      p_is_assisted: Boolean(isAssisted),
+    });
+
+    if (rpcError) {
+      return { success: false, error: rpcError.message };
+    }
+
+    const result = data as Record<string, unknown> | null;
+    if (!result?.success) {
+      return {
+        success: false,
+        error: (result?.error as string) || "Failed to submit incident report.",
+      };
     }
 
     revalidatePath("/driver");
     revalidatePath("/boarding");
     revalidatePath("/boarding/assisted");
+    revalidatePath("/admin/incidents");
 
     return {
       success: true,
-      message: "Incident reported and escalated to transport administration.",
+      message:
+        (result.message as string) ||
+        "Incident reported and escalated to transport administration.",
+      data: result,
     };
   } catch (err: unknown) {
     const message = err instanceof Error ? err.message : "Failed to submit incident report.";

@@ -29,14 +29,29 @@ interface CancelRpcResult {
   promoted_student_id?: string;
 }
 
-interface BoardingRpcResult {
-  success: boolean;
-  error?: string;
-  message?: string;
-  passenger_name?: string;
-  student_id?: string;
-  boarded_count?: number;
-  capacity?: number;
+async function ensureActiveStudentAccount(
+  supabase: Awaited<ReturnType<typeof createClient>>,
+  userId: string
+): Promise<string | null> {
+  const { data: profile } = await supabase
+    .from("profiles")
+    .select("student_id, role, is_active")
+    .eq("id", userId)
+    .single();
+
+  if (!profile || profile.is_active === false) {
+    return "Your account is currently deactivated. Please contact a CosmoRide administrator.";
+  }
+
+  if (profile.role !== "student") {
+    return "Only active student accounts may perform student booking operations.";
+  }
+
+  if (!profile.student_id || profile.student_id.trim() === "") {
+    return "Your student profile is incomplete. Please complete your registration with your matriculation number before booking.";
+  }
+
+  return null;
 }
 
 /**
@@ -66,18 +81,12 @@ export async function bookSeat(
       return { success: false, error: "Authentication required to book a seat." };
     }
 
-    // Verify student profile completeness
-    const { data: profile } = await supabase
-      .from("profiles")
-      .select("student_id")
-      .eq("id", user.id)
-      .single();
-
-    if (!profile?.student_id || profile.student_id.trim() === "") {
+    // Verify active student profile completeness
+    const profileError = await ensureActiveStudentAccount(supabase, user.id);
+    if (profileError) {
       return {
         success: false,
-        error:
-          "Your student profile is incomplete. Please complete your registration with your matriculation number before booking.",
+        error: profileError,
       };
     }
 
@@ -138,6 +147,11 @@ export async function cancelBooking(bookingId: string): Promise<ActionResponse> 
       return { success: false, error: "Authentication required." };
     }
 
+    const profileError = await ensureActiveStudentAccount(supabase, user.id);
+    if (profileError) {
+      return { success: false, error: profileError };
+    }
+
     // Call atomic stored procedure
     const { data, error } = await supabase.rpc("cancel_booking_and_promote", {
       p_booking_id: bookingId,
@@ -188,6 +202,11 @@ export async function cancelWaitlistAction(waitlistId: string): Promise<ActionRe
       return { success: false, error: "Authentication required." };
     }
 
+    const profileError = await ensureActiveStudentAccount(supabase, user.id);
+    if (profileError) {
+      return { success: false, error: profileError };
+    }
+
     const { data, error } = await supabase.rpc("cancel_waitlist_entry", {
       p_waitlist_id: waitlistId,
       p_student_id: user.id,
@@ -216,75 +235,6 @@ export async function cancelWaitlistAction(waitlistId: string): Promise<ActionRe
     };
   } catch (err: unknown) {
     const message = err instanceof Error ? err.message : "Failed to leave waitlist.";
-    return { success: false, error: message };
-  }
-}
-
-/**
- * Validates a boarding pass token and boards a passenger.
- * Uses atomic procedure `verify_and_board_passenger` to ensure:
- * 1. Opaque ticket token verification (no sensitive data exposed in QR).
- * 2. Correct journey and vehicle match.
- * 3. Cancelled booking rejection.
- * 4. Duplicate scan prevention.
- * 5. Safe capacity ceiling enforcement.
- * 6. Auditable logging of manual exceptions.
- */
-export async function verifyAndBoardPass(
-  ticketToken: string,
-  journeyId: string,
-  boardingMethod: "qr_scan" | "manual_override" = "qr_scan",
-  exceptionReason?: string
-): Promise<ActionResponse<BoardingRpcResult>> {
-  try {
-    const trimmedReason = exceptionReason?.trim() || null;
-    if (boardingMethod === "manual_override" && (!trimmedReason || trimmedReason.length < 5)) {
-      return {
-        success: false,
-        error: "Manual boarding override requires an exception reason of at least 5 characters.",
-      };
-    }
-
-    const supabase = await createClient();
-    const {
-      data: { user },
-    } = await supabase.auth.getUser();
-
-    if (!user) {
-      return { success: false, error: "Authentication required." };
-    }
-
-    const { data, error } = await supabase.rpc("verify_and_board_passenger", {
-      p_ticket_token: ticketToken,
-      p_officer_id: user.id,
-      p_journey_id: journeyId,
-      p_boarding_method: boardingMethod,
-      p_exception_reason: trimmedReason,
-    });
-
-    if (error) {
-      return { success: false, error: error.message };
-    }
-
-    const result = data as unknown as BoardingRpcResult;
-    if (!result || !result.success) {
-      return {
-        success: false,
-        error: result?.error ?? "Boarding verification failed.",
-      };
-    }
-
-    revalidatePath("/boarding");
-    revalidatePath("/boarding/sessions");
-    revalidatePath("/driver");
-
-    return {
-      success: true,
-      message: result.message ?? "Passenger boarded.",
-      data: result,
-    };
-  } catch (err: unknown) {
-    const message = err instanceof Error ? err.message : "Failed to verify boarding pass.";
     return { success: false, error: message };
   }
 }

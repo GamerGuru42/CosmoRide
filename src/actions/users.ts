@@ -23,6 +23,20 @@ export async function updateStudentContactPhone(phone: string) {
       return { success: false, error: "Authentication required." };
     }
 
+    const { data: profile } = await supabase
+      .from("profiles")
+      .select("role, is_active")
+      .eq("id", user.id)
+      .single();
+
+    if (!profile || profile.is_active === false) {
+      return { success: false, error: "Your account is deactivated." };
+    }
+
+    if (profile.role !== "student") {
+      return { success: false, error: "Only active students can update student contact numbers." };
+    }
+
     const { error } = await supabase
       .from("profiles")
       .update({ phone: validatedPhone })

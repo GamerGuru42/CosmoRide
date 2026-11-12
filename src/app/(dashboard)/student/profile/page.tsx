@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import { redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
+import { getRoleHome } from "@/lib/role-routing";
 import { StudentProfileView, type StudentProfileData, type StudentHostelOption } from "@/components/student/student-profile-view";
 
 export const metadata: Metadata = {
@@ -28,6 +29,8 @@ export default async function StudentProfilePage() {
       student_id,
       phone,
       role,
+      admin_role,
+      is_active,
       hostel_id,
       created_at,
       hostel:hostels (
@@ -39,7 +42,15 @@ export default async function StudentProfilePage() {
     .eq("id", user.id)
     .single();
 
-  if (!profile?.student_id || profile.student_id.trim() === "") {
+  if (!profile || profile.is_active === false) {
+    redirect("/login?error=account_inactive");
+  }
+
+  if (profile.role !== "student") {
+    redirect(getRoleHome(profile.role, profile.admin_role));
+  }
+
+  if (!profile.student_id || profile.student_id.trim() === "") {
     redirect("/register?reason=incomplete_profile");
   }
 

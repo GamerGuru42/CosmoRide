@@ -1,6 +1,7 @@
 import { createServerClient } from "@supabase/ssr";
 import { NextResponse, type NextRequest } from "next/server";
 import type { Database } from "./types";
+import { getRoleHome, isAllowedAdminSubRole } from "@/lib/role-routing";
 
 /**
  * Updates the Supabase auth session from middleware.
@@ -66,58 +67,79 @@ export async function updateSession(request: NextRequest) {
     const isLogin = pathname === "/login";
     const isRegister = pathname === "/register";
     const isStudentRoute = pathname.startsWith("/student");
+    const isBoardingRoute = pathname.startsWith("/boarding");
+    const isDriverRoute = pathname.startsWith("/driver");
+    const isAdminRoute = pathname.startsWith("/admin");
 
-    // Perform profile check only on routes where routing or profile completeness matters
-    if (isLogin || isRegister || isStudentRoute) {
+    if (
+      isLogin ||
+      isRegister ||
+      isStudentRoute ||
+      isBoardingRoute ||
+      isDriverRoute ||
+      isAdminRoute
+    ) {
       const { data: profile } = await supabase
         .from("profiles")
-        .select("role, student_id")
+        .select("role, admin_role, student_id, is_active")
         .eq("id", user.id)
         .single();
+
+      if (profile && profile.is_active === false) {
+        await supabase.auth.signOut();
+        const url = new URL("/login", request.url);
+        url.searchParams.set("error", "account_inactive");
+        return redirectWithCookies(url);
+      }
 
       if (profile) {
         const isStudent = profile.role === "student";
         const hasCompleteProfile = Boolean(
           profile.student_id && profile.student_id.trim() !== ""
         );
+        const roleHome = isStudent
+          ? hasCompleteProfile
+            ? "/student"
+            : "/register"
+          : getRoleHome(profile.role, profile.admin_role);
 
         // If accessing /login while already logged in
         if (isLogin) {
-          if (isStudent) {
-            return redirectWithCookies(
-              new URL(hasCompleteProfile ? "/student" : "/register", request.url)
-            );
-          } else {
-            const dest =
-              profile.role === "admin"
-                ? "/admin"
-                : profile.role === "boarding_officer"
-                ? "/boarding"
-                : "/driver";
-            return redirectWithCookies(new URL(dest, request.url));
-          }
+          return redirectWithCookies(new URL(roleHome, request.url));
         }
 
-        // If accessing /register while already possessing a complete profile
+        // If accessing /register while already possessing a complete profile or non-student role
         if (isRegister) {
-          if (isStudent && hasCompleteProfile) {
-            return redirectWithCookies(new URL("/student", request.url));
-          } else if (!isStudent) {
-            const dest =
-              profile.role === "admin"
-                ? "/admin"
-                : profile.role === "boarding_officer"
-                ? "/boarding"
-                : "/driver";
-            return redirectWithCookies(new URL(dest, request.url));
+          if ((isStudent && hasCompleteProfile) || !isStudent) {
+            return redirectWithCookies(new URL(roleHome, request.url));
           }
         }
 
-        // If accessing /student or /student/* with incomplete profile
-        if (isStudentRoute && isStudent && !hasCompleteProfile) {
-          const url = new URL("/register", request.url);
-          url.searchParams.set("reason", "incomplete_profile");
-          return redirectWithCookies(url);
+        // Enforce strict role-group isolation across protected routes
+        if (isStudentRoute) {
+          if (!isStudent) {
+            return redirectWithCookies(new URL(roleHome, request.url));
+          }
+          if (!hasCompleteProfile) {
+            const url = new URL("/register", request.url);
+            url.searchParams.set("reason", "incomplete_profile");
+            return redirectWithCookies(url);
+          }
+        }
+
+        if (isAdminRoute && profile.role !== "admin") {
+          return redirectWithCookies(new URL(roleHome, request.url));
+        }
+
+        const isSupervisoryAdmin =
+          profile.role === "admin" && isAllowedAdminSubRole(profile.admin_role);
+
+        if (isBoardingRoute && profile.role !== "boarding_officer" && !isSupervisoryAdmin) {
+          return redirectWithCookies(new URL(roleHome, request.url));
+        }
+
+        if (isDriverRoute && profile.role !== "driver" && !isSupervisoryAdmin) {
+          return redirectWithCookies(new URL(roleHome, request.url));
         }
       }
     }

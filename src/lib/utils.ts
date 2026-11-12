@@ -70,15 +70,54 @@ export function getTodayDateString(date: Date = new Date()): string {
 
 /**
  * Calculate available seats for a journey.
- * Bookable seats = min(proposed_allocation, vehicle safe_capacity) - booked_count
+ * Bookable seats = min(proposed_allocation, vehicle safe_capacity, 32) - booked_count
  */
 export function calculateAvailableSeats(
   proposedAllocation: number,
   safeCapacity: number,
   bookedCount: number
 ): number {
-  const maxSeats = Math.min(proposedAllocation, safeCapacity);
+  if (!safeCapacity || safeCapacity <= 0 || !proposedAllocation || proposedAllocation <= 0) {
+    return 0;
+  }
+  const maxSeats = Math.min(proposedAllocation, safeCapacity, 32);
   return Math.max(0, maxSeats - bookedCount);
+}
+
+/**
+ * Compute bounded physical seating + standing capacity (max 20 seated + 12 standing = 32),
+ * requiring positive verified vehicle safe_capacity.
+ */
+export function calculateCapacityBreakdown(params: {
+  proposedAllocation: number | null | undefined;
+  safeCapacity: number | null | undefined;
+  seatedLimit?: number | null;
+  standingLimit?: number | null;
+}): {
+  seatedLimit: number;
+  standingLimit: number;
+  effectiveCapacity: number;
+} {
+  const safeCap = params.safeCapacity ?? 0;
+  if (safeCap <= 0) {
+    return { seatedLimit: 0, standingLimit: 0, effectiveCapacity: 0 };
+  }
+  const rawAlloc =
+    params.proposedAllocation && params.proposedAllocation > 0
+      ? params.proposedAllocation
+      : safeCap;
+  const bounded = Math.min(safeCap, rawAlloc, 32);
+  const seatedLimit = Math.min(params.seatedLimit ?? 20, 20, bounded);
+  const standingLimit = Math.min(
+    params.standingLimit ?? 12,
+    12,
+    Math.max(0, bounded - seatedLimit)
+  );
+  return {
+    seatedLimit,
+    standingLimit,
+    effectiveCapacity: seatedLimit + standingLimit,
+  };
 }
 
 /**

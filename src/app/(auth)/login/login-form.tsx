@@ -3,6 +3,7 @@
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
+import { getRoleHome } from "@/lib/role-routing";
 
 /**
  * Client-side login form component for authorized staff and administrators.
@@ -35,20 +36,23 @@ export function LoginForm() {
       if (data.user) {
         const { data: profile } = await supabase
           .from("profiles")
-          .select("role, student_id")
+          .select("role, admin_role, student_id, is_active")
           .eq("id", data.user.id)
           .single();
 
-        if (profile?.role === "admin") {
-          router.push("/admin");
-        } else if (profile?.role === "boarding_officer") {
-          router.push("/boarding");
-        } else if (profile?.role === "driver") {
-          router.push("/driver");
-        } else if (!profile?.student_id) {
+        if (!profile || profile.is_active === false) {
+          await supabase.auth.signOut();
+          setError(
+            "Your account is currently deactivated. Please contact a CosmoRide Super Administrator."
+          );
+          router.refresh();
+          return;
+        }
+
+        if (profile.role === "student" && !profile.student_id) {
           router.push("/register");
         } else {
-          router.push("/student");
+          router.push(getRoleHome(profile.role, profile.admin_role));
         }
         router.refresh();
       }

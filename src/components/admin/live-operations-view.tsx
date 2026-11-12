@@ -2,7 +2,7 @@
 
 import React, { useState } from "react";
 import Link from "next/link";
-import { formatTime, formatDate } from "@/lib/utils";
+import { calculateCapacityBreakdown, formatTime, formatDate } from "@/lib/utils";
 import { StatusBadge } from "@/components/ui/status-badge";
 import {
   BusIcon,
@@ -262,7 +262,13 @@ export function LiveOperationsView({
                       {selectedJourney.vehiclePlate || "Not Assigned"}
                     </p>
                     <p className="text-[11px] text-[#526B82]">
-                      Safe Cap: {selectedJourney.safeCapacity || 32} passengers (20 seated, 12 standing)
+                      {(() => {
+                        const cap = calculateCapacityBreakdown({
+                          proposedAllocation: selectedJourney.safeCapacity,
+                          safeCapacity: selectedJourney.safeCapacity,
+                        });
+                        return `Safe Cap: ${cap.effectiveCapacity} passengers (${cap.seatedLimit} seated, ${cap.standingLimit} standing)`;
+                      })()}
                     </p>
                   </div>
 

@@ -1,7 +1,7 @@
 "use client";
 
 import React, { useState, useMemo, useTransition } from "react";
-import { formatTime, formatDate, calculateAvailableSeats, getTodayDateString } from "@/lib/utils";
+import { formatTime, formatDate, calculateCapacityBreakdown, getTodayDateString } from "@/lib/utils";
 import { DEPARTURE_STATUS_CONFIG } from "@/lib/constants";
 import type { JourneyStatus } from "@/lib/supabase/types";
 import { bookSeat } from "@/actions/bookings";
@@ -27,6 +27,9 @@ export interface DepartureJourney {
   bookedCount: number;
   seatedCount?: number;
   standingCount?: number;
+  seatedLimit?: number;
+  standingLimit?: number;
+  effectiveCapacity?: number;
   routeId: string;
   routeName: string;
   routeCode: string;
@@ -44,7 +47,7 @@ export interface DepartureJourney {
     eventType: string;
     stopName: string;
     timestamp: string;
-    isAssisted: boolean;
+    isAssisted?: boolean;
   } | null;
 }
 
@@ -52,6 +55,20 @@ interface DepartureBoardProps {
   journeys: DepartureJourney[];
   currentUserId?: string;
   onBookingSuccess?: () => void;
+}
+
+function getBookingModalLabels(bookedCount: number, safeCapacity: number) {
+  const cap = calculateCapacityBreakdown({
+    proposedAllocation: safeCapacity,
+    safeCapacity,
+  });
+  if (cap.effectiveCapacity <= 0 || bookedCount >= cap.effectiveCapacity) {
+    return { heading: "Join Waiting List", button: "Join Waitlist" };
+  }
+  if (cap.standingLimit > 0 && bookedCount >= cap.seatedLimit) {
+    return { heading: "Confirm Standing Place", button: "Confirm Standing Place" };
+  }
+  return { heading: "Confirm Seated Place", button: "Confirm Seat" };
 }
 
 export function DepartureBoard({ journeys, currentUserId, onBookingSuccess }: DepartureBoardProps) {
@@ -180,15 +197,21 @@ export function DepartureBoard({ journeys, currentUserId, onBookingSuccess }: De
       ) : (
         <div className="space-y-3">
           {filteredJourneys.map((j) => {
-            const availableSeats = calculateAvailableSeats(
-              j.proposedAllocation,
-              j.safeCapacity,
-              j.bookedCount
-            );
-            const isFull = availableSeats <= 0;
+            const derivedCap = calculateCapacityBreakdown({
+              proposedAllocation: j.proposedAllocation,
+              safeCapacity: j.safeCapacity,
+              seatedLimit: j.seatedLimit,
+              standingLimit: j.standingLimit,
+            });
+            const seatedLimit = j.seatedLimit ?? derivedCap.seatedLimit;
+            const standingLimit = j.standingLimit ?? derivedCap.standingLimit;
+            const totalLimit = j.effectiveCapacity ?? derivedCap.effectiveCapacity;
+            const availableSeats = Math.max(0, totalLimit - j.bookedCount);
+            const isFull = totalLimit > 0 && availableSeats <= 0;
             const isDelayed = j.delayMinutes > 0;
             const hasUserBooked = Boolean(j.userBookingId);
             const hasUserWaitlisted = Boolean(j.userWaitlistPosition);
+            const isBookingWindowOpen = j.status === "scheduled" && totalLimit > 0;
 
             // Calculate status label and style
             let statusKey: keyof typeof DEPARTURE_STATUS_CONFIG = "scheduled";
@@ -284,19 +307,26 @@ export function DepartureBoard({ journeys, currentUserId, onBookingSuccess }: De
                       </div>
 
                       {(() => {
-                        const seatedLimit = 20;
-                        const standingLimit = 12;
-                        const totalLimit = j.safeCapacity || 32;
                         const seatedOccupied = j.seatedCount ?? Math.min(j.bookedCount, seatedLimit);
                         const standingOccupied = j.standingCount ?? Math.max(0, j.bookedCount - seatedLimit);
                         const seatedRemaining = Math.max(0, seatedLimit - seatedOccupied);
                         const standingRemaining = Math.max(0, standingLimit - standingOccupied);
                         const totalRemaining = Math.max(0, totalLimit - j.bookedCount);
 
+                        if (totalLimit <= 0) {
+                          return (
+                            <div className="text-xs font-mono text-amber-700 font-semibold">
+                              Capacity pending vehicle certification
+                            </div>
+                          );
+                        }
+
                         return (
                           <div className="text-xs font-mono text-[#526B82]">
                             {isFull ? (
-                              <span className="text-purple-700 font-bold block">Capacity Reached (32/32 max)</span>
+                              <span className="text-purple-700 font-bold block">
+                                Capacity Reached ({totalLimit}/{totalLimit} max)
+                              </span>
                             ) : (
                               <div>
                                 <span className="block">
@@ -304,9 +334,14 @@ export function DepartureBoard({ journeys, currentUserId, onBookingSuccess }: De
                                 </span>
                                 <span className="text-[10px] text-slate-500 block">
                                   {seatedRemaining > 0 ? (
-                                    <span>{seatedRemaining} seated ({seatedOccupied}/20) · {standingRemaining} standing ({standingOccupied}/12)</span>
+                                    <span>
+                                      {seatedRemaining} seated ({seatedOccupied}/{seatedLimit})
+                                      {standingLimit > 0 ? ` · ${standingRemaining} standing (${standingOccupied}/${standingLimit})` : ""}
+                                    </span>
                                   ) : (
-                                    <span className="text-amber-700 font-medium">Seated full (20/20) · {standingRemaining} standing open ({standingOccupied}/12)</span>
+                                    <span className="text-amber-700 font-medium">
+                                      Seated full ({seatedLimit}/{seatedLimit}) · {standingRemaining} standing open ({standingOccupied}/{standingLimit})
+                                    </span>
                                   )}
                                 </span>
                               </div>
@@ -327,12 +362,12 @@ export function DepartureBoard({ journeys, currentUserId, onBookingSuccess }: De
                         <span className="inline-flex items-center gap-1.5 px-3 py-2 rounded-lg bg-purple-50 text-purple-700 text-xs font-bold border border-purple-200">
                           Waitlist #{j.userWaitlistPosition}
                         </span>
-                      ) : j.status === "completed" || j.status === "in_transit" || j.status === "cancelled" ? (
+                      ) : !isBookingWindowOpen ? (
                         <button
                           disabled
                           className="px-3.5 py-2 rounded-lg bg-slate-100 text-slate-400 text-xs font-medium cursor-not-allowed"
                         >
-                          Closed
+                          {totalLimit <= 0 ? "Unavailable" : j.status === "scheduled" ? "Closed" : "Booking Closed"}
                         </button>
                       ) : isFull ? (
                         <button
@@ -346,7 +381,7 @@ export function DepartureBoard({ journeys, currentUserId, onBookingSuccess }: De
                           onClick={() => handleOpenBooking(j)}
                           className="px-4 py-2 rounded-lg bg-[#102D4A] hover:bg-[#18426C] text-white text-xs font-bold transition-colors shadow-xs"
                         >
-                          {j.bookedCount < 20 ? "Book Seat" : "Book Standing Place"}
+                          {(j.seatedCount ?? Math.min(j.bookedCount, seatedLimit)) < seatedLimit ? "Book Seat" : "Book Standing Place"}
                         </button>
                       )}
                     </div>
@@ -363,7 +398,7 @@ export function DepartureBoard({ journeys, currentUserId, onBookingSuccess }: De
                       </span>
                     </div>
                     <span className="text-[10px] text-emerald-700 font-semibold shrink-0">
-                      {j.latestStopUpdate.isAssisted ? "Representative recorded" : "Driver reported"}
+                      {j.latestStopUpdate.isAssisted === true ? "Representative recorded" : "Live operational update"}
                     </span>
                   </div>
                 )}
@@ -409,11 +444,7 @@ export function DepartureBoard({ journeys, currentUserId, onBookingSuccess }: De
                   RESERVATION
                 </span>
                 <h3 className="text-base font-bold text-white font-mono">
-                  {activeBookingJourney.bookedCount >= (activeBookingJourney.safeCapacity || 32)
-                    ? "Join Waiting List"
-                    : activeBookingJourney.bookedCount >= 20
-                    ? "Confirm Standing Place"
-                    : "Confirm Seated Place"}
+                  {getBookingModalLabels(activeBookingJourney.bookedCount, activeBookingJourney.safeCapacity).heading}
                 </h3>
               </div>
               <button
@@ -469,28 +500,49 @@ export function DepartureBoard({ journeys, currentUserId, onBookingSuccess }: De
                         {activeBookingJourney.vehicleRegistration}
                       </span>
                     </div>
-                    <div className="flex justify-between items-center text-[#526B82]">
-                      <span>Vehicle Capacity</span>
-                      <span className="font-semibold text-[#102D4A]">
-                        32 passengers max (20 seated, 12 standing)
-                      </span>
-                    </div>
-                    <div className="flex justify-between items-center text-[#526B82]">
-                      <span>Automatic Place</span>
-                      <span className={`font-bold ${
-                        activeBookingJourney.bookedCount < 20
-                          ? "text-[#20A477]"
-                          : activeBookingJourney.bookedCount < 32
-                          ? "text-amber-700"
-                          : "text-purple-700"
-                      }`}>
-                        {activeBookingJourney.bookedCount < 20
-                          ? "Seated Passenger Place (FCFS)"
-                          : activeBookingJourney.bookedCount < 32
-                          ? "Standing Passenger Place (FCFS - 20 seats full)"
-                          : "Waiting List Entry"}
-                      </span>
-                    </div>
+                    {(() => {
+                      const derivedModalCap = calculateCapacityBreakdown({
+                        proposedAllocation: activeBookingJourney.proposedAllocation,
+                        safeCapacity: activeBookingJourney.safeCapacity,
+                        seatedLimit: activeBookingJourney.seatedLimit,
+                        standingLimit: activeBookingJourney.standingLimit,
+                      });
+                      const mSeatedLimit = activeBookingJourney.seatedLimit ?? derivedModalCap.seatedLimit;
+                      const mStandingLimit = activeBookingJourney.standingLimit ?? derivedModalCap.standingLimit;
+                      const mTotalLimit = activeBookingJourney.effectiveCapacity ?? derivedModalCap.effectiveCapacity;
+                      const mSeatedOccupied = activeBookingJourney.seatedCount ?? Math.min(activeBookingJourney.bookedCount, mSeatedLimit);
+                      const mSeatedOpen = mSeatedOccupied < mSeatedLimit;
+                      const mSpaceOpen = activeBookingJourney.bookedCount < mTotalLimit;
+
+                      return (
+                        <>
+                          <div className="flex justify-between items-center text-[#526B82]">
+                            <span>Vehicle Capacity</span>
+                            <span className="font-semibold text-[#102D4A]">
+                              {mTotalLimit} passengers max ({mSeatedLimit} seated{mStandingLimit > 0 ? `, ${mStandingLimit} standing` : ""})
+                            </span>
+                          </div>
+                          <div className="flex justify-between items-center text-[#526B82]">
+                            <span>Automatic Place</span>
+                            <span
+                              className={`font-bold ${
+                                !mSpaceOpen
+                                  ? "text-purple-700"
+                                  : mSeatedOpen
+                                  ? "text-[#20A477]"
+                                  : "text-amber-700"
+                              }`}
+                            >
+                              {!mSpaceOpen
+                                ? "Waiting List Entry"
+                                : mSeatedOpen
+                                ? "Seated Passenger Place (FCFS)"
+                                : `Standing Passenger Place (FCFS - ${mSeatedLimit} seats full)`}
+                            </span>
+                          </div>
+                        </>
+                      );
+                    })()}
                   </div>
 
                   {/* Authorized Pickup Stop Selection */}
@@ -516,15 +568,34 @@ export function DepartureBoard({ journeys, currentUserId, onBookingSuccess }: De
                   </div>
 
                   {/* Capacity Note */}
-                  {activeBookingJourney.bookedCount >= (activeBookingJourney.safeCapacity || 32) ? (
-                    <div className="p-2.5 rounded-lg bg-purple-50 border border-purple-200 text-xs text-purple-700">
-                      <strong>Waitlist Notice:</strong> All 32 passenger places (20 seated, 12 standing) on this bus are currently confirmed. If you confirm, you will be added to the official waiting list and automatically promoted if a passenger cancels.
-                    </div>
-                  ) : activeBookingJourney.bookedCount >= 20 ? (
-                    <div className="p-2.5 rounded-lg bg-amber-50 border border-amber-200 text-xs text-amber-800">
-                      <strong>Standing Place Notice:</strong> All 20 seated places are confirmed. Your reservation will be automatically allocated a <strong>Standing Passenger Place</strong> (12 standing capacity max).
-                    </div>
-                  ) : null}
+                  {(() => {
+                    const derivedModalCap = calculateCapacityBreakdown({
+                      proposedAllocation: activeBookingJourney.proposedAllocation,
+                      safeCapacity: activeBookingJourney.safeCapacity,
+                      seatedLimit: activeBookingJourney.seatedLimit,
+                      standingLimit: activeBookingJourney.standingLimit,
+                    });
+                    const mSeatedLimit = activeBookingJourney.seatedLimit ?? derivedModalCap.seatedLimit;
+                    const mStandingLimit = activeBookingJourney.standingLimit ?? derivedModalCap.standingLimit;
+                    const mTotalLimit = activeBookingJourney.effectiveCapacity ?? derivedModalCap.effectiveCapacity;
+                    const mSeatedOccupied = activeBookingJourney.seatedCount ?? Math.min(activeBookingJourney.bookedCount, mSeatedLimit);
+
+                    if (mTotalLimit > 0 && activeBookingJourney.bookedCount >= mTotalLimit) {
+                      return (
+                        <div className="p-2.5 rounded-lg bg-purple-50 border border-purple-200 text-xs text-purple-700">
+                          <strong>Waitlist Notice:</strong> All {mTotalLimit} passenger places ({mSeatedLimit} seated{mStandingLimit > 0 ? `, ${mStandingLimit} standing` : ""}) on this bus are currently confirmed. If you confirm, you will be added to the official waiting list and automatically promoted if a passenger cancels.
+                        </div>
+                      );
+                    }
+                    if (mStandingLimit > 0 && mSeatedOccupied >= mSeatedLimit) {
+                      return (
+                        <div className="p-2.5 rounded-lg bg-amber-50 border border-amber-200 text-xs text-amber-800">
+                          <strong>Standing Place Notice:</strong> All {mSeatedLimit} seated places are confirmed. Your reservation will be automatically allocated a <strong>Standing Passenger Place</strong> ({mStandingLimit} standing capacity max).
+                        </div>
+                      );
+                    }
+                    return null;
+                  })()}
 
                   {/* Actions */}
                   <div className="pt-2 flex gap-3">
@@ -543,11 +614,7 @@ export function DepartureBoard({ journeys, currentUserId, onBookingSuccess }: De
                     >
                       {isPending
                         ? "Processing..."
-                        : activeBookingJourney.bookedCount >= (activeBookingJourney.safeCapacity || 32)
-                        ? "Join Waitlist"
-                        : activeBookingJourney.bookedCount >= 20
-                        ? "Confirm Standing Place"
-                        : "Confirm Seat"}
+                        : getBookingModalLabels(activeBookingJourney.bookedCount, activeBookingJourney.safeCapacity).button}
                     </button>
                   </div>
                 </>

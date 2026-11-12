@@ -1,6 +1,6 @@
 import type { Metadata } from "next";
-import { redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
+import { requireOperationalStaffPageAccess } from "@/lib/admin-auth";
 import { getTodayDateString } from "@/lib/utils";
 import {
   DriverDashboardView,
@@ -16,36 +16,24 @@ export const metadata: Metadata = {
 export const dynamic = "force-dynamic";
 
 export default async function DriverDashboardPage() {
+  const { userId, profile } = await requireOperationalStaffPageAccess("driver");
   const supabase = await createClient();
-
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
-
-  if (!user) {
-    redirect("/login");
-  }
-
-  // Fetch driver profile
-  const { data: profile } = await supabase
-    .from("profiles")
-    .select("id, full_name, phone, role")
-    .eq("id", user.id)
-    .single();
-
-  if (!profile || (profile.role !== "driver" && profile.role !== "admin")) {
-    redirect("/student");
-  }
 
   // Fetch driver record (Mode A)
   const { data: driverRecord } = await supabase
     .from("drivers")
-    .select("id, driver_reference, phone, status, assigned_vehicle_id")
-    .eq("profile_id", user.id)
+    .select("id, driver_reference, phone, status, has_app_access, assigned_vehicle_id")
+    .eq("profile_id", userId)
     .maybeSingle();
 
-  const driverReference = driverRecord?.driver_reference || "DRV-CU-APP";
+  const driverReference =
+    driverRecord?.driver_reference ||
+    (profile.role === "admin" ? "SUPERVISORY" : "Unassigned");
   const driverPhone = driverRecord?.phone || profile.phone || null;
+  const isUnlinkedDriver = profile.role === "driver" && !driverRecord;
+  const isModeBOnlyDriver = Boolean(
+    profile.role === "driver" && driverRecord && !driverRecord.has_app_access
+  );
 
   const todayStr = getTodayDateString();
 
@@ -100,9 +88,9 @@ export default async function DriverDashboardPage() {
   // Filter journeys for this driver (unless admin)
   if (profile.role === "driver") {
     if (driverRecord?.id) {
-      journeysQuery = journeysQuery.or(`driver_id.eq.${user.id},driver_record_id.eq.${driverRecord.id}`);
+      journeysQuery = journeysQuery.or(`driver_id.eq.${userId},driver_record_id.eq.${driverRecord.id}`);
     } else {
-      journeysQuery = journeysQuery.eq("driver_id", user.id);
+      journeysQuery = journeysQuery.eq("driver_id", userId);
     }
   }
 
@@ -173,6 +161,23 @@ export default async function DriverDashboardPage() {
 
   return (
     <div className="space-y-6">
+      {(isUnlinkedDriver || isModeBOnlyDriver) && (
+        <div
+          role="alert"
+          className="rounded-2xl border border-amber-200 bg-amber-50 p-4 text-xs text-amber-900 space-y-1"
+        >
+          <p className="font-bold text-amber-950">
+            {isUnlinkedDriver
+              ? "Driver Profile Not Yet Linked to Fleet Roster"
+              : "Mode B (Representative-Assisted Dispatch) Active"}
+          </p>
+          <p className="leading-relaxed">
+            {isUnlinkedDriver
+              ? "Your user account has not yet been linked to a driver record (drivers.profile_id). Contact a Super Administrator or Bus Manager to link your profile for Mode A execution."
+              : "Direct Mode A smartphone dispatch is disabled on your driver record; Hostel Boarding Representatives handle assisted dispatch on your behalf."}
+          </p>
+        </div>
+      )}
       <DriverDashboardView
         driverName={profile.full_name}
         driverReference={driverReference}

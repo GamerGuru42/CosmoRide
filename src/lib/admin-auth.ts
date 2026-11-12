@@ -1,64 +1,23 @@
 import { redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
 import type { AdminRoleType, UserRole } from "@/lib/supabase/types";
+import {
+  ALLOWED_ADMIN_SUB_ROLES,
+  canAccessAdminDomain,
+  getDefaultAdminHome,
+  getRoleHome,
+  isAllowedAdminSubRole,
+  type AdminDomain,
+} from "@/lib/role-routing";
 
-export type AdminDomain =
-  | "overview"
-  | "operations"
-  | "dispatch"
-  | "oversight"
-  | "users"
-  | "routes"
-  | "schedules"
-  | "vehicles"
-  | "drivers"
-  | "journeys"
-  | "journey_create"
-  | "incidents"
-  | "announcements"
-  | "reports"
-  | "audit"
-  | "settings";
-
-const ADMIN_DOMAIN_ROLES: Record<AdminDomain, readonly AdminRoleType[]> = {
-  overview: ["super_admin", "hostel_manager"],
-  operations: ["super_admin", "bus_manager", "hostel_manager"],
-  dispatch: ["super_admin", "bus_manager", "hostel_manager"],
-  oversight: ["super_admin", "hostel_manager"],
-  users: ["super_admin"],
-  routes: ["super_admin"],
-  schedules: ["super_admin", "bus_manager"],
-  vehicles: ["super_admin", "bus_manager"],
-  drivers: ["super_admin", "bus_manager"],
-  journeys: ["super_admin", "bus_manager", "hostel_manager"],
-  journey_create: ["super_admin", "bus_manager"],
-  incidents: ["super_admin", "bus_manager", "hostel_manager"],
-  announcements: ["super_admin", "bus_manager", "hostel_manager"],
-  reports: ["super_admin", "hostel_manager"],
-  audit: ["super_admin", "hostel_manager"],
-  settings: ["super_admin"],
+export {
+  ALLOWED_ADMIN_SUB_ROLES,
+  canAccessAdminDomain,
+  getDefaultAdminHome,
+  getRoleHome,
+  isAllowedAdminSubRole,
+  type AdminDomain,
 };
-
-export function canAccessAdminDomain(
-  adminRole: AdminRoleType | string | null | undefined,
-  domain: AdminDomain
-): boolean {
-  if (!adminRole) return false;
-  return (ADMIN_DOMAIN_ROLES[domain] as readonly string[]).includes(adminRole);
-}
-
-export function getDefaultAdminHome(adminRole: AdminRoleType | string | null | undefined): string {
-  if (adminRole === "bus_manager") return "/admin/dispatch";
-  return "/admin";
-}
-
-export function getRoleHome(role: UserRole | string | null | undefined, adminRole?: AdminRoleType | string | null): string {
-  if (role === "admin") return getDefaultAdminHome(adminRole);
-  if (role === "boarding_officer") return "/boarding";
-  if (role === "driver") return "/driver";
-  if (role === "student") return "/student";
-  return "/login";
-}
 
 export interface VerifiedAdminPageContext {
   userId: string;
@@ -90,7 +49,7 @@ export async function requireAdminPageAccess(
     .single();
 
   if (!profile || profile.is_active === false) {
-    redirect("/login");
+    redirect("/login?error=account_inactive");
   }
 
   if (profile.role !== "admin") {
@@ -118,5 +77,75 @@ export async function requireAdminPageAccess(
     fullName: profile.full_name || "Administrator",
     adminRole: profile.admin_role as AdminRoleType,
     unassignedAdminRole: false,
+  };
+}
+
+export interface VerifiedOperationalStaffContext {
+  userId: string;
+  email: string;
+  profile: {
+    id: string;
+    full_name: string;
+    phone: string | null;
+    role: UserRole;
+    admin_role: AdminRoleType | null;
+    is_active: boolean;
+    assigned_transport_group_id: string | null;
+    hostel_id: string | null;
+    avatar_url: string | null;
+    created_at: string;
+  };
+}
+
+/**
+ * Enforces fail-closed active authentication and role isolation for /boarding and /driver SSR pages.
+ * Allows active assigned primary role staff or supervisory admins with a valid admin_role.
+ */
+export async function requireOperationalStaffPageAccess(
+  allowedPrimaryRole: "boarding_officer" | "driver"
+): Promise<VerifiedOperationalStaffContext> {
+  const supabase = await createClient();
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+
+  if (!user) {
+    redirect("/login");
+  }
+
+  const { data: profile } = await supabase
+    .from("profiles")
+    .select(
+      "id, full_name, phone, role, admin_role, is_active, assigned_transport_group_id, hostel_id, avatar_url, created_at"
+    )
+    .eq("id", user.id)
+    .single();
+
+  if (!profile || profile.is_active === false) {
+    redirect("/login?error=account_inactive");
+  }
+
+  const isAuthorizedAdmin =
+    profile.role === "admin" && isAllowedAdminSubRole(profile.admin_role);
+
+  if (profile.role !== allowedPrimaryRole && !isAuthorizedAdmin) {
+    redirect(getRoleHome(profile.role, profile.admin_role));
+  }
+
+  return {
+    userId: user.id,
+    email: user.email || "",
+    profile: {
+      id: profile.id,
+      full_name: profile.full_name,
+      phone: profile.phone,
+      role: profile.role as UserRole,
+      admin_role: profile.admin_role as AdminRoleType | null,
+      is_active: profile.is_active,
+      assigned_transport_group_id: profile.assigned_transport_group_id,
+      hostel_id: profile.hostel_id,
+      avatar_url: profile.avatar_url,
+      created_at: profile.created_at,
+    },
   };
 }

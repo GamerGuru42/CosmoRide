@@ -514,6 +514,13 @@ export async function removeStopFromRouteAction(
 // 4. SCHEDULES & BULK JOURNEY GENERATION
 // ============================================================
 
+function normalizeScheduleTime(raw: string): string | null {
+  const trimmed = raw.trim();
+  if (/^\d{2}:\d{2}$/.test(trimmed)) return `${trimmed}:00`;
+  if (/^\d{2}:\d{2}:\d{2}$/.test(trimmed)) return trimmed;
+  return null;
+}
+
 export async function createScheduleTemplateAction({
   routeId,
   dayOfWeek,
@@ -534,20 +541,13 @@ export async function createScheduleTemplateAction({
   try {
     const { supabase, user } = await verifyAdminCaller("schedules");
 
-    const normalizeTime = (raw: string): string | null => {
-      const trimmed = raw.trim();
-      if (/^\d{2}:\d{2}$/.test(trimmed)) return `${trimmed}:00`;
-      if (/^\d{2}:\d{2}:\d{2}$/.test(trimmed)) return trimmed;
-      return null;
-    };
-
-    const normalizedDeparture = normalizeTime(departureTime);
+    const normalizedDeparture = normalizeScheduleTime(departureTime);
     if (!normalizedDeparture) {
       return { success: false, error: "Departure time must use HH:MM or HH:MM:SS format." };
     }
 
     const normalizedLatest = latestDepartureTime?.trim()
-      ? normalizeTime(latestDepartureTime)
+      ? normalizeScheduleTime(latestDepartureTime)
       : null;
 
     if (latestDepartureTime?.trim() && !normalizedLatest) {
@@ -906,6 +906,239 @@ export async function updateUserRoleAndOperationAction({
     return { success: true, message: `Updated ${targetUser.full_name} to role ${role}${adminRole ? ` (${adminRole})` : ""}.` };
   } catch (err: unknown) {
     const message = err instanceof Error ? err.message : "Failed to update user role.";
+    return { success: false, error: message };
+  }
+}
+
+function unwrapAdminRpcResult(
+  data: unknown,
+  fallbackError: string,
+  fallbackSuccess: string
+): AdminActionResponse {
+  const result = (data && typeof data === "object" ? data : null) as Record<string, unknown> | null;
+  if (!result?.success) {
+    return {
+      success: false,
+      error: (typeof result?.error === "string" && result.error) || fallbackError,
+      data: result ?? undefined,
+    };
+  }
+  return {
+    success: true,
+    message: (typeof result?.message === "string" && result.message) || fallbackSuccess,
+    data: result,
+  };
+}
+
+export async function setUserActiveStatusAction({
+  userId,
+  isActive,
+  reason,
+}: {
+  userId: string;
+  isActive: boolean;
+  reason?: string;
+}): Promise<AdminActionResponse> {
+  try {
+    const { supabase, user } = await verifyAdminCaller("users");
+
+    if (!userId) {
+      return { success: false, error: "Target user ID is required." };
+    }
+    if (userId === user.id && !isActive) {
+      return { success: false, error: "Super Administrators cannot deactivate their own active session." };
+    }
+
+    const { data, error } = await supabase.rpc("admin_set_user_active_status", {
+      p_admin_id: user.id,
+      p_target_user_id: userId,
+      p_is_active: isActive,
+      p_reason: reason?.trim() || null,
+    });
+
+    if (error) return { success: false, error: error.message };
+
+    const response = unwrapAdminRpcResult(
+      data,
+      "Failed to update account activation status.",
+      isActive ? "Account reactivated successfully." : "Account suspended successfully."
+    );
+
+    if (response.success) {
+      revalidatePath("/admin/users");
+      revalidatePath("/admin/drivers");
+    }
+
+    return response;
+  } catch (err: unknown) {
+    const message = err instanceof Error ? err.message : "Failed to update account activation status.";
+    return { success: false, error: message };
+  }
+}
+
+export async function linkDriverProfileAction({
+  driverId,
+  profileId,
+}: {
+  driverId: string;
+  profileId: string | null;
+}): Promise<AdminActionResponse> {
+  try {
+    const { supabase, user } = await verifyAdminCaller("drivers");
+
+    if (!driverId) {
+      return { success: false, error: "Driver record ID is required." };
+    }
+
+    const { data, error } = await supabase.rpc("admin_link_driver_profile", {
+      p_admin_id: user.id,
+      p_driver_id: driverId,
+      p_profile_id: profileId || null,
+    });
+
+    if (error) return { success: false, error: error.message };
+
+    const response = unwrapAdminRpcResult(
+      data,
+      "Failed to update driver Mode A account link.",
+      profileId
+        ? "Driver linked to Mode A smartphone account."
+        : "Driver switched to Mode B (unlinked / non-smartphone)."
+    );
+
+    if (response.success) {
+      revalidatePath("/admin/drivers");
+      revalidatePath("/admin/users");
+      revalidatePath("/admin/journeys");
+      revalidatePath("/admin/dispatch");
+      revalidatePath("/driver");
+    }
+
+    return response;
+  } catch (err: unknown) {
+    const message = err instanceof Error ? err.message : "Failed to link driver account.";
+    return { success: false, error: message };
+  }
+}
+
+export async function updateScheduleTemplateAction({
+  scheduleId,
+  routeId,
+  dayOfWeek,
+  departureTime,
+  latestDepartureTime,
+  direction = "outbound",
+  proposedAllocation = 32,
+  notes,
+  isActive = true,
+}: {
+  scheduleId: string;
+  routeId: string;
+  dayOfWeek: number;
+  departureTime: string;
+  latestDepartureTime?: string | null;
+  direction?: "outbound" | "inbound";
+  proposedAllocation?: number;
+  notes?: string;
+  isActive?: boolean;
+}): Promise<AdminActionResponse> {
+  try {
+    const { supabase, user } = await verifyAdminCaller("schedules");
+
+    const normalizedDeparture = normalizeScheduleTime(departureTime);
+    if (!normalizedDeparture) {
+      return { success: false, error: "Departure time must use HH:MM or HH:MM:SS format." };
+    }
+
+    const normalizedLatest = latestDepartureTime?.trim()
+      ? normalizeScheduleTime(latestDepartureTime)
+      : null;
+
+    if (latestDepartureTime?.trim() && !normalizedLatest) {
+      return { success: false, error: "Latest departure time must use HH:MM or HH:MM:SS format." };
+    }
+
+    if (normalizedLatest && normalizedLatest < normalizedDeparture) {
+      return {
+        success: false,
+        error: "Latest permitted departure time cannot be earlier than planned departure time.",
+      };
+    }
+
+    if (!Number.isFinite(proposedAllocation) || proposedAllocation < 1 || proposedAllocation > 32) {
+      return {
+        success: false,
+        error: "Proposed allocation must be between 1 and 32 passengers.",
+      };
+    }
+
+    const { data, error } = await supabase.rpc("admin_update_schedule_template", {
+      p_admin_id: user.id,
+      p_schedule_id: scheduleId,
+      p_route_id: routeId,
+      p_day_of_week: dayOfWeek,
+      p_departure_time: normalizedDeparture,
+      p_latest_departure_time: normalizedLatest,
+      p_direction: direction,
+      p_proposed_allocation: proposedAllocation,
+      p_notes: notes?.trim() || null,
+      p_is_active: isActive,
+    });
+
+    if (error) return { success: false, error: error.message };
+
+    const response = unwrapAdminRpcResult(
+      data,
+      "Failed to update schedule template.",
+      "Schedule template updated. Existing generated journeys remain preserved."
+    );
+
+    if (response.success) {
+      revalidatePath("/admin/schedules");
+      revalidatePath("/student");
+      revalidatePath("/student/departures");
+    }
+
+    return response;
+  } catch (err: unknown) {
+    const message = err instanceof Error ? err.message : "Failed to update schedule template.";
+    return { success: false, error: message };
+  }
+}
+
+export async function toggleScheduleStatusAction({
+  scheduleId,
+  isActive,
+}: {
+  scheduleId: string;
+  isActive: boolean;
+}): Promise<AdminActionResponse> {
+  try {
+    const { supabase, user } = await verifyAdminCaller("schedules");
+
+    const { data, error } = await supabase.rpc("admin_toggle_schedule_status", {
+      p_admin_id: user.id,
+      p_schedule_id: scheduleId,
+      p_is_active: isActive,
+    });
+
+    if (error) return { success: false, error: error.message };
+
+    const response = unwrapAdminRpcResult(
+      data,
+      "Failed to update schedule status.",
+      isActive
+        ? "Schedule template activated. Existing generated journeys remain preserved."
+        : "Schedule template paused. Existing generated journeys remain preserved."
+    );
+
+    if (response.success) {
+      revalidatePath("/admin/schedules");
+    }
+
+    return response;
+  } catch (err: unknown) {
+    const message = err instanceof Error ? err.message : "Failed to toggle schedule status.";
     return { success: false, error: message };
   }
 }

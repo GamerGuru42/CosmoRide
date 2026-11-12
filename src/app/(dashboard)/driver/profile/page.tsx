@@ -1,6 +1,6 @@
 import type { Metadata } from "next";
-import { redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
+import { requireOperationalStaffPageAccess } from "@/lib/admin-auth";
 import { ROLE_LABELS, DEVELOPER_ATTRIBUTION } from "@/lib/constants";
 
 export const metadata: Metadata = {
@@ -11,25 +11,8 @@ export const metadata: Metadata = {
 export const dynamic = "force-dynamic";
 
 export default async function DriverProfilePage() {
+  const { userId, email, profile } = await requireOperationalStaffPageAccess("driver");
   const supabase = await createClient();
-
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
-
-  if (!user) {
-    redirect("/login");
-  }
-
-  const { data: profile } = await supabase
-    .from("profiles")
-    .select("id, full_name, phone, role, avatar_url, created_at")
-    .eq("id", user.id)
-    .single();
-
-  if (!profile || (profile.role !== "driver" && profile.role !== "admin")) {
-    redirect("/student");
-  }
 
   // Fetch driver record
   const { data: driverRecord } = await supabase
@@ -47,7 +30,7 @@ export default async function DriverProfilePage() {
         safe_capacity
       )
     `)
-    .eq("profile_id", user.id)
+    .eq("profile_id", userId)
     .maybeSingle();
 
   const assignedVehicle = Array.isArray(driverRecord?.assigned_vehicle)
@@ -81,7 +64,7 @@ export default async function DriverProfilePage() {
             <h2 className="text-lg font-bold text-[#102D4A]">
               {profile.full_name}
             </h2>
-            <p className="text-xs text-[#526B82]">{user.email}</p>
+            <p className="text-xs text-[#526B82]">{email}</p>
             <div className="mt-1 flex items-center gap-2">
               <span className="inline-flex items-center rounded-full bg-slate-100 px-2.5 py-0.5 text-[10px] font-bold uppercase text-[#102D4A]">
                 {ROLE_LABELS[profile.role as keyof typeof ROLE_LABELS] || profile.role}
@@ -101,7 +84,7 @@ export default async function DriverProfilePage() {
               Driver Identification Code
             </span>
             <span className="text-sm font-bold font-mono text-[#102D4A] block">
-              {driverRecord?.driver_reference || "DRV-CU-01"}
+              {driverRecord?.driver_reference || "Unassigned"}
             </span>
             <span className="text-[11px] text-[#526B82] block">
               University Transportation Directorate Ref
@@ -113,10 +96,10 @@ export default async function DriverProfilePage() {
               Assigned Fleet Vehicle
             </span>
             <span className="text-sm font-bold text-[#102D4A] block">
-              {assignedVehicle?.registration_number || "CU-EB-01"}
+              {assignedVehicle?.registration_number || "Unassigned"}
             </span>
             <span className="text-[11px] text-[#526B82] block">
-              {assignedVehicle?.name || "Electric Transit Coach"}
+              {assignedVehicle?.name || "No vehicle currently assigned"}
             </span>
           </div>
 
@@ -136,11 +119,23 @@ export default async function DriverProfilePage() {
             <span className="text-[10px] font-bold text-[#526B82] uppercase tracking-wider block">
               Operational Access Mode
             </span>
-            <span className="text-sm font-bold text-[#20A477] block">
-              Mode A: Direct Smartphone Access
+            <span
+              className={`text-sm font-bold block ${
+                driverRecord?.has_app_access ? "text-[#20A477]" : "text-amber-700"
+              }`}
+            >
+              {driverRecord?.has_app_access
+                ? "Mode A: Direct Smartphone Access"
+                : driverRecord
+                ? "Mode B: Representative-Assisted Dispatch"
+                : "Unlinked Driver Profile"}
             </span>
             <span className="text-[11px] text-[#526B82] block">
-              Direct journey execution enabled
+              {driverRecord?.has_app_access
+                ? "Direct journey execution enabled"
+                : driverRecord
+                ? "Managed by hostel boarding representatives"
+                : "Contact administrator to link driver roster record"}
             </span>
           </div>
         </div>

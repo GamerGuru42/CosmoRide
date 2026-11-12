@@ -2,7 +2,7 @@
 
 import React, { useState } from "react";
 import Link from "next/link";
-import { formatTime, formatDate } from "@/lib/utils";
+import { calculateCapacityBreakdown, formatTime, formatDate } from "@/lib/utils";
 import { StatusBadge } from "@/components/ui/status-badge";
 import {
   BusIcon,
@@ -412,10 +412,16 @@ export function AdminOverview({
                             : "text-slate-400"
                         }`}
                       >
-                        Total: {j.bookedCount}/{j.safeCapacity || 32}
+                        Total: {j.bookedCount}/{Math.max(0, j.safeCapacity)}
                       </div>
                       <div className="text-[10px] text-slate-500 font-mono">
-                        Seated: {j.seatedCount ?? 0}/20 · Standing: {j.standingCount ?? 0}/12
+                        {(() => {
+                          const cap = calculateCapacityBreakdown({
+                            proposedAllocation: j.safeCapacity,
+                            safeCapacity: j.safeCapacity,
+                          });
+                          return `Seated: ${j.seatedCount ?? 0}/${cap.seatedLimit} · Standing: ${j.standingCount ?? 0}/${cap.standingLimit}`;
+                        })()}
                       </div>
                       <div className="w-16 mx-auto bg-slate-100 rounded-full h-1 mt-1 overflow-hidden">
                         <div

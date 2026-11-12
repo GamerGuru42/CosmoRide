@@ -2,9 +2,15 @@
 
 import React, { useState, useTransition } from "react";
 import Link from "next/link";
-import { formatTime, getTodayDateString } from "@/lib/utils";
+import {
+  calculateCapacityBreakdown,
+  formatTime,
+  getTodayDateString,
+} from "@/lib/utils";
 import {
   createScheduleTemplateAction,
+  updateScheduleTemplateAction,
+  toggleScheduleStatusAction,
   generateJourneysFromSchedulesAction,
 } from "@/actions/admin";
 
@@ -54,6 +60,7 @@ export function SchedulesManagement({
 
   // Modals state
   const [showAddModal, setShowAddModal] = useState(false);
+  const [editingSchedule, setEditingSchedule] = useState<ScheduleItem | null>(null);
   const [showGeneratorModal, setShowGeneratorModal] = useState(false);
   const [actionError, setActionError] = useState<string | null>(null);
   const [actionSuccess, setActionSuccess] = useState<string | null>(null);
@@ -66,6 +73,16 @@ export function SchedulesManagement({
   const [direction, setDirection] = useState<"outbound" | "inbound">("outbound");
   const [allocation, setAllocation] = useState(32);
   const [notes, setNotes] = useState("");
+
+  // Edit schedule form state
+  const [editRouteId, setEditRouteId] = useState("");
+  const [editDayOfWeek, setEditDayOfWeek] = useState(1);
+  const [editDepartureTime, setEditDepartureTime] = useState("07:30");
+  const [editLatestDepartureTime, setEditLatestDepartureTime] = useState("");
+  const [editDirection, setEditDirection] = useState<"outbound" | "inbound">("outbound");
+  const [editAllocation, setEditAllocation] = useState(32);
+  const [editNotes, setEditNotes] = useState("");
+  const [editIsActive, setEditIsActive] = useState(true);
 
   // Generator form state
   const todayIso = getTodayDateString();
@@ -134,6 +151,108 @@ export function SchedulesManagement({
         setShowAddModal(false);
         window.location.reload();
       }, 1000);
+    });
+  };
+
+  const handleOpenEditSchedule = (s: ScheduleItem) => {
+    setEditingSchedule(s);
+    setEditRouteId(s.routeId);
+    setEditDayOfWeek(s.dayOfWeek);
+    setEditDepartureTime(s.departureTime.slice(0, 5));
+    setEditLatestDepartureTime(s.latestDepartureTime ? s.latestDepartureTime.slice(0, 5) : "");
+    setEditDirection(s.direction);
+    setEditAllocation(s.proposedAllocation);
+    setEditNotes(s.notes || "");
+    setEditIsActive(s.isActive);
+    setActionError(null);
+    setActionSuccess(null);
+  };
+
+  const handleUpdateSchedule = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!editingSchedule) return;
+    setActionError(null);
+    setActionSuccess(null);
+
+    const formattedTime =
+      editDepartureTime.length === 5 ? `${editDepartureTime}:00` : editDepartureTime;
+    const formattedLatestTime =
+      editLatestDepartureTime.trim().length === 5
+        ? `${editLatestDepartureTime.trim()}:00`
+        : editLatestDepartureTime.trim() || null;
+
+    startTransition(async () => {
+      const res = await updateScheduleTemplateAction({
+        scheduleId: editingSchedule.id,
+        routeId: editRouteId,
+        dayOfWeek: Number(editDayOfWeek),
+        departureTime: formattedTime,
+        latestDepartureTime: formattedLatestTime,
+        direction: editDirection,
+        proposedAllocation: Number(editAllocation),
+        notes: editNotes || undefined,
+        isActive: editIsActive,
+      });
+
+      if (!res.success) {
+        setActionError(res.error || "Failed to update schedule template.");
+        return;
+      }
+
+      const routeOpt = availableRoutes.find((r) => r.id === editRouteId);
+      setSchedules((prev) =>
+        prev.map((item) =>
+          item.id === editingSchedule.id
+            ? {
+                ...item,
+                routeId: editRouteId,
+                routeCode: routeOpt?.code || item.routeCode,
+                routeName: routeOpt?.name || item.routeName,
+                dayOfWeek: Number(editDayOfWeek),
+                departureTime: formattedTime,
+                latestDepartureTime: formattedLatestTime,
+                direction: editDirection,
+                proposedAllocation: Number(editAllocation),
+                notes: editNotes.trim() || null,
+                isActive: editIsActive,
+              }
+            : item
+        )
+      );
+
+      setActionSuccess(res.message || "Schedule template updated.");
+      setTimeout(() => {
+        setEditingSchedule(null);
+        window.location.reload();
+      }, 900);
+    });
+  };
+
+  const handleToggleScheduleStatus = (s: ScheduleItem) => {
+    setActionError(null);
+    setActionSuccess(null);
+    const nextActive = !s.isActive;
+
+    startTransition(async () => {
+      const res = await toggleScheduleStatusAction({
+        scheduleId: s.id,
+        isActive: nextActive,
+      });
+
+      if (!res.success) {
+        setActionError(res.error || "Failed to toggle schedule status.");
+        return;
+      }
+
+      setSchedules((prev) =>
+        prev.map((item) => (item.id === s.id ? { ...item, isActive: nextActive } : item))
+      );
+      setActionSuccess(
+        res.message ||
+          (nextActive
+            ? "Schedule template activated. Existing generated journeys remain preserved."
+            : "Schedule template paused. Existing generated journeys remain preserved.")
+      );
     });
   };
 
@@ -214,9 +333,20 @@ export function SchedulesManagement({
             Timetable Schedule Templates ({filteredSchedules.length})
           </h3>
           <p className="mt-0.5 text-xs text-[#526B82]">
-            Permanent recurring departure templates used by the Bulk Journey Generator to produce daily student trips.
+            Permanent recurring departure templates used by the Bulk Journey Generator to produce daily student trips. Pausing or editing a template preserves existing generated journeys.
           </p>
         </div>
+
+        {!showAddModal && !editingSchedule && !showGeneratorModal && actionError && (
+          <div className="mx-5 mt-4 rounded-lg bg-rose-50 p-3 text-xs text-[#D9534F] border border-rose-200">
+            {actionError}
+          </div>
+        )}
+        {!showAddModal && !editingSchedule && !showGeneratorModal && actionSuccess && (
+          <div className="mx-5 mt-4 rounded-lg bg-emerald-50 p-3 text-xs text-emerald-800 border border-emerald-200">
+            {actionSuccess}
+          </div>
+        )}
 
         {filteredSchedules.length === 0 ? (
           <div className="p-12 text-center">
@@ -248,42 +378,84 @@ export function SchedulesManagement({
                   <th className="px-4 py-3 font-semibold">Route Code &amp; Name</th>
                   <th className="px-4 py-3 font-semibold">Direction</th>
                   <th className="px-4 py-3 font-semibold text-center">Proposed Allocation</th>
+                  <th className="px-4 py-3 font-semibold">Status</th>
                   <th className="px-4 py-3 font-semibold">Notes</th>
+                  <th className="px-4 py-3 font-semibold text-right">Actions</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-slate-100 text-slate-700">
-                {filteredSchedules.map((s) => (
-                  <tr key={s.id} className="hover:bg-slate-50/80 transition-colors">
-                    <td className="px-4 py-3 whitespace-nowrap font-semibold text-slate-900">
-                      {DAY_NAMES[s.dayOfWeek]}
-                    </td>
-                    <td className="px-4 py-3 whitespace-nowrap font-mono font-bold text-[#102D4A]">
-                      {formatTime(s.departureTime)}
-                      {s.latestDepartureTime && s.latestDepartureTime !== s.departureTime && (
-                        <span className="block text-[10px] font-sans font-normal text-slate-500">
-                          (Window: {formatTime(s.departureTime)} – {formatTime(s.latestDepartureTime)})
+                {filteredSchedules.map((s) => {
+                  const allocationBreakdown = calculateCapacityBreakdown({
+                    proposedAllocation: s.proposedAllocation,
+                    safeCapacity: s.proposedAllocation,
+                  });
+                  return (
+                    <tr key={s.id} className="hover:bg-slate-50/80 transition-colors">
+                      <td className="px-4 py-3 whitespace-nowrap font-semibold text-slate-900">
+                        {DAY_NAMES[s.dayOfWeek]}
+                      </td>
+                      <td className="px-4 py-3 whitespace-nowrap font-mono font-bold text-[#102D4A]">
+                        {formatTime(s.departureTime)}
+                        {s.latestDepartureTime && s.latestDepartureTime !== s.departureTime && (
+                          <span className="block text-[10px] font-sans font-normal text-slate-500">
+                            (Window: {formatTime(s.departureTime)} – {formatTime(s.latestDepartureTime)})
+                          </span>
+                        )}
+                      </td>
+                      <td className="px-4 py-3">
+                        <span className="font-mono font-bold text-[#102D4A]">{s.routeCode}</span>
+                        <span className="block text-[11px] text-[#526B82] truncate max-w-[240px]">
+                          {s.routeName}
                         </span>
-                      )}
-                    </td>
-                    <td className="px-4 py-3">
-                      <span className="font-mono font-bold text-[#102D4A]">{s.routeCode}</span>
-                      <span className="block text-[11px] text-[#526B82] truncate max-w-[240px]">
-                        {s.routeName}
-                      </span>
-                    </td>
-                    <td className="px-4 py-3 whitespace-nowrap capitalize text-slate-600">
-                      {s.direction}
-                    </td>
-                    <td className="px-4 py-3 text-center whitespace-nowrap">
-                      <span className="inline-flex items-center rounded-md bg-blue-50 px-2 py-0.5 font-mono font-bold text-blue-900 text-xs">
-                        {s.proposedAllocation} cap (20 seated, 12 standing)
-                      </span>
-                    </td>
-                    <td className="px-4 py-3 text-[#526B82]">
-                      {s.notes || <span className="italic text-slate-400">Regular service</span>}
-                    </td>
-                  </tr>
-                ))}
+                      </td>
+                      <td className="px-4 py-3 whitespace-nowrap capitalize text-slate-600">
+                        {s.direction}
+                      </td>
+                      <td className="px-4 py-3 text-center whitespace-nowrap">
+                        <span className="inline-flex items-center rounded-md bg-blue-50 px-2 py-0.5 font-mono font-bold text-blue-900 text-xs">
+                          {s.proposedAllocation} cap ({allocationBreakdown.seatedLimit} seated,{" "}
+                          {allocationBreakdown.standingLimit} standing)
+                        </span>
+                      </td>
+                      <td className="px-4 py-3 whitespace-nowrap">
+                        {s.isActive ? (
+                          <span className="inline-flex items-center rounded-full bg-emerald-100 px-2.5 py-0.5 text-[11px] font-semibold text-emerald-800">
+                            Active
+                          </span>
+                        ) : (
+                          <span className="inline-flex items-center rounded-full bg-amber-100 px-2.5 py-0.5 text-[11px] font-semibold text-amber-800">
+                            Paused
+                          </span>
+                        )}
+                      </td>
+                      <td className="px-4 py-3 text-[#526B82]">
+                        {s.notes || <span className="italic text-slate-400">Regular service</span>}
+                      </td>
+                      <td className="px-4 py-3 text-right whitespace-nowrap space-x-1">
+                        <button
+                          type="button"
+                          onClick={() => handleOpenEditSchedule(s)}
+                          disabled={isPending}
+                          className="rounded px-2.5 py-1 text-xs font-semibold text-[#102D4A] hover:bg-slate-100 transition-colors"
+                        >
+                          Edit
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => handleToggleScheduleStatus(s)}
+                          disabled={isPending}
+                          className={`rounded px-2.5 py-1 text-xs font-semibold transition-colors ${
+                            s.isActive
+                              ? "text-amber-800 hover:bg-amber-50"
+                              : "text-emerald-800 hover:bg-emerald-50"
+                          }`}
+                        >
+                          {s.isActive ? "Pause" : "Activate"}
+                        </button>
+                      </td>
+                    </tr>
+                  );
+                })}
               </tbody>
             </table>
           </div>
@@ -510,7 +682,7 @@ export function SchedulesManagement({
                   <input
                     type="number"
                     min="1"
-                    max="100"
+                    max="32"
                     required
                     value={allocation}
                     onChange={(e) => setAllocation(Number(e.target.value))}
@@ -545,6 +717,160 @@ export function SchedulesManagement({
                   className="rounded-lg bg-[#102D4A] px-4 py-2 font-semibold text-white hover:bg-[#0c233a] disabled:opacity-50"
                 >
                   {isPending ? "Saving..." : "Save Schedule Template"}
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {/* Modal: Edit Recurring Schedule Template */}
+      {editingSchedule && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4">
+          <div className="w-full max-w-md rounded-2xl bg-white p-6 shadow-xl">
+            <h3 className="text-base font-bold text-[#102D4A]">
+              Edit Schedule Template: {editingSchedule.routeCode}
+            </h3>
+            <p className="mt-1 text-xs text-[#526B82]">
+              Update future weekly schedule generation rules. Previously generated journeys remain preserved.
+            </p>
+
+            {actionError && (
+              <div className="mt-3 rounded-lg bg-rose-50 p-3 text-xs text-[#D9534F] border border-rose-200">
+                {actionError}
+              </div>
+            )}
+            {actionSuccess && (
+              <div className="mt-3 rounded-lg bg-emerald-50 p-3 text-xs text-emerald-800 border border-emerald-200">
+                {actionSuccess}
+              </div>
+            )}
+
+            <form onSubmit={handleUpdateSchedule} className="mt-4 space-y-3.5 text-xs">
+              <div>
+                <label className="block font-semibold text-[#102D4A] mb-1">Route *</label>
+                <select
+                  value={editRouteId}
+                  onChange={(e) => setEditRouteId(e.target.value)}
+                  className="w-full rounded-lg border border-slate-300 p-2 focus:border-[#102D4A] focus:outline-none"
+                >
+                  {availableRoutes.map((r) => (
+                    <option key={r.id} value={r.id}>
+                      {r.code} - {r.name}
+                    </option>
+                  ))}
+                </select>
+              </div>
+
+              <div>
+                <label className="block font-semibold text-[#102D4A] mb-1">
+                  Day of the Week *
+                </label>
+                <select
+                  value={editDayOfWeek}
+                  onChange={(e) => setEditDayOfWeek(Number(e.target.value))}
+                  className="w-full rounded-lg border border-slate-300 p-2 focus:border-[#102D4A] focus:outline-none"
+                >
+                  {DAY_NAMES.map((name, idx) => (
+                    <option key={idx} value={idx}>
+                      {name}
+                    </option>
+                  ))}
+                </select>
+              </div>
+
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <label className="block font-semibold text-[#102D4A] mb-1">
+                    Planned Departure *
+                  </label>
+                  <input
+                    type="time"
+                    required
+                    value={editDepartureTime}
+                    onChange={(e) => setEditDepartureTime(e.target.value)}
+                    className="w-full rounded-lg border border-slate-300 p-2 focus:border-[#102D4A] focus:outline-none"
+                  />
+                </div>
+                <div>
+                  <label className="block font-semibold text-[#102D4A] mb-1">
+                    Latest Permitted (Optional)
+                  </label>
+                  <input
+                    type="time"
+                    value={editLatestDepartureTime}
+                    onChange={(e) => setEditLatestDepartureTime(e.target.value)}
+                    className="w-full rounded-lg border border-slate-300 p-2 focus:border-[#102D4A] focus:outline-none"
+                  />
+                </div>
+              </div>
+
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <label className="block font-semibold text-[#102D4A] mb-1">Direction</label>
+                  <select
+                    value={editDirection}
+                    onChange={(e) => setEditDirection(e.target.value as "outbound" | "inbound")}
+                    className="w-full rounded-lg border border-slate-300 p-2 focus:border-[#102D4A] focus:outline-none"
+                  >
+                    <option value="outbound">Outbound</option>
+                    <option value="inbound">Inbound</option>
+                  </select>
+                </div>
+
+                <div>
+                  <label className="block font-semibold text-[#102D4A] mb-1">
+                    Proposed Allocation *
+                  </label>
+                  <input
+                    type="number"
+                    min="1"
+                    max="32"
+                    required
+                    value={editAllocation}
+                    onChange={(e) => setEditAllocation(Number(e.target.value))}
+                    className="w-full rounded-lg border border-slate-300 p-2 focus:border-[#102D4A] focus:outline-none"
+                  />
+                </div>
+              </div>
+
+              <div className="rounded-lg border border-slate-200 bg-slate-50 p-2.5">
+                <label className="flex items-center gap-2 font-semibold text-[#102D4A] cursor-pointer">
+                  <input
+                    type="checkbox"
+                    checked={editIsActive}
+                    onChange={(e) => setEditIsActive(e.target.checked)}
+                    className="h-4 w-4 rounded border-slate-300 text-[#102D4A] focus:ring-[#102D4A]"
+                  />
+                  <span>Template Active (included in future bulk journey generation)</span>
+                </label>
+              </div>
+
+              <div>
+                <label className="block font-semibold text-[#102D4A] mb-1">Notes</label>
+                <textarea
+                  rows={2}
+                  value={editNotes}
+                  onChange={(e) => setEditNotes(e.target.value)}
+                  className="w-full rounded-lg border border-slate-300 p-2 focus:border-[#102D4A] focus:outline-none"
+                />
+              </div>
+
+              <div className="mt-5 flex justify-end gap-2 pt-2 border-t border-slate-200">
+                <button
+                  type="button"
+                  onClick={() => setEditingSchedule(null)}
+                  disabled={isPending}
+                  className="rounded-lg border border-slate-300 px-3.5 py-2 font-medium text-slate-700 hover:bg-slate-50"
+                >
+                  Cancel
+                </button>
+                <button
+                  type="submit"
+                  disabled={isPending}
+                  className="rounded-lg bg-[#102D4A] px-4 py-2 font-semibold text-white hover:bg-[#0c233a] disabled:opacity-50"
+                >
+                  {isPending ? "Saving..." : "Update Schedule"}
                 </button>
               </div>
             </form>

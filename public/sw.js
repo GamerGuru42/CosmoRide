@@ -1,7 +1,12 @@
 /**
- * CosmoRide Service Worker — App Shell Caching
- * Caches the application shell for offline access.
- * No background sync in v1.
+ * CosmoRide Service Worker — Intentionally Unregistered (Online-Only Security Policy)
+ *
+ * Notice: CosmoRide does NOT register this service worker in src/app/layout.tsx or any client
+ * entry point because seat reservations, live occupancy counts, QR boarding verification,
+ * Stage 2-7 operational controls, and role/session revocation require authoritative live
+ * Supabase connectivity and must never queue or approve offline state transitions.
+ *
+ * Retained solely as a static placeholder asset without client registration.
  */
 
 const CACHE_NAME = "cosmoride-v1";

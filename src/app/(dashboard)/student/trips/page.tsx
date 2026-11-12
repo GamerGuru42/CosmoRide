@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import { redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
+import { getRoleHome } from "@/lib/role-routing";
 import type { JourneyStatus } from "@/lib/supabase/types";
 import { StudentTripsView, type TripItem, type WaitlistItem } from "@/components/student/student-trips-view";
 
@@ -23,11 +24,19 @@ export default async function StudentTripsPage() {
   // Fetch student profile info
   const { data: profile } = await supabase
     .from("profiles")
-    .select("full_name, student_id")
+    .select("full_name, student_id, role, admin_role, is_active")
     .eq("id", user.id)
     .single();
 
-  if (!profile?.student_id || profile.student_id.trim() === "") {
+  if (!profile || profile.is_active === false) {
+    redirect("/login?error=account_inactive");
+  }
+
+  if (profile.role !== "student") {
+    redirect(getRoleHome(profile.role, profile.admin_role));
+  }
+
+  if (!profile.student_id || profile.student_id.trim() === "") {
     redirect("/register?reason=incomplete_profile");
   }
 

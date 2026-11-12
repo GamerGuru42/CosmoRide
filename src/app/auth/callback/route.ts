@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase/server";
+import { getRoleHome } from "@/lib/role-routing";
 
 /**
  * Auth callback handler for Supabase.
@@ -47,22 +48,21 @@ export async function GET(request: Request) {
 
   const email = (user.email ?? "").toLowerCase().trim();
 
-  // Retrieve user profile to check existing role and profile completeness
+  // Retrieve user profile to check existing role, active status, and profile completeness
   const { data: profile } = await supabase
     .from("profiles")
-    .select("id, role, student_id, full_name, is_active")
+    .select("id, role, admin_role, student_id, full_name, is_active")
     .eq("id", user.id)
     .single();
 
-  // If user is already an authorized staff or administrator, redirect to staff dashboard
+  if (profile && profile.is_active === false) {
+    await supabase.auth.signOut();
+    return NextResponse.redirect(`${origin}/login?error=account_inactive`);
+  }
+
+  // If user is already an authorized staff or administrator, redirect to role-appropriate dashboard
   if (profile && ["admin", "boarding_officer", "driver"].includes(profile.role)) {
-    if (profile.role === "admin") {
-      return NextResponse.redirect(`${origin}/admin`);
-    } else if (profile.role === "boarding_officer") {
-      return NextResponse.redirect(`${origin}/boarding`);
-    } else if (profile.role === "driver") {
-      return NextResponse.redirect(`${origin}/driver`);
-    }
+    return NextResponse.redirect(`${origin}${getRoleHome(profile.role, profile.admin_role)}`);
   }
 
   // Student accounts: Validate Cosmopolitan University domain (@cosmopolitan.edu.ng)
@@ -85,6 +85,6 @@ export async function GET(request: Request) {
   }
 
   // Completed student profile -> proceed to student dashboard
-  const destination = next.startsWith("/") && !next.startsWith("//") ? next : "/student";
+  const destination = next.startsWith("/student") ? next : "/student";
   return NextResponse.redirect(`${origin}${destination}`);
 }

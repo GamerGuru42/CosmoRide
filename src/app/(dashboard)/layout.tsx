@@ -41,6 +41,10 @@ export default async function DashboardLayout({
     );
   }
 
+  if (profile.is_active === false) {
+    redirect("/login?error=account_inactive");
+  }
+
   // If student profile is incomplete, redirect to registration completion
   if (
     profile.role === "student" &&

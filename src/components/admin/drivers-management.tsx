@@ -1,7 +1,11 @@
 "use client";
 
 import React, { useState, useTransition } from "react";
-import { createDriverRecordAction, updateDriverRecordAction } from "@/actions/admin";
+import {
+  createDriverRecordAction,
+  updateDriverRecordAction,
+  linkDriverProfileAction,
+} from "@/actions/admin";
 import { StatusBadge } from "@/components/ui/status-badge";
 
 export interface DriverItem {
@@ -18,6 +22,7 @@ export interface DriverItem {
   assignedVehiclePlate: string | null;
   assignedVehicleName: string | null;
   profileId: string | null;
+  profileName?: string | null;
   profileEmail: string | null;
   createdAt: string;
 }
@@ -28,9 +33,16 @@ export interface AvailableVehicleOption {
   name: string | null;
 }
 
+export interface AvailableDriverProfileOption {
+  id: string;
+  fullName: string;
+  staffId: string | null;
+}
+
 interface DriversManagementProps {
   initialDrivers: DriverItem[];
   availableVehicles: AvailableVehicleOption[];
+  driverProfiles?: AvailableDriverProfileOption[];
 }
 
 const DRIVER_STATUS_CONFIG: Record<string, { label: string; color: string }> = {
@@ -43,6 +55,7 @@ const DRIVER_STATUS_CONFIG: Record<string, { label: string; color: string }> = {
 export function DriversManagement({
   initialDrivers,
   availableVehicles,
+  driverProfiles = [],
 }: DriversManagementProps) {
   const [drivers, setDrivers] = useState<DriverItem[]>(initialDrivers);
   const [search, setSearch] = useState("");
@@ -53,6 +66,8 @@ export function DriversManagement({
   // Modals state
   const [showAddModal, setShowAddModal] = useState(false);
   const [editingDriver, setEditingDriver] = useState<DriverItem | null>(null);
+  const [linkingDriver, setLinkingDriver] = useState<DriverItem | null>(null);
+  const [selectedProfileId, setSelectedProfileId] = useState<string>("");
   const [formError, setFormError] = useState<string | null>(null);
   const [formSuccess, setFormSuccess] = useState<string | null>(null);
 
@@ -119,6 +134,56 @@ export function DriversManagement({
     setEditNotes(d.notes || "");
     setFormError(null);
     setFormSuccess(null);
+  };
+
+  const handleOpenLinkProfile = (d: DriverItem) => {
+    setLinkingDriver(d);
+    setSelectedProfileId(d.profileId || "");
+    setFormError(null);
+    setFormSuccess(null);
+  };
+
+  const handleLinkProfileSubmit = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!linkingDriver) return;
+    setFormError(null);
+    setFormSuccess(null);
+
+    startTransition(async () => {
+      const targetProfileId = selectedProfileId || null;
+      const res = await linkDriverProfileAction({
+        driverId: linkingDriver.id,
+        profileId: targetProfileId,
+      });
+
+      if (!res.success) {
+        setFormError(res.error || "Failed to update Mode A account link.");
+        return;
+      }
+
+      const matchedProfile = targetProfileId
+        ? driverProfiles.find((p) => p.id === targetProfileId)
+        : null;
+
+      setDrivers((prev) =>
+        prev.map((d) =>
+          d.id === linkingDriver.id
+            ? {
+                ...d,
+                profileId: targetProfileId,
+                profileName: matchedProfile?.fullName || null,
+                hasAppAccess: Boolean(targetProfileId),
+              }
+            : d
+        )
+      );
+
+      setFormSuccess(res.message || "Driver Mode A/B link updated.");
+      setTimeout(() => {
+        setLinkingDriver(null);
+        window.location.reload();
+      }, 900);
+    });
   };
 
   const handleCreateDriver = (e: React.FormEvent) => {
@@ -305,14 +370,33 @@ export function DriversManagement({
                       </span>
                     </td>
                     <td className="px-4 py-3 whitespace-nowrap">
-                      {d.hasAppAccess ? (
-                        <span className="inline-flex items-center gap-1.5 rounded-full bg-emerald-100 px-2.5 py-0.5 text-[11px] font-semibold text-emerald-800">
-                          <span>📱</span> Mode A (App Access)
-                        </span>
+                      {d.hasAppAccess && d.profileId ? (
+                        <div>
+                          <span className="inline-flex items-center gap-1.5 rounded-full bg-emerald-100 px-2.5 py-0.5 text-[11px] font-semibold text-emerald-800">
+                            <span>📱</span> Mode A (App Access)
+                          </span>
+                          <span className="mt-0.5 block text-[10px] text-[#526B82]">
+                            Linked: {d.profileName || "Active Driver Account"}
+                          </span>
+                        </div>
+                      ) : d.hasAppAccess ? (
+                        <div>
+                          <span className="inline-flex items-center gap-1.5 rounded-full bg-blue-100 px-2.5 py-0.5 text-[11px] font-semibold text-blue-800">
+                            <span>📱</span> Mode A (Unlinked)
+                          </span>
+                          <span className="mt-0.5 block text-[10px] text-amber-700">
+                            Link user account to enable driver login
+                          </span>
+                        </div>
                       ) : (
-                        <span className="inline-flex items-center gap-1.5 rounded-full bg-amber-100 px-2.5 py-0.5 text-[11px] font-semibold text-amber-800">
-                          <span>🤝</span> Mode B (Assisted Ops)
-                        </span>
+                        <div>
+                          <span className="inline-flex items-center gap-1.5 rounded-full bg-amber-100 px-2.5 py-0.5 text-[11px] font-semibold text-amber-800">
+                            <span>🤝</span> Mode B (Assisted Ops)
+                          </span>
+                          <span className="mt-0.5 block text-[10px] text-[#526B82]">
+                            Non-smartphone / officer-assisted
+                          </span>
+                        </div>
                       )}
                     </td>
                     <td className="px-4 py-3 whitespace-nowrap">
@@ -348,7 +432,13 @@ export function DriversManagement({
                     <td className="px-4 py-3 whitespace-nowrap">
                       <StatusBadge status={d.status} statusConfig={DRIVER_STATUS_CONFIG} />
                     </td>
-                    <td className="px-4 py-3 text-right whitespace-nowrap">
+                    <td className="px-4 py-3 text-right whitespace-nowrap space-x-1">
+                      <button
+                        onClick={() => handleOpenLinkProfile(d)}
+                        className="rounded px-2.5 py-1 text-xs font-semibold text-blue-800 hover:bg-blue-50 transition-colors"
+                      >
+                        {d.profileId ? "Account Link" : "Link Mode A"}
+                      </button>
                       <button
                         onClick={() => handleOpenEdit(d)}
                         className="rounded px-2.5 py-1 text-xs font-semibold text-[#102D4A] hover:bg-slate-100 transition-colors"
@@ -665,6 +755,85 @@ export function DriversManagement({
                   className="rounded-lg bg-[#102D4A] px-4 py-2 font-semibold text-white hover:bg-[#0c233a] disabled:opacity-50"
                 >
                   {isPending ? "Updating..." : "Save Changes"}
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {/* Modal: Link Mode A Smartphone Account / Convert to Mode B */}
+      {linkingDriver && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4">
+          <div className="w-full max-w-md rounded-2xl bg-white p-6 shadow-xl">
+            <h3 className="text-base font-bold text-[#102D4A]">
+              Mode A / B Account Link: {linkingDriver.fullName}
+            </h3>
+            <p className="mt-1 text-xs text-[#526B82]">
+              Link an active user account with role <span className="font-mono font-semibold">driver</span> for Mode A smartphone login, or leave unlinked for Mode B assisted operations.
+            </p>
+
+            {formError && (
+              <div className="mt-3 rounded-lg bg-rose-50 p-3 text-xs text-[#D9534F] border border-rose-200">
+                {formError}
+              </div>
+            )}
+            {formSuccess && (
+              <div className="mt-3 rounded-lg bg-emerald-50 p-3 text-xs text-emerald-800 border border-emerald-200">
+                {formSuccess}
+              </div>
+            )}
+
+            <form onSubmit={handleLinkProfileSubmit} className="mt-4 space-y-4 text-xs">
+              <div>
+                <label className="block font-semibold text-[#102D4A] mb-1">
+                  Linked Driver User Account
+                </label>
+                <select
+                  value={selectedProfileId}
+                  onChange={(e) => setSelectedProfileId(e.target.value)}
+                  className="w-full rounded-lg border border-slate-300 p-2 focus:border-[#102D4A] focus:outline-none"
+                >
+                  <option value="">-- None (Mode B: Assisted / Non-Smartphone Driver) --</option>
+                  {driverProfiles.map((p) => {
+                    const linkedToOther = drivers.find(
+                      (other) => other.profileId === p.id && other.id !== linkingDriver.id
+                    );
+                    return (
+                      <option key={p.id} value={p.id} disabled={Boolean(linkedToOther)}>
+                        {p.fullName}
+                        {p.staffId ? ` (${p.staffId})` : ""}
+                        {linkedToOther ? ` — Linked to ${linkedToOther.driverReference}` : ""}
+                      </option>
+                    );
+                  })}
+                </select>
+                {driverProfiles.length === 0 && (
+                  <p className="mt-1.5 text-[11px] text-amber-700">
+                    No active user accounts currently have role &quot;driver&quot;. Assign role &quot;Driver&quot; to a user in User Permissions first to link Mode A access, or keep unlinked for Mode B.
+                  </p>
+                )}
+              </div>
+
+              <div className="rounded-lg border border-slate-200 bg-slate-50 p-3 text-[11px] text-[#526B82]">
+                Updating this link automatically sets <span className="font-semibold text-[#102D4A]">has_app_access</span> and synchronizes future scheduled journeys assigned to {linkingDriver.driverReference}.
+              </div>
+
+              <div className="flex justify-end gap-2 pt-2 border-t border-slate-200">
+                <button
+                  type="button"
+                  onClick={() => setLinkingDriver(null)}
+                  disabled={isPending}
+                  className="rounded-lg border border-slate-300 px-3.5 py-2 font-medium text-slate-700 hover:bg-slate-50"
+                >
+                  Cancel
+                </button>
+                <button
+                  type="submit"
+                  disabled={isPending}
+                  className="rounded-lg bg-[#102D4A] px-4 py-2 font-semibold text-white hover:bg-[#0c233a] disabled:opacity-50"
+                >
+                  {isPending ? "Saving Link..." : selectedProfileId ? "Save Mode A Link" : "Switch to Mode B"}
                 </button>
               </div>
             </form>

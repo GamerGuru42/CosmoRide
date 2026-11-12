@@ -57,6 +57,22 @@ export default async function LoginPage({ searchParams }: LoginPageProps) {
         </div>
       )}
 
+      {error === "account_inactive" && (
+        <div
+          role="alert"
+          className="rounded-xl border border-rose-200 bg-rose-50 p-4 text-xs text-rose-800 space-y-1"
+        >
+          <div className="flex items-center gap-1.5 font-bold text-rose-900">
+            <span>⛔</span>
+            <span>Account Deactivated</span>
+          </div>
+          <p className="leading-relaxed">
+            Your CosmoRide account has been suspended or deactivated by an administrator.
+            Please contact your university transport administrator for assistance.
+          </p>
+        </div>
+      )}
+
       {error === "auth_callback_failed" && (
         <div
           role="alert"

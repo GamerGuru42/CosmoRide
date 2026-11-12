@@ -42,6 +42,29 @@ export async function completeStudentProfileAction(formData: {
 
     const email = user.email?.toLowerCase() ?? "";
 
+    // Enforce active student account
+    const { data: existingProfile } = await supabase
+      .from("profiles")
+      .select("role, is_active")
+      .eq("id", user.id)
+      .single();
+
+    if (existingProfile && existingProfile.is_active === false) {
+      return {
+        success: false,
+        code: "ACCOUNT_INACTIVE",
+        error: "Your account has been deactivated. Contact a CosmoRide administrator.",
+      };
+    }
+
+    if (existingProfile && existingProfile.role !== "student") {
+      return {
+        success: false,
+        code: "FORBIDDEN",
+        error: "Only student accounts may complete student matriculation registration.",
+      };
+    }
+
     // Domain validation: must be @cosmopolitan.edu.ng
     if (!email.endsWith("@cosmopolitan.edu.ng")) {
       return {
@@ -154,6 +177,28 @@ export async function selectStudentHostelAction(
         success: false,
         code: "UNAUTHORIZED",
         error: "Your session has expired. Please sign in again.",
+      };
+    }
+
+    const { data: studentProfile } = await supabase
+      .from("profiles")
+      .select("role, is_active")
+      .eq("id", user.id)
+      .single();
+
+    if (!studentProfile || studentProfile.is_active === false) {
+      return {
+        success: false,
+        code: "ACCOUNT_INACTIVE",
+        error: "Your account has been deactivated. Contact a CosmoRide administrator.",
+      };
+    }
+
+    if (studentProfile.role !== "student") {
+      return {
+        success: false,
+        code: "FORBIDDEN",
+        error: "Only student accounts can update student hostel assignments.",
       };
     }
 

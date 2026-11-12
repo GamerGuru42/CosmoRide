@@ -25,6 +25,8 @@ export interface JourneyListItem {
     | "cancelled";
   proposedAllocation: number;
   safeCapacity: number;
+  seatedCapacity?: number;
+  standingCapacity?: number;
   routeCode: string;
   routeName: string;
   transportGroupName: string;
@@ -45,6 +47,7 @@ export interface JourneyListItem {
 interface JourneysManagementProps {
   initialDate: string;
   journeys: JourneyListItem[];
+  canCancelJourneys?: boolean;
 }
 
 const JOURNEY_STATUS_CONFIG: Record<string, { label: string; color: string }> = {
@@ -61,6 +64,7 @@ const JOURNEY_STATUS_CONFIG: Record<string, { label: string; color: string }> = 
 export function JourneysManagement({
   initialDate,
   journeys,
+  canCancelJourneys = false,
 }: JourneysManagementProps) {
   const [selectedDate, setSelectedDate] = useState(initialDate);
   const [statusFilter, setStatusFilter] = useState("all");
@@ -269,15 +273,18 @@ export function JourneysManagement({
                     <td className="px-4 py-3 text-center whitespace-nowrap">
                       <div
                         className={`font-semibold text-xs ${
-                          j.bookedCount >= j.safeCapacity
+                          j.safeCapacity <= 0 || j.bookedCount >= j.safeCapacity
                             ? "text-[#D9534F]"
                             : "text-[#102D4A]"
                         }`}
                       >
-                        Total: {j.bookedCount}/{j.safeCapacity || 32}
+                        {j.safeCapacity > 0
+                          ? `Total: ${j.bookedCount}/${j.safeCapacity}`
+                          : `Booked: ${j.bookedCount} (Unverified)`}
                       </div>
                       <div className="text-[10px] text-slate-500 font-mono">
-                        Seated: {j.seatedCount ?? 0}/20 · Standing: {j.standingCount ?? 0}/12
+                        Seated: {j.seatedCount ?? 0}/{j.seatedCapacity ?? 0} · Standing:{" "}
+                        {j.standingCount ?? 0}/{j.standingCapacity ?? 0}
                       </div>
                     </td>
                     <td className="px-4 py-3 text-center whitespace-nowrap font-bold text-emerald-700">
@@ -299,7 +306,8 @@ export function JourneysManagement({
                         >
                           Monitor
                         </Link>
-                        {j.status !== "in_transit" &&
+                        {canCancelJourneys &&
+                          j.status !== "in_transit" &&
                           j.status !== "completed" &&
                           j.status !== "cancelled" && (
                           <button

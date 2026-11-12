@@ -122,6 +122,16 @@ export async function updateJourneyStatus(
       return { success: false, error: "Authentication required." };
     }
 
+    const { data: actorProfile } = await supabase
+      .from("profiles")
+      .select("is_active")
+      .eq("id", user.id)
+      .single();
+
+    if (!actorProfile || actorProfile.is_active === false) {
+      return { success: false, error: "Your account is currently deactivated." };
+    }
+
     if (newStatus === "scheduled") {
       return {
         success: false,
@@ -243,6 +253,16 @@ export async function reportJourneyDelay(
 
     if (!user) {
       return { success: false, error: "Authentication required." };
+    }
+
+    const { data: actorProfile } = await supabase
+      .from("profiles")
+      .select("is_active")
+      .eq("id", user.id)
+      .single();
+
+    if (!actorProfile || actorProfile.is_active === false) {
+      return { success: false, error: "Your account is currently deactivated." };
     }
 
     const { data: rpcResult, error: rpcError } = await supabase.rpc(

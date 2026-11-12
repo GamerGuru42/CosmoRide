@@ -1,7 +1,7 @@
 import type { Metadata } from "next";
 import Link from "next/link";
-import { redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
+import { requireOperationalStaffPageAccess } from "@/lib/admin-auth";
 import { formatTime, formatDate, getTodayDateString } from "@/lib/utils";
 import { BusIcon, CheckCircleIcon, QrCodeIcon, UserIcon } from "@/components/ui/icons";
 
@@ -13,30 +13,18 @@ export const metadata: Metadata = {
 export const dynamic = "force-dynamic";
 
 export default async function BoardingOfficerDashboardPage() {
+  const { profile } = await requireOperationalStaffPageAccess("boarding_officer");
   const supabase = await createClient();
 
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
-
-  if (!user) {
-    redirect("/login");
-  }
-
-  // Fetch officer profile with transport group details
-  const { data: profile } = await supabase
-    .from("profiles")
-    .select("id, full_name, role, assigned_transport_group_id")
-    .eq("id", user.id)
-    .single();
-
-  if (!profile || (profile.role !== "boarding_officer" && profile.role !== "admin")) {
-    redirect("/student");
-  }
+  const isUnassignedBoardingOfficer =
+    profile.role === "boarding_officer" && !profile.assigned_transport_group_id;
 
   // Fetch transport group info if assigned
-  let transportGroupName = "All Transport Operations (Administrator)";
-  let transportGroupCode = "admin";
+  let transportGroupName =
+    profile.role === "admin"
+      ? "All Transport Operations (Supervisory)"
+      : "Unassigned Hostel Operation";
+  let transportGroupCode = profile.role === "admin" ? "SUPERVISORY" : "UNASSIGNED";
 
   if (profile.assigned_transport_group_id) {
     const { data: tg } = await supabase
@@ -55,9 +43,23 @@ export default async function BoardingOfficerDashboardPage() {
   const todayStr = getTodayDateString();
 
   // Query today's journeys with route, vehicle, driver, and bookings
-  let journeysQuery = supabase
-    .from("journeys")
-    .select(`
+  let journeys: Array<{
+    id: string;
+    journey_date: string;
+    scheduled_departure: string;
+    status: string;
+    proposed_allocation: number;
+    routes: unknown;
+    vehicles: unknown;
+    driver_record: unknown;
+    driver: unknown;
+    bookings: Array<{ id: string; status: string }> | null;
+  }> = [];
+
+  if (!isUnassignedBoardingOfficer) {
+    let journeysQuery = supabase
+      .from("journeys")
+      .select(`
       id,
       journey_date,
       scheduled_departure,
@@ -88,16 +90,17 @@ export default async function BoardingOfficerDashboardPage() {
         status
       )
     `)
-    .eq("journey_date", todayStr)
-    .order("scheduled_departure", { ascending: true });
+      .eq("journey_date", todayStr)
+      .order("scheduled_departure", { ascending: true });
 
-  // Enforce transport group isolation: if boarding officer with assigned group, only fetch their assigned operation
-  if (profile.role === "boarding_officer" && profile.assigned_transport_group_id) {
-    journeysQuery = journeysQuery.eq("routes.transport_group_id", profile.assigned_transport_group_id);
+    // Enforce transport group isolation: if boarding officer with assigned group, only fetch their assigned operation
+    if (profile.role === "boarding_officer" && profile.assigned_transport_group_id) {
+      journeysQuery = journeysQuery.eq("routes.transport_group_id", profile.assigned_transport_group_id);
+    }
+
+    const { data: rawJourneys } = await journeysQuery;
+    journeys = rawJourneys || [];
   }
-
-  const { data: rawJourneys, error: journeyError } = await journeysQuery;
-  const journeys = rawJourneys || [];
 
   // Aggregate operational statistics
   let totalConfirmed = 0;
@@ -173,6 +176,23 @@ export default async function BoardingOfficerDashboardPage() {
           </Link>
         </div>
       </div>
+
+      {/* Unassigned Transport Group Blocked Warning */}
+      {isUnassignedBoardingOfficer && (
+        <div
+          role="alert"
+          className="rounded-2xl border border-rose-200 bg-rose-50 p-4 text-xs text-rose-900 space-y-1"
+        >
+          <p className="font-bold text-rose-950">
+            Transport Group Assignment Required — Operations Blocked
+          </p>
+          <p className="leading-relaxed">
+            Your boarding officer account has no assigned hostel transport group. Journey manifests,
+            QR pass validation, and dispatch actions are restricted until a Super Administrator assigns
+            your transport group.
+          </p>
+        </div>
+      )}
 
       {/* Operational Metrics Grid */}
       <div className="grid grid-cols-2 md:grid-cols-4 gap-3">

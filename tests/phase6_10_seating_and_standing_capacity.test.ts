@@ -512,10 +512,11 @@ describe("Phase 6.10: Electric Bus Seating & Standing Capacity Verification", ()
       );
     });
 
-    it("departure board shows total 32 max, 20 seated, 12 standing, and remaining capacity", () => {
+    it("departure board shows bounded vehicle capacity, seated/standing breakdown, and remaining availability", () => {
       assert.ok(
-        departureBoardContent.includes("32 total") || departureBoardContent.includes("32 max"),
-        "Departure board must specify total capacity"
+        departureBoardContent.includes("{totalLimit} total") ||
+          departureBoardContent.includes("{totalLimit} max"),
+        "Departure board must specify bounded total capacity"
       );
       assert.ok(
         departureBoardContent.includes("seated") && departureBoardContent.includes("standing"),
@@ -532,9 +533,11 @@ describe("Phase 6.10: Electric Bus Seating & Standing Capacity Verification", ()
 
     it("boarding officer scan result modal displays Seated Place vs Standing Place badges", () => {
       assert.ok(
-        scanResultModalContent.includes("Seated Place (20 max)") &&
-          scanResultModalContent.includes("Standing Place (12 max)"),
-        "Scan result modal must identify passenger category"
+        scanResultModalContent.includes("Seated Place") &&
+          scanResultModalContent.includes("Standing Place") &&
+          !scanResultModalContent.includes("Seated Place (20 max)") &&
+          !scanResultModalContent.includes("Standing Place (12 max)"),
+        "Scan result modal must identify passenger category without hardcoded 20/12 ceiling overrides"
       );
     });
 
@@ -551,13 +554,14 @@ describe("Phase 6.10: Electric Bus Seating & Standing Capacity Verification", ()
       );
     });
 
-    it("admin journey views display Seated: X/20, Standing: X/12, Total: X/32", () => {
+    it("admin journey views display bounded seated, standing, and total capacities", () => {
       assert.ok(
         journeysMgmtContent.includes("Seated:") &&
-          journeysMgmtContent.includes("/20") &&
+          journeysMgmtContent.includes("{j.seatedCapacity ?? 0}") &&
           journeysMgmtContent.includes("Standing:") &&
-          journeysMgmtContent.includes("/12"),
-        "Admin journeys table must display seated and standing breakdown"
+          journeysMgmtContent.includes("{j.standingCapacity ?? 0}") &&
+          journeysMgmtContent.includes("{j.safeCapacity}"),
+        "Admin journeys table must display dynamic seated and standing breakdown"
       );
     });
   });

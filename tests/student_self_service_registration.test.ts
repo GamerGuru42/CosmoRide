@@ -2,6 +2,7 @@ import { describe, it } from "node:test";
 import assert from "node:assert/strict";
 import fs from "node:fs";
 import path from "node:path";
+import { getRoleHome } from "../src/lib/role-routing";
 
 /**
  * CosmoRide — Self-Service Student Registration with Google OAuth
@@ -344,7 +345,7 @@ describe("COSMORIDE — Self-Service Student Registration Verification Suite", (
 
     it("server action bookSeat validates profile completeness before executing reservation", () => {
       assert.ok(
-        bookingsActionContent.includes("profile?.student_id"),
+        bookingsActionContent.includes("profile.student_id"),
         "bookSeat server action must verify student_id"
       );
       assert.ok(
@@ -431,7 +432,10 @@ describe("COSMORIDE — Self-Service Student Registration Verification Suite", (
 
     it("redirects authenticated student with complete profile from /register or /login to /student", () => {
       assert.ok(
-        middlewareContent.includes('new URL(hasCompleteProfile ? "/student" : "/register", request.url)'),
+        middlewareContent.includes('hasCompleteProfile') &&
+          middlewareContent.includes('? "/student"') &&
+          middlewareContent.includes(': "/register"') &&
+          middlewareContent.includes("new URL(roleHome, request.url)"),
         "Middleware must route complete profile to /student on /login access"
       );
     });
@@ -445,25 +449,14 @@ describe("COSMORIDE — Self-Service Student Registration Verification Suite", (
 
     it("preserves staff direct routing to /admin, /boarding, and /driver", () => {
       assert.ok(
-        middlewareContent.includes('profile.role === "admin"'),
-        "Middleware must check profile.role === 'admin'"
+        middlewareContent.includes('getRoleHome(profile.role, profile.admin_role)'),
+        "Middleware must route authenticated staff via shared getRoleHome helper"
       );
-      assert.ok(
-        middlewareContent.includes('"/admin"'),
-        "Middleware must route admin to /admin"
-      );
-      assert.ok(
-        middlewareContent.includes('profile.role === "boarding_officer"'),
-        "Middleware must check profile.role === 'boarding_officer'"
-      );
-      assert.ok(
-        middlewareContent.includes('"/boarding"'),
-        "Middleware must route boarding officer to /boarding"
-      );
-      assert.ok(
-        middlewareContent.includes('"/driver"'),
-        "Middleware must route driver to /driver"
-      );
+      assert.strictEqual(getRoleHome("admin", "super_admin"), "/admin");
+      assert.strictEqual(getRoleHome("admin", "hostel_manager"), "/admin");
+      assert.strictEqual(getRoleHome("admin", "bus_manager"), "/admin/dispatch");
+      assert.strictEqual(getRoleHome("boarding_officer"), "/boarding");
+      assert.strictEqual(getRoleHome("driver"), "/driver");
     });
   });
 

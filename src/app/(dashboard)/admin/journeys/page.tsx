@@ -1,7 +1,7 @@
 import type { Metadata } from "next";
 import { createClient } from "@/lib/supabase/server";
 import { requireAdminPageAccess } from "@/lib/admin-auth";
-import { getTodayDateString } from "@/lib/utils";
+import { calculateCapacityBreakdown, getTodayDateString } from "@/lib/utils";
 import { PageHeader } from "@/components/ui/page-header";
 import {
   JourneysManagement,
@@ -22,7 +22,9 @@ interface AdminJourneysPageProps {
 export default async function AdminJourneysPage({
   searchParams,
 }: AdminJourneysPageProps) {
-  await requireAdminPageAccess("journeys");
+  const { adminRole } = await requireAdminPageAccess("journeys");
+  const canCancelJourneys =
+    adminRole === "super_admin" || adminRole === "bus_manager";
   const resolvedParams = await searchParams;
   const todayStr = getTodayDateString();
   const targetDate = resolvedParams.date || todayStr;
@@ -51,7 +53,9 @@ export default async function AdminJourneysPage({
       vehicle:vehicles(
         registration_number,
         name,
-        safe_capacity
+        safe_capacity,
+        seated_capacity,
+        standing_capacity
       ),
       driver_record:drivers(
         full_name,
@@ -100,6 +104,13 @@ export default async function AdminJourneysPage({
       driverMode = "app";
     }
 
+    const capacityBreakdown = calculateCapacityBreakdown({
+      proposedAllocation: j.proposed_allocation,
+      safeCapacity: vehicle?.safe_capacity ?? null,
+      seatedLimit: vehicle?.seated_capacity ?? null,
+      standingLimit: vehicle?.standing_capacity ?? null,
+    });
+
     return {
       id: j.id,
       journeyDate: j.journey_date,
@@ -109,7 +120,9 @@ export default async function AdminJourneysPage({
       actualArrival: j.actual_arrival,
       status: j.status as JourneyListItem["status"],
       proposedAllocation: j.proposed_allocation,
-      safeCapacity: vehicle?.safe_capacity ?? j.proposed_allocation ?? 0,
+      safeCapacity: capacityBreakdown.effectiveCapacity,
+      seatedCapacity: capacityBreakdown.seatedLimit,
+      standingCapacity: capacityBreakdown.standingLimit,
       routeCode: route?.code || "RT",
       routeName: route?.name || "Route",
       transportGroupName: tgName || "General Fleet",
@@ -138,6 +151,7 @@ export default async function AdminJourneysPage({
       <JourneysManagement
         initialDate={targetDate}
         journeys={journeys}
+        canCancelJourneys={canCancelJourneys}
       />
     </div>
   );

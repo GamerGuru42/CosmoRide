@@ -17,7 +17,7 @@ export const metadata: Metadata = {
 export const dynamic = "force-dynamic";
 
 export default async function AdminUsersPage() {
-  await requireAdminPageAccess("users");
+  const { userId: currentAdminId } = await requireAdminPageAccess("users");
   const supabase = await createClient();
 
   // Fetch profiles with transport group and hostel
@@ -30,6 +30,7 @@ export default async function AdminUsersPage() {
       phone,
       role,
       admin_role,
+      is_active,
       assigned_transport_group_id,
       hostel_id,
       created_at,
@@ -49,6 +50,7 @@ export default async function AdminUsersPage() {
       phone: p.phone,
       role: (p.role || "student") as UserProfileItem["role"],
       adminRole: (p.admin_role as UserProfileItem["adminRole"]) || null,
+      isActive: p.is_active !== false,
       assignedTransportGroupId: p.assigned_transport_group_id,
       transportGroupName: tg?.name || null,
       hostelName: h?.name || null,
@@ -89,6 +91,7 @@ export default async function AdminUsersPage() {
         initialUsers={users}
         transportGroups={transportGroups}
         hostels={hostels}
+        currentUserId={currentAdminId}
       />
     </div>
   );

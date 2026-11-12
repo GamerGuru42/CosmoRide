@@ -1544,6 +1544,63 @@ export type Database = {
         };
         Returns: Json;
       };
+      get_student_departure_occupancy: {
+        Args: {
+          p_journey_ids: string[];
+        };
+        Returns: Json;
+      };
+      report_operational_incident: {
+        Args: {
+          p_journey_id: string | null;
+          p_actor_id: string;
+          p_category: string;
+          p_severity?: IncidentSeverity;
+          p_description?: string;
+          p_is_assisted?: boolean;
+        };
+        Returns: Json;
+      };
+      admin_set_user_active_status: {
+        Args: {
+          p_admin_id: string;
+          p_target_user_id: string;
+          p_is_active: boolean;
+          p_reason?: string | null;
+        };
+        Returns: Json;
+      };
+      admin_update_schedule_template: {
+        Args: {
+          p_admin_id: string;
+          p_schedule_id: string;
+          p_route_id: string;
+          p_day_of_week: number;
+          p_departure_time: string;
+          p_latest_departure_time?: string | null;
+          p_direction?: RouteDirection;
+          p_proposed_allocation?: number;
+          p_notes?: string | null;
+          p_is_active?: boolean;
+        };
+        Returns: Json;
+      };
+      admin_toggle_schedule_status: {
+        Args: {
+          p_admin_id: string;
+          p_schedule_id: string;
+          p_is_active: boolean;
+        };
+        Returns: Json;
+      };
+      admin_link_driver_profile: {
+        Args: {
+          p_admin_id: string;
+          p_driver_id: string;
+          p_profile_id?: string | null;
+        };
+        Returns: Json;
+      };
     };
     Enums: {
       user_role: UserRole;

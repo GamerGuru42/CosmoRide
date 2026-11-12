@@ -1,6 +1,6 @@
 import type { Metadata } from "next";
-import { redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
+import { requireOperationalStaffPageAccess } from "@/lib/admin-auth";
 import { ROLE_LABELS, DEVELOPER_ATTRIBUTION } from "@/lib/constants";
 
 export const metadata: Metadata = {
@@ -11,35 +11,8 @@ export const metadata: Metadata = {
 export const dynamic = "force-dynamic";
 
 export default async function BoardingOfficerProfilePage() {
+  const { email, profile } = await requireOperationalStaffPageAccess("boarding_officer");
   const supabase = await createClient();
-
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
-
-  if (!user) {
-    redirect("/login");
-  }
-
-  // Fetch full officer profile
-  const { data: profile } = await supabase
-    .from("profiles")
-    .select(`
-      id,
-      full_name,
-      phone,
-      role,
-      avatar_url,
-      assigned_transport_group_id,
-      hostel_id,
-      created_at
-    `)
-    .eq("id", user.id)
-    .single();
-
-  if (!profile || (profile.role !== "boarding_officer" && profile.role !== "admin")) {
-    redirect("/student");
-  }
 
   // Fetch transport group info
   let transportGroup = null;
@@ -90,7 +63,7 @@ export default async function BoardingOfficerProfilePage() {
             <h2 className="text-lg font-bold text-[#102D4A]">
               {profile.full_name}
             </h2>
-            <p className="text-xs text-[#526B82]">{user.email}</p>
+            <p className="text-xs text-[#526B82]">{email}</p>
             <div className="mt-1 flex items-center gap-2">
               <span className="inline-flex items-center rounded-full bg-slate-100 px-2.5 py-0.5 text-[10px] font-bold uppercase text-[#102D4A]">
                 {ROLE_LABELS[profile.role as keyof typeof ROLE_LABELS] || profile.role}
@@ -110,10 +83,16 @@ export default async function BoardingOfficerProfilePage() {
               Assigned Hostel Operation / Fleet
             </span>
             <span className="text-sm font-bold text-[#102D4A] block">
-              {transportGroup?.name || "All Operations (Supervisory)"}
+              {transportGroup?.name ||
+                (profile.role === "admin"
+                  ? "All Operations (Supervisory)"
+                  : "Unassigned Hostel Operation")}
             </span>
             <span className="text-[11px] text-[#526B82] block">
-              {transportGroup?.description || "University-wide transport oversight"}
+              {transportGroup?.description ||
+                (profile.role === "admin"
+                  ? "University-wide transport oversight"
+                  : "Awaiting transport group assignment from Super Administrator")}
             </span>
           </div>
 
@@ -122,7 +101,7 @@ export default async function BoardingOfficerProfilePage() {
               Assigned Hostel / Base
             </span>
             <span className="text-sm font-bold text-[#102D4A] block">
-              {hostel?.name || "Main Campus Terminal"}
+              {hostel?.name || "Not assigned"}
             </span>
             <span className="text-[11px] text-[#526B82] block">
               Primary passenger verification post

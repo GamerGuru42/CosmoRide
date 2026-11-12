@@ -1,7 +1,10 @@
 "use client";
 
 import React, { useState, useTransition } from "react";
-import { updateUserRoleAndOperationAction } from "@/actions/admin";
+import {
+  updateUserRoleAndOperationAction,
+  setUserActiveStatusAction,
+} from "@/actions/admin";
 import { StatusBadge } from "@/components/ui/status-badge";
 
 export interface UserProfileItem {
@@ -11,6 +14,7 @@ export interface UserProfileItem {
   phone: string | null;
   role: "student" | "boarding_officer" | "driver" | "admin";
   adminRole?: "hostel_manager" | "bus_manager" | "super_admin" | null;
+  isActive: boolean;
   assignedTransportGroupId: string | null;
   transportGroupName: string | null;
   hostelName: string | null;
@@ -32,6 +36,7 @@ interface UsersManagementProps {
   initialUsers: UserProfileItem[];
   transportGroups: TransportGroupOption[];
   hostels: HostelOption[];
+  currentUserId?: string;
 }
 
 const ROLE_CONFIG: Record<string, { label: string; color: string }> = {
@@ -45,14 +50,18 @@ export function UsersManagement({
   initialUsers,
   transportGroups,
   hostels,
+  currentUserId,
 }: UsersManagementProps) {
   const [users, setUsers] = useState<UserProfileItem[]>(initialUsers);
   const [search, setSearch] = useState("");
   const [roleFilter, setRoleFilter] = useState("all");
+  const [statusFilter, setStatusFilter] = useState("all");
   const [isPending, startTransition] = useTransition();
 
   // Modal state
   const [editingUser, setEditingUser] = useState<UserProfileItem | null>(null);
+  const [statusTarget, setStatusTarget] = useState<UserProfileItem | null>(null);
+  const [statusReason, setStatusReason] = useState("");
   const [newRole, setNewRole] = useState<UserProfileItem["role"]>("student");
   const [newAdminRole, setNewAdminRole] = useState<"hostel_manager" | "bus_manager" | "super_admin" | "">("");
   const [newTgId, setNewTgId] = useState<string>("");
@@ -67,7 +76,11 @@ export function UsersManagement({
       (u.phone && u.phone.includes(search));
 
     const matchesRole = roleFilter === "all" || u.role === roleFilter;
-    return matchesSearch && matchesRole;
+    const matchesStatus =
+      statusFilter === "all" ||
+      (statusFilter === "active" && u.isActive) ||
+      (statusFilter === "inactive" && !u.isActive);
+    return matchesSearch && matchesRole && matchesStatus;
   });
 
   const handleOpenEdit = (u: UserProfileItem) => {
@@ -108,6 +121,45 @@ export function UsersManagement({
     });
   };
 
+  const handleOpenStatusModal = (u: UserProfileItem) => {
+    setStatusTarget(u);
+    setStatusReason("");
+    setActionError(null);
+    setActionSuccess(null);
+  };
+
+  const handleConfirmStatusToggle = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!statusTarget) return;
+    setActionError(null);
+    setActionSuccess(null);
+
+    const nextActive = !statusTarget.isActive;
+    startTransition(async () => {
+      const res = await setUserActiveStatusAction({
+        userId: statusTarget.id,
+        isActive: nextActive,
+        reason: statusReason || undefined,
+      });
+
+      if (!res.success) {
+        setActionError(res.error || "Failed to update account status.");
+        return;
+      }
+
+      setUsers((prev) =>
+        prev.map((u) => (u.id === statusTarget.id ? { ...u, isActive: nextActive } : u))
+      );
+      setActionSuccess(
+        res.message || (nextActive ? "Account reactivated." : "Account suspended.")
+      );
+      setTimeout(() => {
+        setStatusTarget(null);
+        window.location.reload();
+      }, 900);
+    });
+  };
+
   return (
     <div className="space-y-6">
       {/* Top Filter Bar */}
@@ -133,6 +185,16 @@ export function UsersManagement({
             <option value="boarding_officer">Hostel Rep / Boarding Officer</option>
             <option value="driver">Driver</option>
             <option value="admin">Administrator</option>
+          </select>
+
+          <select
+            value={statusFilter}
+            onChange={(e) => setStatusFilter(e.target.value)}
+            className="rounded-lg border border-slate-300 bg-white px-3 py-2 text-xs text-slate-700 focus:border-[#102D4A] focus:outline-none"
+          >
+            <option value="all">All Statuses</option>
+            <option value="active">Active Accounts</option>
+            <option value="inactive">Suspended Accounts</option>
           </select>
         </div>
 
@@ -166,6 +228,7 @@ export function UsersManagement({
                   <th className="px-4 py-3 font-semibold">Role</th>
                   <th className="px-4 py-3 font-semibold">Assigned Fleet / Operation</th>
                   <th className="px-4 py-3 font-semibold">Hostel</th>
+                  <th className="px-4 py-3 font-semibold">Account Status</th>
                   <th className="px-4 py-3 font-semibold text-right">Actions</th>
                 </tr>
               </thead>
@@ -205,12 +268,40 @@ export function UsersManagement({
                     <td className="px-4 py-3 whitespace-nowrap">
                       {u.hostelName || <span className="text-slate-400 italic">None</span>}
                     </td>
-                    <td className="px-4 py-3 text-right whitespace-nowrap">
+                    <td className="px-4 py-3 whitespace-nowrap">
+                      {u.isActive ? (
+                        <span className="inline-flex items-center rounded-full bg-emerald-100 px-2.5 py-0.5 text-[11px] font-semibold text-emerald-800">
+                          Active
+                        </span>
+                      ) : (
+                        <span className="inline-flex items-center rounded-full bg-rose-100 px-2.5 py-0.5 text-[11px] font-semibold text-rose-800">
+                          Suspended
+                        </span>
+                      )}
+                    </td>
+                    <td className="px-4 py-3 text-right whitespace-nowrap space-x-1">
                       <button
                         onClick={() => handleOpenEdit(u)}
                         className="rounded px-2.5 py-1 text-xs font-semibold text-[#102D4A] hover:bg-slate-100 transition-colors"
                       >
                         Edit Role / Permissions
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => handleOpenStatusModal(u)}
+                        disabled={Boolean(currentUserId && u.id === currentUserId && u.isActive)}
+                        title={
+                          currentUserId && u.id === currentUserId && u.isActive
+                            ? "You cannot suspend your own active session"
+                            : undefined
+                        }
+                        className={`rounded px-2.5 py-1 text-xs font-semibold transition-colors disabled:opacity-40 disabled:cursor-not-allowed ${
+                          u.isActive
+                            ? "text-[#D9534F] hover:bg-rose-50"
+                            : "text-emerald-800 hover:bg-emerald-50"
+                        }`}
+                      >
+                        {u.isActive ? "Suspend" : "Reactivate"}
                       </button>
                     </td>
                   </tr>
@@ -335,6 +426,79 @@ export function UsersManagement({
                   className="rounded-lg bg-[#102D4A] px-4 py-2 font-semibold text-white hover:bg-[#0c233a] disabled:opacity-50"
                 >
                   {isPending ? "Updating..." : "Save Role Assignment"}
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {/* Modal: Suspend / Reactivate Account */}
+      {statusTarget && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4">
+          <div className="w-full max-w-md rounded-2xl bg-white p-6 shadow-xl">
+            <h3 className="text-base font-bold text-[#102D4A]">
+              {statusTarget.isActive ? "Suspend User Account" : "Reactivate User Account"}:{" "}
+              {statusTarget.fullName}
+            </h3>
+            <p className="mt-1 text-xs text-[#526B82]">
+              {statusTarget.isActive
+                ? "Suspending immediately blocks login, active middleware access, bookings, boarding scans, and RPC actions for this user."
+                : "Reactivating restores access under this user's assigned role and permissions."}
+            </p>
+
+            {actionError && (
+              <div className="mt-3 rounded-lg bg-rose-50 p-3 text-xs text-[#D9534F] border border-rose-200">
+                {actionError}
+              </div>
+            )}
+            {actionSuccess && (
+              <div className="mt-3 rounded-lg bg-emerald-50 p-3 text-xs text-emerald-800 border border-emerald-200">
+                {actionSuccess}
+              </div>
+            )}
+
+            <form onSubmit={handleConfirmStatusToggle} className="mt-4 space-y-3.5 text-xs">
+              <div>
+                <label className="block font-semibold text-[#102D4A] mb-1">
+                  Audit Reason (Optional)
+                </label>
+                <textarea
+                  rows={2}
+                  value={statusReason}
+                  onChange={(e) => setStatusReason(e.target.value)}
+                  placeholder={
+                    statusTarget.isActive
+                      ? "e.g. Graduated student, reassigned staff, or policy review..."
+                      : "e.g. Cleared for renewed semester duties..."
+                  }
+                  className="w-full rounded-lg border border-slate-300 p-2 focus:border-[#102D4A] focus:outline-none"
+                />
+              </div>
+
+              <div className="flex justify-end gap-2 pt-2 border-t border-slate-200">
+                <button
+                  type="button"
+                  onClick={() => setStatusTarget(null)}
+                  disabled={isPending}
+                  className="rounded-lg border border-slate-300 px-3.5 py-2 font-medium text-slate-700 hover:bg-slate-50"
+                >
+                  Cancel
+                </button>
+                <button
+                  type="submit"
+                  disabled={isPending}
+                  className={`rounded-lg px-4 py-2 font-semibold text-white disabled:opacity-50 ${
+                    statusTarget.isActive
+                      ? "bg-[#D9534F] hover:bg-rose-700"
+                      : "bg-emerald-700 hover:bg-emerald-800"
+                  }`}
+                >
+                  {isPending
+                    ? "Applying..."
+                    : statusTarget.isActive
+                    ? "Confirm Suspension"
+                    : "Confirm Reactivation"}
                 </button>
               </div>
             </form>

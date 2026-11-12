@@ -30,8 +30,11 @@ export function ScanResultModal({
 }: ScanResultModalProps) {
   const [secondsRemaining, setSecondsRemaining] = useState<number>(3);
 
+  const isSuccessCode =
+    result?.code === "VALID" || result?.code === "BOARDING_APPROVED";
+
   useEffect(() => {
-    if (!result || result.code !== "VALID" || !autoAdvance) {
+    if (!result || !isSuccessCode || !autoAdvance) {
       return;
     }
 
@@ -121,7 +124,7 @@ export function ScanResultModal({
                       : "bg-emerald-100 text-emerald-900 border border-emerald-300"
                       }`}
                   >
-                    {result.passengerCategory === "standing" ? "Standing Place (12 max)" : "Seated Place (20 max)"}
+                    {result.passengerCategory === "standing" ? "Standing Place" : "Seated Place"}
                   </span>
                 </div>
               )}
@@ -168,7 +171,7 @@ export function ScanResultModal({
               autoFocus
               className={`w-full py-3.5 px-4 rounded-xl text-sm font-bold text-white shadow-md transition-all active:scale-[0.98] ${config.buttonBg} hover:opacity-95 focus:outline-none focus:ring-4 focus:ring-offset-2 ${config.ringColor}`}
             >
-              {result.code === "VALID" && autoAdvance ? (
+              {isSuccessCode && autoAdvance ? (
                 <span>
                   Scan Next Passenger (auto in {secondsRemaining}s)
                 </span>
@@ -186,6 +189,7 @@ export function ScanResultModal({
 function getStatusConfig(code: BoardingStatusCode | "INVALID") {
   switch (code) {
     case "VALID":
+    case "BOARDING_APPROVED":
       return {
         badge: "AUTHORISED BOARDING",
         headline: "VERIFIED & BOARDED",
@@ -198,6 +202,8 @@ function getStatusConfig(code: BoardingStatusCode | "INVALID") {
       };
 
     case "ALREADY_BOARDED":
+    case "ALREADY_CHECKED_IN":
+    case "TICKET_ALREADY_BOARDED":
       return {
         badge: "DUPLICATE SCAN PREVENTED",
         headline: "ALREADY BOARDED",
@@ -222,6 +228,8 @@ function getStatusConfig(code: BoardingStatusCode | "INVALID") {
       };
 
     case "CANCELLED":
+    case "CANCELLED_TICKET":
+    case "TICKET_CANCELLED":
       return {
         badge: "RESERVATION VOID",
         headline: "BOOKING CANCELLED",
@@ -246,6 +254,7 @@ function getStatusConfig(code: BoardingStatusCode | "INVALID") {
       };
 
     case "CAPACITY_EXCEEDED":
+    case "BUS_FULL":
       return {
         badge: "SAFETY LIMIT",
         headline: "BUS CAPACITY REACHED",
@@ -255,6 +264,44 @@ function getStatusConfig(code: BoardingStatusCode | "INVALID") {
         messageBoxStyle: "bg-rose-50 text-rose-900 border border-rose-200",
         buttonBg: "bg-[#102D4A]",
         ringColor: "focus:ring-slate-300",
+      };
+
+    case "UNVERIFIED_VEHICLE_CAPACITY":
+      return {
+        badge: "SAFETY GATE HALT",
+        headline: "UNVERIFIED VEHICLE CAPACITY",
+        icon: "🛑",
+        bannerBg: "bg-[#D9534F]",
+        borderColor: "border-[#D9534F]",
+        messageBoxStyle: "bg-rose-50 text-rose-900 border border-rose-200",
+        buttonBg: "bg-[#102D4A]",
+        ringColor: "focus:ring-slate-300",
+      };
+
+    case "JOURNEY_NOT_BOARDING":
+    case "BOARDING_CLOSED":
+    case "JOURNEY_CLOSED":
+      return {
+        badge: "BOARDING GATE CLOSED",
+        headline: "BOARDING NOT OPEN",
+        icon: "🔒",
+        bannerBg: "bg-[#D9534F]",
+        borderColor: "border-[#D9534F]",
+        messageBoxStyle: "bg-rose-50 text-rose-900 border border-rose-200",
+        buttonBg: "bg-[#102D4A]",
+        ringColor: "focus:ring-slate-300",
+      };
+
+    case "EXCEPTION_REASON_REQUIRED":
+      return {
+        badge: "AUDIT REQUIREMENT",
+        headline: "EXCEPTION REASON REQUIRED",
+        icon: "⚠️",
+        bannerBg: "bg-[#E5A13B]",
+        borderColor: "border-[#E5A13B]",
+        messageBoxStyle: "bg-amber-50 text-amber-900 border border-amber-200",
+        buttonBg: "bg-[#E5A13B]",
+        ringColor: "focus:ring-amber-300",
       };
 
     case "INVALID_TICKET":
@@ -270,7 +317,7 @@ function getStatusConfig(code: BoardingStatusCode | "INVALID") {
         ringColor: "focus:ring-slate-300",
       };
 
-    case "JOURNEY_CLOSED":
+    case "FORBIDDEN":
     case "UNAUTHORIZED":
     case "SERVER_ERROR":
     default:

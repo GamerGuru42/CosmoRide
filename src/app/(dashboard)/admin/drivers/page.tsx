@@ -6,6 +6,7 @@ import {
   DriversManagement,
   type DriverItem,
   type AvailableVehicleOption,
+  type AvailableDriverProfileOption,
 } from "@/components/admin/drivers-management";
 
 export const metadata: Metadata = {
@@ -47,6 +48,7 @@ export default async function AdminDriversPage() {
 
   const drivers: DriverItem[] = (driversData ?? []).map((d) => {
     const vehicle = Array.isArray(d.vehicle) ? d.vehicle[0] : d.vehicle;
+    const profile = Array.isArray(d.profile) ? d.profile[0] : d.profile;
     return {
       id: d.id,
       driverReference: d.driver_reference,
@@ -61,10 +63,25 @@ export default async function AdminDriversPage() {
       assignedVehiclePlate: vehicle?.registration_number || null,
       assignedVehicleName: vehicle?.name || null,
       profileId: d.profile_id,
+      profileName: profile?.full_name || null,
       profileEmail: null,
       createdAt: d.created_at,
     };
   });
+
+  // Fetch active driver-role profiles eligible for Mode A account linking
+  const { data: driverProfilesData } = await supabase
+    .from("profiles")
+    .select("id, full_name, student_id")
+    .eq("role", "driver")
+    .eq("is_active", true)
+    .order("full_name", { ascending: true });
+
+  const driverProfiles: AvailableDriverProfileOption[] = (driverProfilesData ?? []).map((p) => ({
+    id: p.id,
+    fullName: p.full_name,
+    staffId: p.student_id,
+  }));
 
   // Fetch available vehicles for default vehicle dropdown
   const { data: vehiclesData } = await supabase
@@ -89,6 +106,7 @@ export default async function AdminDriversPage() {
       <DriversManagement
         initialDrivers={drivers}
         availableVehicles={availableVehicles}
+        driverProfiles={driverProfiles}
       />
     </div>
   );

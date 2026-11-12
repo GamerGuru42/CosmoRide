@@ -3,6 +3,7 @@ import Link from "next/link";
 import { redirect } from "next/navigation";
 import { APP_NAME, UNIVERSITY_NAME, UNIVERSITY_EMAIL_DOMAIN } from "@/lib/constants";
 import { createClient } from "@/lib/supabase/server";
+import { getRoleHome } from "@/lib/role-routing";
 import { GoogleSignInButton } from "@/components/auth/google-sign-in-button";
 import { RegisterForm } from "./register-form";
 
@@ -140,20 +141,22 @@ export default async function RegisterPage({ searchParams }: RegisterPageProps) 
   // Query student profile
   const { data: profile } = await supabase
     .from("profiles")
-    .select("id, full_name, student_id, role")
+    .select("id, full_name, student_id, role, admin_role, is_active")
     .eq("id", user.id)
     .single();
 
+  if (profile && profile.is_active === false) {
+    redirect("/login?error=account_inactive");
+  }
+
   // State 3: Already registered with complete profile
-  if (profile?.student_id && profile.student_id.trim() !== "") {
+  if (profile?.role === "student" && profile?.student_id && profile.student_id.trim() !== "") {
     redirect("/student");
   }
 
   // If user is staff (admin, boarding_officer, driver), redirect to their respective dashboard
   if (profile && profile.role !== "student") {
-    if (profile.role === "admin") redirect("/admin");
-    if (profile.role === "boarding_officer") redirect("/boarding");
-    if (profile.role === "driver") redirect("/driver");
+    redirect(getRoleHome(profile.role, profile.admin_role));
   }
 
   // State 4: Authenticated student with incomplete profile -> Show completion form

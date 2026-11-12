@@ -8,7 +8,6 @@ import {
   openBoardingSessionAction,
   closeBoardingSessionAction,
   authoriseDepartureAction,
-  confirmDispatchAction,
   markPassengerNoShowAction,
   type BoardingStatusCode,
 } from "@/actions/boarding";
@@ -57,6 +56,7 @@ export interface ActiveBoardingJourney {
   | "in_transit"
   | "completed"
   | "cancelled";
+  readinessStatus?: "pending" | "passed" | "failed_unsafe";
   routeCode: string;
   routeName: string;
   vehicleRegistration: string;
@@ -71,9 +71,13 @@ export interface ActiveBoardingJourney {
 
 interface BoardingScannerViewProps {
   journeys: ActiveBoardingJourney[];
+  unassignedTransportGroup?: boolean;
 }
 
-export function BoardingScannerView({ journeys }: BoardingScannerViewProps) {
+export function BoardingScannerView({
+  journeys,
+  unassignedTransportGroup = false,
+}: BoardingScannerViewProps) {
   const [selectedJourneyId, setSelectedJourneyId] = useState<string>(
     journeys[0]?.id || ""
   );
@@ -142,9 +146,20 @@ export function BoardingScannerView({ journeys }: BoardingScannerViewProps) {
     (p) => p.status === "checked_in" && p.passengerCategory === "standing"
   ).length;
 
-  const seatedLimit = currentJourney?.seatedCapacity ?? 20;
-  const standingLimit = currentJourney?.standingCapacity ?? 12;
-  const totalSafeCapacity = Math.min(32, currentJourney?.safeCapacity || 32);
+  const totalSafeCapacity =
+    currentJourney && currentJourney.safeCapacity > 0
+      ? Math.min(32, currentJourney.safeCapacity)
+      : 0;
+  const hasVerifiedCapacity = totalSafeCapacity > 0;
+  const seatedLimit = hasVerifiedCapacity
+    ? Math.min(20, currentJourney?.seatedCapacity ?? totalSafeCapacity)
+    : 0;
+  const standingLimit = hasVerifiedCapacity
+    ? Math.min(
+        12,
+        currentJourney?.standingCapacity ?? Math.max(0, totalSafeCapacity - seatedLimit)
+      )
+    : 0;
 
   // Handler for QR scan
   function handleScan(token: string) {
@@ -166,7 +181,7 @@ export function BoardingScannerView({ journeys }: BoardingScannerViewProps) {
         studentId: res.studentId,
         passengerCategory: res.passengerCategory,
         boardedCount: res.boardedCount,
-        capacity: res.capacity,
+        capacity: res.totalCapacity ?? res.capacity,
         busRegistration: res.busRegistration || currentJourney.vehicleRegistration,
         routeCode: currentJourney.routeCode,
       });
@@ -211,8 +226,9 @@ export function BoardingScannerView({ journeys }: BoardingScannerViewProps) {
     if (!currentJourney) return;
     setFeedbackMessage(null);
     startTransition(async () => {
-      const res = await closeBoardingSessionAction(currentJourney.id, closureNotes || undefined);
+      const res = await closeBoardingSessionAction(currentJourney.id, closureNotes.trim() || undefined);
       if (res.success) {
+        setClosureNotes("");
         setFeedbackMessage({ type: "success", text: res.message || "Boarding closed. Manifest ready for review." });
       } else {
         setFeedbackMessage({ type: "error", text: res.error || "Failed to close boarding." });
@@ -225,28 +241,15 @@ export function BoardingScannerView({ journeys }: BoardingScannerViewProps) {
     if (!currentJourney) return;
     setFeedbackMessage(null);
     startTransition(async () => {
-      const res = await authoriseDepartureAction(currentJourney.id, closureNotes || undefined);
+      const res = await authoriseDepartureAction(currentJourney.id, closureNotes.trim() || undefined);
       if (res.success) {
+        setClosureNotes("");
         setFeedbackMessage({
           type: "success",
           text: res.message || "Departure authorised. Driver instructed to close doors.",
         });
       } else {
         setFeedbackMessage({ type: "error", text: res.error || "Failed to authorise departure." });
-      }
-    });
-  }
-
-  // Stage 7: Confirm Dispatch / Actual Departure
-  function handleConfirmDispatch() {
-    if (!currentJourney) return;
-    setFeedbackMessage(null);
-    startTransition(async () => {
-      const res = await confirmDispatchAction(currentJourney.id);
-      if (res.success) {
-        setFeedbackMessage({ type: "success", text: res.message || "Bus departed terminal." });
-      } else {
-        setFeedbackMessage({ type: "error", text: res.error || "Failed to record departure." });
       }
     });
   }
@@ -258,6 +261,25 @@ export function BoardingScannerView({ journeys }: BoardingScannerViewProps) {
         await markPassengerNoShowAction(bookingId);
       });
     }
+  }
+
+  if (unassignedTransportGroup) {
+    return (
+      <div
+        role="alert"
+        className="rounded-2xl border border-rose-200 bg-rose-50 p-8 text-center space-y-2"
+      >
+        <span className="text-4xl block mb-2">🔒</span>
+        <h3 className="text-base font-bold text-rose-950">
+          Transport Group Assignment Required
+        </h3>
+        <p className="text-xs text-rose-900 max-w-md mx-auto leading-relaxed">
+          Your boarding officer account is not currently assigned to any hostel transport group.
+          QR scanning and boarding controls remain locked until a Super Administrator assigns your
+          hostel operation.
+        </p>
+      </div>
+    );
   }
 
   if (!currentJourney) {
@@ -328,6 +350,7 @@ export function BoardingScannerView({ journeys }: BoardingScannerViewProps) {
               setSelectedJourneyId(e.target.value);
               setScanResult(null);
               setFeedbackMessage(null);
+              setClosureNotes("");
             }}
             className="w-full md:w-auto text-sm font-bold bg-[#F6F8FA] border border-slate-300 rounded-xl px-3.5 py-2.5 text-[#102D4A] focus:outline-none focus:border-[#102D4A]"
           >
@@ -339,8 +362,23 @@ export function BoardingScannerView({ journeys }: BoardingScannerViewProps) {
           </select>
         </div>
 
-        {/* Current State Indicator Badge */}
-        <div className="flex items-center gap-2">
+        {/* Current State & Readiness Badges */}
+        <div className="flex flex-wrap items-center gap-2">
+          {currentJourney.readinessStatus === "passed" && (
+            <span className="px-3 py-1.5 rounded-xl bg-emerald-50 text-emerald-800 text-xs font-bold border border-emerald-200">
+              READINESS: PASSED
+            </span>
+          )}
+          {currentJourney.readinessStatus === "failed_unsafe" && (
+            <span className="px-3 py-1.5 rounded-xl bg-rose-100 text-rose-900 text-xs font-bold border border-rose-300">
+              READINESS: UNSAFE VEHICLE
+            </span>
+          )}
+          {(!currentJourney.readinessStatus || currentJourney.readinessStatus === "pending") && (
+            <span className="px-3 py-1.5 rounded-xl bg-amber-50 text-amber-800 text-xs font-bold border border-amber-200">
+              READINESS: PENDING CHECK
+            </span>
+          )}
           {currentJourney.status === "scheduled" && (
             <span className="px-3 py-1.5 rounded-xl bg-slate-100 text-[#526B82] text-xs font-bold border border-slate-200">
               STAGE 1: SCHEDULED
@@ -373,6 +411,19 @@ export function BoardingScannerView({ journeys }: BoardingScannerViewProps) {
           )}
         </div>
       </div>
+
+      {/* Vehicle Safety Warning */}
+      {currentJourney.readinessStatus === "failed_unsafe" && (
+        <div
+          role="alert"
+          className="rounded-xl border border-rose-300 bg-rose-50 p-3.5 text-xs font-semibold text-rose-900 flex items-center gap-2"
+        >
+          <AlertTriangleIcon className="w-4 h-4 text-rose-600 shrink-0" />
+          <span>
+            SAFETY HALT: This vehicle failed its pre-trip readiness inspection (marked UNSAFE). Dispatch and boarding authorization remain blocked until rectified.
+          </span>
+        </div>
+      )}
 
       {/* Stage-Driven Operational Action Panel */}
       <div className="bg-white rounded-2xl border border-slate-200 p-5 shadow-xs space-y-4">
@@ -460,52 +511,84 @@ export function BoardingScannerView({ journeys }: BoardingScannerViewProps) {
 
           {/* Stage 4 -> Stage 5: Close Boarding Gate */}
           {currentJourney.status === "boarding" && (
-            <div className="flex items-center gap-3 flex-wrap w-full">
-              <button
-                onClick={handleCloseBoarding}
-                disabled={isPending}
-                className="px-4 py-2.5 bg-[#E5A13B] hover:bg-[#c9892c] text-[#102D4A] text-xs font-bold rounded-xl transition-colors shadow-xs flex items-center gap-2"
-              >
-                <span>🔒</span>
-                <span>Close Boarding Gate &amp; Review Manifest</span>
-              </button>
-              <span className="text-xs text-[#526B82]">
-                Halts scanning. Preserves unboarded passengers without auto-marking no-shows.
-              </span>
+            <div className="space-y-3 w-full">
+              <div className="w-full">
+                <label
+                  htmlFor="closure-notes-input"
+                  className="block text-[11px] font-bold uppercase tracking-wider text-[#526B82] mb-1"
+                >
+                  Boarding Closure / Handover Notes (Optional)
+                </label>
+                <textarea
+                  id="closure-notes-input"
+                  rows={2}
+                  value={closureNotes}
+                  onChange={(e) => setClosureNotes(e.target.value)}
+                  placeholder="Optional operational remarks for manifest audit or dispatch review..."
+                  className="w-full rounded-xl border border-slate-300 bg-[#F6F8FA] px-3 py-2 text-xs text-[#102D4A] focus:outline-none focus:border-[#102D4A]"
+                />
+              </div>
+              <div className="flex items-center gap-3 flex-wrap">
+                <button
+                  onClick={handleCloseBoarding}
+                  disabled={isPending}
+                  className="px-4 py-2.5 bg-[#E5A13B] hover:bg-[#c9892c] text-[#102D4A] text-xs font-bold rounded-xl transition-colors shadow-xs flex items-center gap-2"
+                >
+                  <span>🔒</span>
+                  <span>Close Boarding Gate &amp; Review Manifest</span>
+                </button>
+                <span className="text-xs text-[#526B82]">
+                  Halts scanning. Preserves unboarded passengers without auto-marking no-shows.
+                </span>
+              </div>
             </div>
           )}
 
           {/* Stage 5 -> Stage 6: Authorise Departure */}
           {currentJourney.status === "boarding_closed" && (
-            <div className="flex items-center gap-3 flex-wrap w-full">
-              <button
-                onClick={handleAuthoriseDeparture}
-                disabled={isPending}
-                className="px-5 py-2.5 bg-[#102D4A] hover:bg-[#0c233a] text-white text-xs font-bold rounded-xl transition-colors shadow-xs flex items-center gap-2"
-              >
-                <span>✅</span>
-                <span>Confirm Boarding Completion &amp; Authorise Departure</span>
-              </button>
-              <span className="text-xs text-[#526B82]">
-                Signals Bus Manager and Driver that doors may be closed for dispatch.
-              </span>
+            <div className="space-y-3 w-full">
+              <div className="w-full">
+                <label
+                  htmlFor="authorise-notes-input"
+                  className="block text-[11px] font-bold uppercase tracking-wider text-[#526B82] mb-1"
+                >
+                  Departure Authorisation Notes (Optional)
+                </label>
+                <textarea
+                  id="authorise-notes-input"
+                  rows={2}
+                  value={closureNotes}
+                  onChange={(e) => setClosureNotes(e.target.value)}
+                  placeholder="Confirm final headcount or handover notes before authorising departure..."
+                  className="w-full rounded-xl border border-slate-300 bg-[#F6F8FA] px-3 py-2 text-xs text-[#102D4A] focus:outline-none focus:border-[#102D4A]"
+                />
+              </div>
+              <div className="flex items-center gap-3 flex-wrap">
+                <button
+                  onClick={handleAuthoriseDeparture}
+                  disabled={isPending || currentJourney.readinessStatus === "failed_unsafe"}
+                  className="px-5 py-2.5 bg-[#102D4A] hover:bg-[#0c233a] disabled:opacity-50 text-white text-xs font-bold rounded-xl transition-colors shadow-xs flex items-center gap-2"
+                >
+                  <span>✅</span>
+                  <span>Confirm Boarding Completion &amp; Authorise Departure</span>
+                </button>
+                <span className="text-xs text-[#526B82]">
+                  Signals Bus Manager and Driver that doors may be closed for Stage 7 dispatch.
+                </span>
+              </div>
             </div>
           )}
 
-          {/* Stage 6 -> Stage 7: Confirm Dispatch */}
+          {/* Stage 6 Complete -> Awaiting Stage 7 Dispatch Confirmation by Bus Manager / Driver */}
           {currentJourney.status === "ready_to_depart" && (
-            <div className="flex items-center gap-3 flex-wrap w-full">
-              <button
-                onClick={handleConfirmDispatch}
-                disabled={isPending}
-                className="px-5 py-2.5 bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-bold rounded-xl transition-colors shadow-xs flex items-center gap-2"
-              >
-                <BusIcon className="w-4 h-4" />
-                <span>Confirm Rolling Dispatch / Bus Departed</span>
-              </button>
-              <span className="text-xs text-emerald-800 font-semibold">
-                Bus is authorized for departure. Doors closed. Rolling out of terminal.
-              </span>
+            <div className="w-full rounded-xl border border-emerald-200 bg-emerald-50 p-3.5 text-xs text-emerald-900">
+              <p className="font-bold text-emerald-950">
+                Stage 6 Complete — Departure Authorised
+              </p>
+              <p className="mt-0.5 leading-relaxed">
+                Final boarding verification is locked. Awaiting Stage 7 rolling dispatch confirmation from the
+                Bus Manager (&ldquo;Admin Dispatch Console&rdquo;) or assigned Mode A driver (or Assisted Ops for non-smartphone drivers).
+              </p>
             </div>
           )}
 
@@ -543,7 +626,9 @@ export function BoardingScannerView({ journeys }: BoardingScannerViewProps) {
             </span>
           </div>
           <span className="font-mono text-sm text-[#102D4A]">
-            {boardedCount} Boarded / {totalSafeCapacity} Capacity (Max 32)
+            {hasVerifiedCapacity
+              ? `${boardedCount} Boarded / ${totalSafeCapacity} Capacity (Max ${totalSafeCapacity})`
+              : `${boardedCount} Boarded — Unverified Vehicle Capacity`}
           </span>
         </div>
 
@@ -557,7 +642,7 @@ export function BoardingScannerView({ journeys }: BoardingScannerViewProps) {
               {seatedBoarded} <span className="text-xs font-normal text-[#526B82]">/ {seatedLimit}</span>
             </span>
             <span className="text-[10px] text-emerald-700 block font-medium">
-              Priority Seating (Max 20)
+              Priority Seating {hasVerifiedCapacity ? `(Max ${seatedLimit})` : "(Unverified)"}
             </span>
           </div>
 
@@ -569,7 +654,7 @@ export function BoardingScannerView({ journeys }: BoardingScannerViewProps) {
               {standingBoarded} <span className="text-xs font-normal text-[#526B82]">/ {standingLimit}</span>
             </span>
             <span className="text-[10px] text-amber-700 block font-medium">
-              Standing Area (Max 12)
+              Standing Area {hasVerifiedCapacity ? `(Max ${standingLimit})` : "(Unverified)"}
             </span>
           </div>
 
@@ -590,13 +675,18 @@ export function BoardingScannerView({ journeys }: BoardingScannerViewProps) {
               Total Passengers
             </span>
             <span
-              className={`text-xl font-extrabold font-mono ${boardedCount >= totalSafeCapacity ? "text-rose-600" : "text-[#20A477]"
-                }`}
+              className={`text-xl font-extrabold font-mono ${
+                !hasVerifiedCapacity || boardedCount >= totalSafeCapacity
+                  ? "text-rose-600"
+                  : "text-[#20A477]"
+              }`}
             >
               {boardedCount} / {totalSafeCapacity}
             </span>
             <span className="text-[10px] text-[#526B82] block">
-              {Math.max(0, totalSafeCapacity - boardedCount)} places remaining
+              {hasVerifiedCapacity
+                ? `${Math.max(0, totalSafeCapacity - boardedCount)} places remaining`
+                : "Vehicle capacity unverified"}
             </span>
           </div>
         </div>
@@ -604,13 +694,20 @@ export function BoardingScannerView({ journeys }: BoardingScannerViewProps) {
         {/* Progress bar */}
         <div className="w-full h-3 rounded-full bg-slate-100 overflow-hidden">
           <div
-            className={`h-full transition-all duration-300 ${boardedCount >= totalSafeCapacity
+            className={`h-full transition-all duration-300 ${
+              !hasVerifiedCapacity || boardedCount >= totalSafeCapacity
                 ? "bg-[#D9534F]"
-                : boardedCount >= 20
+                : boardedCount >= seatedLimit
                   ? "bg-[#E5A13B]"
                   : "bg-[#20A477]"
-              }`}
-            style={{ width: `${Math.min(100, Math.round((boardedCount / totalSafeCapacity) * 100))}%` }}
+            }`}
+            style={{
+              width: `${
+                totalSafeCapacity > 0
+                  ? Math.min(100, Math.round((boardedCount / totalSafeCapacity) * 100))
+                  : 0
+              }%`,
+            }}
           />
         </div>
       </div>

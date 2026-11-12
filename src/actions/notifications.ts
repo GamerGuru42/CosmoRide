@@ -14,6 +14,16 @@ export async function markNotificationAsRead(notificationId: string) {
       return { success: false, error: "Unauthorized" };
     }
 
+    const { data: profile } = await supabase
+      .from("profiles")
+      .select("is_active")
+      .eq("id", user.id)
+      .single();
+
+    if (!profile || profile.is_active === false) {
+      return { success: false, error: "Account is deactivated." };
+    }
+
     const { error } = await supabase
       .from("notifications")
       .update({ is_read: true })
@@ -41,6 +51,16 @@ export async function markAllNotificationsAsRead() {
 
     if (!user) {
       return { success: false, error: "Unauthorized" };
+    }
+
+    const { data: profile } = await supabase
+      .from("profiles")
+      .select("is_active")
+      .eq("id", user.id)
+      .single();
+
+    if (!profile || profile.is_active === false) {
+      return { success: false, error: "Account is deactivated." };
     }
 
     const { error } = await supabase

@@ -57,11 +57,13 @@ export interface DispatchJourneyItem {
 interface BusManagerDispatchViewProps {
   journeys: DispatchJourneyItem[];
   currentDate: string;
+  isReadOnlySupervisory?: boolean;
 }
 
 export function BusManagerDispatchView({
   journeys,
   currentDate,
+  isReadOnlySupervisory = false,
 }: BusManagerDispatchViewProps) {
   const [filterFleet, setFilterFleet] = useState<string>("all");
   const [statusFilter, setStatusFilter] = useState<string>("all");
@@ -159,6 +161,16 @@ export function BusManagerDispatchView({
       </div>
 
       {/* Feedback Banner */}
+      {isReadOnlySupervisory && (
+        <div
+          role="status"
+          className="rounded-xl border border-amber-200 bg-amber-50 p-3.5 text-xs text-amber-900"
+        >
+          <span className="font-bold">Supervisory Read-Only View (Hostel Manager):</span>{" "}
+          You can monitor live arrivals, readiness inspections, and rolling dispatches across all operations. Stage 2 arrival confirmations and Stage 7 rolling dispatch actions are restricted to the Bus Manager or Super Administrator.
+        </div>
+      )}
+
       {feedback && (
         <div
           className={`rounded-xl p-3.5 text-xs font-semibold flex items-center justify-between border ${
@@ -364,7 +376,15 @@ export function BusManagerDispatchView({
                       {j.vehicleName && <span className="ml-1 text-[#526B82]">({j.vehicleName})</span>}
                     </span>
                     <span>
-                      Capacity: <strong className="text-slate-900">{j.safeCapacity} max</strong> (20 seated + 12 standing)
+                      Capacity:{" "}
+                      {j.safeCapacity > 0 ? (
+                        <>
+                          <strong className="text-slate-900">{j.safeCapacity} max</strong>{" "}
+                          ({j.seatedCapacity} seated + {j.standingCapacity} standing)
+                        </>
+                      ) : (
+                        <strong className="text-rose-700">Unverified vehicle capacity</strong>
+                      )}
                     </span>
                   </div>
                 </div>
@@ -414,10 +434,12 @@ export function BusManagerDispatchView({
                 <div className="flex flex-col sm:flex-row items-end sm:items-center gap-3">
                   <div className="text-right text-xs">
                     <div className="font-bold text-[#102D4A]">
-                      {j.boardedCount} / {j.safeCapacity || 32} Boarded
+                      {j.safeCapacity > 0
+                        ? `${j.boardedCount} / ${j.safeCapacity} Boarded`
+                        : `${j.boardedCount} Boarded (Unverified)`}
                     </div>
                     <div className="text-[11px] text-[#526B82]">
-                      {j.seatedBoarded}/20 Seated • {j.standingBoarded}/{j.standingCapacity || 12} Standing
+                      {j.seatedBoarded}/{j.seatedCapacity} Seated • {j.standingBoarded}/{j.standingCapacity} Standing
                     </div>
                     <div className="text-[10px] text-slate-400">
                       {j.bookedCount} total reserved
@@ -426,7 +448,7 @@ export function BusManagerDispatchView({
 
                   {/* Operational Action Buttons */}
                   <div className="flex items-center gap-2">
-                    {j.status === "scheduled" && (
+                    {!isReadOnlySupervisory && j.status === "scheduled" && (
                       <button
                         onClick={() => handleConfirmArrival(j.id)}
                         disabled={isPending}
@@ -437,7 +459,7 @@ export function BusManagerDispatchView({
                       </button>
                     )}
 
-                    {j.status === "ready_to_depart" && (
+                    {!isReadOnlySupervisory && j.status === "ready_to_depart" && (
                       <button
                         onClick={() => handleConfirmDispatch(j.id)}
                         disabled={isPending}

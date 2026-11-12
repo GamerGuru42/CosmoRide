@@ -7,13 +7,17 @@ export type BoardingStatusCode =
   | "VALID"
   | "BOARDING_APPROVED"
   | "ALREADY_BOARDED"
+  | "ALREADY_CHECKED_IN"
+  | "TICKET_ALREADY_BOARDED"
   | "INVALID_TICKET"
   | "WRONG_JOURNEY"
   | "CANCELLED"
+  | "CANCELLED_TICKET"
   | "TICKET_CANCELLED"
   | "CROSS_GROUP_DENIED"
   | "BUS_FULL"
   | "CAPACITY_EXCEEDED"
+  | "UNVERIFIED_VEHICLE_CAPACITY"
   | "JOURNEY_NOT_BOARDING"
   | "BOARDING_CLOSED"
   | "JOURNEY_CLOSED"
@@ -21,6 +25,18 @@ export type BoardingStatusCode =
   | "UNAUTHORIZED"
   | "FORBIDDEN"
   | "SERVER_ERROR";
+
+async function getActiveBoardingActorProfile(
+  supabase: Awaited<ReturnType<typeof createClient>>,
+  userId: string
+) {
+  const { data: profile } = await supabase
+    .from("profiles")
+    .select("id, role, admin_role, is_active")
+    .eq("id", userId)
+    .single();
+  return profile;
+}
 
 export interface BoardingVerificationResult {
   success: boolean;
@@ -82,6 +98,15 @@ export async function verifyAndBoardPassAction(
       };
     }
 
+    const actorProfile = await getActiveBoardingActorProfile(supabase, user.id);
+    if (!actorProfile || actorProfile.is_active === false) {
+      return {
+        success: false,
+        code: "UNAUTHORIZED",
+        message: "Your account is deactivated. Contact a CosmoRide administrator.",
+      };
+    }
+
     const { data, error } = await supabase.rpc("verify_and_board_passenger", {
       p_ticket_token: ticketToken.trim(),
       p_officer_id: user.id,
@@ -112,12 +137,18 @@ export async function verifyAndBoardPassAction(
       studentId: result?.student_id as string | undefined,
       passengerCategory: result?.passenger_category as "seated" | "standing" | undefined,
       boardedCount: result?.boarded_count as number | undefined,
-      boardedSeatedCount: result?.boarded_seated_count as number | undefined,
-      boardedStandingCount: result?.boarded_standing_count as number | undefined,
-      seatedLimit: (result?.seated_limit as number) ?? 20,
-      standingLimit: (result?.standing_limit as number) ?? 12,
-      capacity: (result?.total_capacity as number) ?? (result?.capacity as number) ?? 32,
-      totalCapacity: (result?.total_capacity as number) ?? 32,
+      boardedSeatedCount:
+        (result?.seated_count as number | undefined) ??
+        (result?.boarded_seated_count as number | undefined),
+      boardedStandingCount:
+        (result?.standing_count as number | undefined) ??
+        (result?.boarded_standing_count as number | undefined),
+      seatedLimit: result?.seated_limit as number | undefined,
+      standingLimit: result?.standing_limit as number | undefined,
+      capacity:
+        (result?.total_capacity as number | undefined) ??
+        (result?.capacity as number | undefined),
+      totalCapacity: result?.total_capacity as number | undefined,
       busRegistration: result?.bus_registration as string | undefined,
     };
   } catch (err: unknown) {
@@ -146,6 +177,11 @@ export async function confirmBusArrivalAction(
 
     if (!user) {
       return { success: false, error: "Authentication required." };
+    }
+
+    const actorProfile = await getActiveBoardingActorProfile(supabase, user.id);
+    if (!actorProfile || actorProfile.is_active === false) {
+      return { success: false, error: "Your account is currently deactivated.", code: "ACCOUNT_INACTIVE" };
     }
 
     const { data, error } = await supabase.rpc("confirm_bus_arrival", {
@@ -203,6 +239,11 @@ export async function openBoardingSessionAction(
       return { success: false, error: "Authentication required." };
     }
 
+    const actorProfile = await getActiveBoardingActorProfile(supabase, user.id);
+    if (!actorProfile || actorProfile.is_active === false) {
+      return { success: false, error: "Your account is currently deactivated.", code: "ACCOUNT_INACTIVE" };
+    }
+
     const { data, error } = await supabase.rpc("open_journey_boarding", {
       p_journey_id: journeyId,
       p_officer_id: user.id,
@@ -240,13 +281,6 @@ export async function openBoardingSessionAction(
 }
 
 /**
- * Backwards-compatible alias for startBoardingSession
- */
-export async function startBoardingSession(journeyId: string) {
-  return openBoardingSessionAction(journeyId);
-}
-
-/**
  * Stage 5: Close Boarding Session.
  * Representative manually closes boarding or reviews upon timer expiry.
  * Timer expiry NEVER auto-departs bus.
@@ -264,6 +298,11 @@ export async function closeBoardingSessionAction(
 
     if (!user) {
       return { success: false, error: "Authentication required." };
+    }
+
+    const actorProfile = await getActiveBoardingActorProfile(supabase, user.id);
+    if (!actorProfile || actorProfile.is_active === false) {
+      return { success: false, error: "Your account is currently deactivated.", code: "ACCOUNT_INACTIVE" };
     }
 
     const { data, error } = await supabase.rpc("close_journey_boarding", {
@@ -318,6 +357,11 @@ export async function authoriseDepartureAction(
 
     if (!user) {
       return { success: false, error: "Authentication required." };
+    }
+
+    const actorProfile = await getActiveBoardingActorProfile(supabase, user.id);
+    if (!actorProfile || actorProfile.is_active === false) {
+      return { success: false, error: "Your account is currently deactivated.", code: "ACCOUNT_INACTIVE" };
     }
 
     const { data, error } = await supabase.rpc("authorise_journey_departure", {
@@ -375,6 +419,20 @@ export async function confirmDispatchAction(
       return { success: false, error: "Authentication required." };
     }
 
+    const actorProfile = await getActiveBoardingActorProfile(supabase, user.id);
+    if (
+      !actorProfile ||
+      actorProfile.is_active === false ||
+      actorProfile.role !== "admin" ||
+      (actorProfile.admin_role !== "super_admin" && actorProfile.admin_role !== "bus_manager")
+    ) {
+      return {
+        success: false,
+        error: "Permission denied: Only active Super Administrators or Bus Managers may confirm Stage 7 rolling dispatch.",
+        code: "FORBIDDEN",
+      };
+    }
+
     const { data, error } = await supabase.rpc("confirm_journey_dispatch", {
       p_journey_id: journeyId,
       p_user_id: user.id,
@@ -397,6 +455,7 @@ export async function confirmDispatchAction(
     revalidatePath("/boarding");
     revalidatePath("/boarding/boarding");
     revalidatePath("/boarding/passengers");
+    revalidatePath("/admin/dispatch");
     revalidatePath("/admin/operations");
     revalidatePath("/driver");
     revalidatePath("/student/departures");
@@ -410,75 +469,6 @@ export async function confirmDispatchAction(
     const message = err instanceof Error ? err.message : "Failed to record departure.";
     return { success: false, error: message };
   }
-}
-
-/**
- * Authorised journey closure workflow (backwards compatible).
- */
-export async function closeAndDepartJourneyAction(
-  journeyId: string,
-  closureNotesOrLegacyFlag?: boolean | string,
-  closureNotes?: string
-): Promise<BoardingActionResponse> {
-  try {
-    const supabase = await createClient();
-    const {
-      data: { user },
-    } = await supabase.auth.getUser();
-
-    if (!user) {
-      return { success: false, error: "Authentication required." };
-    }
-
-    const resolvedNotes =
-      typeof closureNotesOrLegacyFlag === "string"
-        ? closureNotesOrLegacyFlag
-        : closureNotes;
-
-    const { data, error } = await supabase.rpc("close_and_depart_journey", {
-      p_journey_id: journeyId,
-      p_officer_id: user.id,
-      p_closure_notes: resolvedNotes?.trim() || null,
-    });
-
-    if (error) {
-      return { success: false, error: error.message };
-    }
-
-    const result = data as Record<string, unknown>;
-    if (!result?.success) {
-      return {
-        success: false,
-        error: (result?.error as string) || "Failed to close journey.",
-      };
-    }
-
-    revalidatePath("/boarding");
-    revalidatePath("/boarding/boarding");
-    revalidatePath("/boarding/passengers");
-    revalidatePath("/driver");
-    revalidatePath("/student/departures");
-
-    return {
-      success: true,
-      message: (result.message as string) || "Journey successfully closed and departed.",
-      data: result,
-    };
-  } catch (err: unknown) {
-    const message = err instanceof Error ? err.message : "Failed to close journey.";
-    return { success: false, error: message };
-  }
-}
-
-/**
- * Backwards-compatible alias for closeAndDepartJourneyAction
- */
-export async function departJourney(
-  journeyId: string,
-  markUnboardedAsNoShow = false,
-  closureNotes?: string
-) {
-  return closeAndDepartJourneyAction(journeyId, markUnboardedAsNoShow, closureNotes);
 }
 
 /**
@@ -562,6 +552,11 @@ export async function markPassengerNoShowAction(
       return { success: false, error: "Authentication required." };
     }
 
+    const actorProfile = await getActiveBoardingActorProfile(supabase, user.id);
+    if (!actorProfile || actorProfile.is_active === false) {
+      return { success: false, error: "Your account is currently deactivated.", code: "ACCOUNT_INACTIVE" };
+    }
+
     const { data, error } = await supabase.rpc("mark_passenger_no_show", {
       p_booking_id: bookingId,
       p_officer_id: user.id,
@@ -605,11 +600,12 @@ export async function markPassengerNoShowAction(
  */
 export async function reportOperationalIncident(
   journeyId: string | null,
-  vehicleId: string | null,
+  _vehicleId: string | null,
   category: string,
   severity: "low" | "medium" | "high" | "critical",
   description: string
 ): Promise<BoardingActionResponse> {
+  void _vehicleId;
   try {
     if (!description || description.trim().length < 10) {
       return { success: false, error: "Please provide a detailed incident description (min 10 characters)." };
@@ -624,22 +620,40 @@ export async function reportOperationalIncident(
       return { success: false, error: "Authentication required." };
     }
 
-    const { error } = await supabase.from("incident_reports").insert({
-      journey_id: journeyId || null,
-      vehicle_id: vehicleId || null,
-      reported_by: user.id,
-      category: category.trim(),
-      severity,
-      description: description.trim(),
-      status: "reported",
+    const actorProfile = await getActiveBoardingActorProfile(supabase, user.id);
+    if (!actorProfile || actorProfile.is_active === false) {
+      return { success: false, error: "Your account is currently deactivated.", code: "ACCOUNT_INACTIVE" };
+    }
+
+    const { data, error } = await supabase.rpc("report_operational_incident", {
+      p_journey_id: journeyId || null,
+      p_actor_id: user.id,
+      p_category: category.trim(),
+      p_severity: severity,
+      p_description: description.trim(),
+      p_is_assisted: true,
     });
 
     if (error) {
       return { success: false, error: error.message };
     }
 
+    const result = data as Record<string, unknown> | null;
+    if (!result?.success) {
+      return {
+        success: false,
+        error: (result?.error as string) || "Failed to submit incident report.",
+        code: result?.code as string | undefined,
+      };
+    }
+
     revalidatePath("/boarding");
-    return { success: true, message: "Incident logged successfully for administrator review." };
+    revalidatePath("/admin/incidents");
+    return {
+      success: true,
+      message: (result.message as string) || "Incident logged successfully for administrator review.",
+      data: result,
+    };
   } catch (err: unknown) {
     const message = err instanceof Error ? err.message : "Failed to submit incident report.";
     return { success: false, error: message };

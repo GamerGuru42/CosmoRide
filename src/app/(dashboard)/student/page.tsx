@@ -25,18 +25,33 @@ export default async function StudentHomePage() {
   // 1. Fetch user profile
   const { data: profile } = await supabase
     .from("profiles")
-    .select("id, full_name, student_id, role")
+    .select("id, full_name, student_id, role, is_active")
     .eq("id", user.id)
     .single();
 
-  if (!profile?.student_id || profile.student_id.trim() === "") {
+  if (!profile) {
+    redirect("/login?error=profile_missing");
+  }
+
+  if (!profile.is_active) {
+    redirect("/login?error=account_inactive");
+  }
+
+  if (profile.role !== "student") {
+    if (profile.role === "admin") redirect("/admin");
+    if (profile.role === "boarding_officer") redirect("/boarding");
+    if (profile.role === "driver") redirect("/driver");
+    redirect("/login");
+  }
+
+  if (!profile.student_id || profile.student_id.trim() === "") {
     redirect("/register?reason=incomplete_profile");
   }
 
   const student = {
     id: user.id,
-    fullName: profile?.full_name || "Student",
-    studentId: profile?.student_id || null,
+    fullName: profile.full_name || "Student",
+    studentId: profile.student_id || null,
   };
 
   // 2. Fetch the student's next upcoming active booking (sorted by earliest upcoming journey)
@@ -183,7 +198,9 @@ export default async function StudentHomePage() {
       vehicle:vehicles (
         name,
         registration_number,
-        safe_capacity
+        safe_capacity,
+        seated_capacity,
+        standing_capacity
       )
     `)
     .gte("journey_date", today)
@@ -198,7 +215,37 @@ export default async function StudentHomePage() {
     .order("scheduled_departure", { ascending: true })
     .limit(8);
 
-  // For each journey, fetch route stops, booking counts, and user's reservation status
+  type OccupancyEntry = {
+    seated_count: number;
+    standing_count: number;
+    active_bookings_count: number;
+    waitlist_count: number;
+    seated_limit: number;
+    standing_limit: number;
+    effective_capacity: number;
+    latest_stop_update: {
+      event_type: string;
+      stop_name: string;
+      created_at: string;
+    } | null;
+  };
+
+  const previewJourneyIds = (journeysData || []).map((j) => j.id);
+  const { data: occResponse } = previewJourneyIds.length
+    ? await supabase.rpc("get_student_departure_occupancy", {
+        p_journey_ids: previewJourneyIds,
+      })
+    : { data: null };
+
+  const occupancyMap =
+    occResponse &&
+    typeof occResponse === "object" &&
+    !Array.isArray(occResponse) &&
+    "occupancy" in occResponse
+      ? ((occResponse as { occupancy?: Record<string, OccupancyEntry> }).occupancy ?? {})
+      : {};
+
+  // For each journey, attach non-PII occupancy, route stops, and current student's reservation status
   const upcomingDepartures: DepartureJourney[] = [];
 
   if (journeysData && journeysData.length > 0) {
@@ -214,29 +261,12 @@ export default async function StudentHomePage() {
       const vehicleInfo = jd.vehicle as unknown as {
         name: string | null;
         registration_number: string;
-        safe_capacity: number;
+        safe_capacity: number | null;
+        seated_capacity: number | null;
+        standing_capacity: number | null;
       } | null;
 
-      // Count booked seats and category distribution
-      const { count: bookedCount } = await supabase
-        .from("bookings")
-        .select("*", { count: "exact", head: true })
-        .eq("journey_id", jd.id)
-        .in("status", ["confirmed", "checked_in"]);
-
-      const { count: seatedCount } = await supabase
-        .from("bookings")
-        .select("*", { count: "exact", head: true })
-        .eq("journey_id", jd.id)
-        .eq("passenger_category", "seated")
-        .in("status", ["confirmed", "checked_in"]);
-
-      const { count: standingCount } = await supabase
-        .from("bookings")
-        .select("*", { count: "exact", head: true })
-        .eq("journey_id", jd.id)
-        .eq("passenger_category", "standing")
-        .in("status", ["confirmed", "checked_in"]);
+      const occ = occupancyMap[jd.id];
 
       // Check if current user has a booking
       const { data: userBooking } = await supabase
@@ -277,7 +307,7 @@ export default async function StudentHomePage() {
         };
       });
 
-      const origin = stopsList[0]?.name || "Main Terminal";
+      const origin = stopsList[0]?.name || "Departure Terminal";
       const destination = stopsList[stopsList.length - 1]?.name || "Destination";
 
       upcomingDepartures.push({
@@ -289,10 +319,13 @@ export default async function StudentHomePage() {
         delayMinutes: jd.delay_minutes ?? 0,
         delayReason: jd.delay_reason,
         proposedAllocation: jd.proposed_allocation,
-        safeCapacity: vehicleInfo?.safe_capacity ?? 32,
-        bookedCount: bookedCount ?? 0,
-        seatedCount: seatedCount ?? 0,
-        standingCount: standingCount ?? 0,
+        safeCapacity: vehicleInfo?.safe_capacity ?? 0,
+        bookedCount: occ?.active_bookings_count ?? 0,
+        seatedCount: occ?.seated_count ?? 0,
+        standingCount: occ?.standing_count ?? 0,
+        seatedLimit: occ?.seated_limit ?? vehicleInfo?.seated_capacity ?? undefined,
+        standingLimit: occ?.standing_limit ?? vehicleInfo?.standing_capacity ?? undefined,
+        effectiveCapacity: occ?.effective_capacity,
         routeId: routeInfo?.id ?? "",
         routeName: routeInfo?.name ?? "Campus Route",
         routeCode: routeInfo?.code ?? "CR",
@@ -300,12 +333,19 @@ export default async function StudentHomePage() {
         destinationName: destination,
         transportGroupName: routeInfo?.transport_group?.name,
         genderGroup: routeInfo?.gender_group,
-        vehicleRegistration: vehicleInfo?.registration_number ?? "TBD",
+        vehicleRegistration: vehicleInfo?.registration_number ?? "Unassigned",
         vehicleName: vehicleInfo?.name ?? null,
         stops: stopsList,
         userBookingId: userBooking?.id ?? null,
         userPassengerCategory: (userBooking as unknown as { passenger_category?: "seated" | "standing" })?.passenger_category ?? null,
         userWaitlistPosition: userWaitlist?.position ?? null,
+        latestStopUpdate: occ?.latest_stop_update
+          ? {
+              eventType: occ.latest_stop_update.event_type,
+              stopName: occ.latest_stop_update.stop_name,
+              timestamp: occ.latest_stop_update.created_at,
+            }
+          : null,
       });
     }
   }

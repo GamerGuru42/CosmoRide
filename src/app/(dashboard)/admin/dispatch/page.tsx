@@ -1,7 +1,7 @@
 import type { Metadata } from "next";
 import { createClient } from "@/lib/supabase/server";
 import { requireAdminPageAccess } from "@/lib/admin-auth";
-import { getTodayDateString } from "@/lib/utils";
+import { calculateCapacityBreakdown, getTodayDateString } from "@/lib/utils";
 import {
   BusManagerDispatchView,
   type DispatchJourneyItem,
@@ -15,7 +15,8 @@ export const metadata: Metadata = {
 export const dynamic = "force-dynamic";
 
 export default async function BusManagerDispatchPage() {
-  await requireAdminPageAccess("dispatch");
+  const { adminRole } = await requireAdminPageAccess("dispatch");
+  const isReadOnlySupervisory = adminRole === "hostel_manager";
   const supabase = await createClient();
 
   const todayStr = getTodayDateString();
@@ -133,9 +134,19 @@ export default async function BusManagerDispatchPage() {
       driverName: driver?.full_name || directDriver?.full_name || null,
       driverPhone: driver?.phone || directDriver?.phone || null,
       driverHasAppAccess: driver ? Boolean(driver.has_app_access) : Boolean(directDriver),
-      safeCapacity: vehicle?.safe_capacity ?? j.proposed_allocation ?? 32,
-      seatedCapacity: vehicle?.seated_capacity ?? 20,
-      standingCapacity: vehicle?.standing_capacity ?? 12,
+      ...(() => {
+        const cap = calculateCapacityBreakdown({
+          proposedAllocation: j.proposed_allocation,
+          safeCapacity: vehicle?.safe_capacity ?? null,
+          seatedLimit: vehicle?.seated_capacity ?? null,
+          standingLimit: vehicle?.standing_capacity ?? null,
+        });
+        return {
+          safeCapacity: cap.effectiveCapacity,
+          seatedCapacity: cap.seatedLimit,
+          standingCapacity: cap.standingLimit,
+        };
+      })(),
       readinessStatus,
       delayMinutes: j.delay_minutes || 0,
       delayReason: j.delay_reason || null,
@@ -149,7 +160,11 @@ export default async function BusManagerDispatchPage() {
 
   return (
     <div className="space-y-6">
-      <BusManagerDispatchView journeys={journeys} currentDate={todayStr} />
+      <BusManagerDispatchView
+        journeys={journeys}
+        currentDate={todayStr}
+        isReadOnlySupervisory={isReadOnlySupervisory}
+      />
     </div>
   );
 }
