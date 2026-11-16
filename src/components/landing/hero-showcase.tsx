@@ -34,13 +34,13 @@ export function HeroShowcase() {
                 <span>Main Campus Bus Park • Kado Campus</span>
               </div>
               <h2 className="text-lg sm:text-2xl font-bold tracking-tight text-white drop-shadow-md">
-                Modern, Climate-Controlled Campus Transit
+                Modern University Campus Transit
               </h2>
             </div>
 
             <div className="flex flex-wrap items-center gap-2 sm:gap-3">
               <span className="rounded-xl bg-black/50 backdrop-blur-md px-3 py-1.5 text-xs font-medium text-slate-200 border border-white/10">
-                30 Safe Seats Max
+                32 Capacity (20 Seated, 12 Standing)
               </span>
               <span className="rounded-xl bg-[#20A477]/80 backdrop-blur-md px-3 py-1.5 text-xs font-bold text-white shadow-sm">
                 Mon – Fri Schedules
@@ -66,8 +66,8 @@ export function HeroShowcase() {
               <ShieldCheck className="h-5 w-5" />
             </div>
             <div>
-              <div className="font-bold text-[#102D4A] text-sm">Zero Standees</div>
-              <div className="text-slate-500 text-[11px]">Strict seat guarantee</div>
+              <div className="font-bold text-[#102D4A] text-sm">20 Seated + 12 Standing</div>
+              <div className="text-slate-500 text-[11px]">Defined capacity rules</div>
             </div>
           </div>
 

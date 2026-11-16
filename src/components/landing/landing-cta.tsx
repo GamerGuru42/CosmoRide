@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { ArrowRight, Bus, ShieldCheck } from "lucide-react";
+import { ArrowRight, ShieldCheck } from "lucide-react";
 import { UNIVERSITY_NAME, APP_NAME } from "@/lib/constants";
 
 export function LandingCTA() {
@@ -24,8 +24,8 @@ export function LandingCTA() {
             </h2>
 
             <p className="text-sm sm:text-base text-slate-300 leading-relaxed max-w-xl mx-auto">
-              Join your fellow Cosmopolitan University students. Reserve your guaranteed seat,
-              skip the queues, and enjoy safe, climate-controlled mobility across Abuja.
+              Join your fellow Cosmopolitan University students. Reserve your campus ride,
+              avoid waiting uncertainty, and travel safely across university routes in Abuja.
             </p>
 
             <div className="pt-4 flex flex-col sm:flex-row items-center justify-center gap-4">
@@ -33,7 +33,7 @@ export function LandingCTA() {
                 href="/login"
                 className="group w-full sm:w-auto inline-flex items-center justify-center gap-2 rounded-2xl bg-[#20A477] px-8 py-4 text-sm font-bold text-white shadow-lg shadow-[#20A477]/30 hover:bg-[#1a8560] hover:scale-[1.02] active:scale-[0.99] transition-all"
               >
-                <span>Sign In to Book a Seat</span>
+                <span>Sign In to Book a Ride</span>
                 <ArrowRight className="h-4 w-4 transition-transform group-hover:translate-x-1" />
               </Link>
 

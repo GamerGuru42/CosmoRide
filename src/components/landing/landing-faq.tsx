@@ -16,24 +16,24 @@ const FAQS: FAQItem[] = [
       `Any currently enrolled ${UNIVERSITY_NAME} student or authorized university staff member. Access is strictly authenticated via your official @cosmopolitan.edu.ng Google Workspace account. Personal email accounts (such as @gmail.com or @yahoo.com) cannot be registered.`,
   },
   {
-    question: "How does the 15-minute booking cutoff work?",
+    question: "How does the booking cutoff work?",
     answer:
-      "To ensure disciplined, punctual departures, seat reservations automatically close exactly 15 minutes prior to the scheduled departure time (anchored to West Africa Time / WAT). This allows the Hostel Representative and Bus Driver to finalize the certified passenger manifest before boarding opens.",
+      "Seat and standing reservations close prior to departure based on the configured booking cutoff window (default 15 minutes, anchored to West Africa Time / WAT). This allows the Hostel Representative and Driver to finalize the passenger manifest before boarding opens.",
   },
   {
     question: "How do I board the shuttle with my digital pass?",
     answer:
-      "Once you book a seat, your encrypted QR Boarding Pass is immediately available in your student portal. When the shuttle arrives at your pickup stop, present your QR pass on your phone screen to the Hostel Representative at the bus door for optical camera scanning.",
+      "Once your booking is confirmed, your digital QR Boarding Pass is available in your student portal. When the shuttle arrives at your pickup stop, present your QR pass on your phone screen to the Hostel Representative at the bus entrance for camera scanning.",
   },
   {
     question: "What happens if a scheduled journey is full?",
     answer:
-      "CosmoRide strictly enforces a safe capacity ceiling of 30 seated passengers per bus — zero standees are permitted. When all 30 seats are booked, you can join the automated priority waitlist. If another passenger cancels their reservation, waitlisted students are automatically promoted.",
+      "CosmoRide enforces an operating capacity of 32 passengers per bus (20 seated and 12 standing places). If all 32 places are booked, students can join the official waiting list. If a confirmed passenger cancels before the cutoff window, waitlisted students are promoted in order.",
   },
   {
     question: "Can I cancel my reservation if my schedule changes?",
     answer:
-      "Yes. You can cancel any confirmed booking directly from your student portal up until the 15-minute cutoff window. Cancelling promptly is strongly encouraged as it instantly frees your seat for waiting peers.",
+      "Yes. You can cancel any confirmed booking directly from your student portal up until the booking cutoff window. Cancelling promptly is strongly encouraged as it instantly frees your spot for waiting peers.",
   },
   {
     question: "Which campuses and hostels are currently connected?",

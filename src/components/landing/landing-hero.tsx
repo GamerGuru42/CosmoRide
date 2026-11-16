@@ -43,9 +43,9 @@ export function LandingHero() {
 
             {/* Concise Supporting Description */}
             <p className="text-base sm:text-lg text-slate-300 max-w-xl leading-relaxed font-normal">
-              Book your guaranteed seat between <strong className="text-white font-semibold">Main Campus</strong>,{" "}
-              <strong className="text-white font-semibold">Kado Campus</strong>, and university residences.
-              Track live timetables, receive instant encrypted QR passes, and travel with total punctuality.
+              Reserve your campus bus ride between <strong className="text-white font-semibold">Main Campus</strong>,{" "}
+              <strong className="text-white font-semibold">Kado Campus</strong>, and student residences.
+              Track scheduled timetables, receive digital QR boarding passes, and travel with structured capacity management.
             </p>
 
             {/* Call to Action Buttons */}
@@ -74,8 +74,8 @@ export function LandingHero() {
                   <ShieldCheck className="h-4 w-4" />
                 </div>
                 <div className="text-xs">
-                  <div className="font-bold text-white">30 Safe Seats Max</div>
-                  <div className="text-[11px] text-slate-400">Zero standing oversell</div>
+                  <div className="font-bold text-white">32 Total Capacity</div>
+                  <div className="text-[11px] text-slate-400">20 seated, 12 standing</div>
                 </div>
               </div>
 
@@ -94,7 +94,7 @@ export function LandingHero() {
                   <QrCode className="h-4 w-4" />
                 </div>
                 <div className="text-xs">
-                  <div className="font-bold text-white">Instant QR Pass</div>
+                  <div className="font-bold text-white">Digital QR Pass</div>
                   <div className="text-[11px] text-slate-400">Fast door scan</div>
                 </div>
               </div>

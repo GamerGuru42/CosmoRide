@@ -12,7 +12,7 @@ import { APP_NAME, UNIVERSITY_NAME } from "@/lib/constants";
 export const metadata: Metadata = {
   title: `${APP_NAME} — Official Campus Mobility Platform | ${UNIVERSITY_NAME}`,
   description:
-    "Official bus booking and campus transit platform for Cosmopolitan University, Abuja. Guaranteed 30-seat capacity, real-time departure timetables, and encrypted digital QR boarding passes.",
+    "Official bus booking and campus transit platform for Cosmopolitan University, Abuja. 32-passenger operating capacity (20 seated, 12 standing), scheduled departure timetables, and digital QR boarding passes.",
 };
 
 export default function LandingPage() {

@@ -28,7 +28,7 @@ const TRANSIT_ROUTES: TransitRoute[] = [
     via: "Wuye Boys' Hostel Stop",
     destination: "Main Campus Central Bus Park",
     days: "Monday – Friday",
-    cutoff: "15 mins before departure (07:15 AM)",
+    cutoff: "Closes prior to departure (default 15m cutoff)",
     description: "Scheduled morning service linking Main Boys' Hostel and Wuye residences directly to Main Campus lecture halls.",
   },
   {
@@ -40,8 +40,8 @@ const TRANSIT_ROUTES: TransitRoute[] = [
     origin: "Main Boys' Hostel Stop (Kado)",
     destination: "Main Campus Central Bus Park",
     days: "Monday – Friday",
-    cutoff: "15 mins before departure (08:15 AM)",
-    description: "Non-stop morning express service providing direct point-to-point transit for 09:00 AM lectures.",
+    cutoff: "Closes prior to departure (default 15m cutoff)",
+    description: "Point-to-point morning express service providing direct transit for 09:00 AM lectures.",
   },
   {
     code: "BOYS_PM_DIRECT",
@@ -52,7 +52,7 @@ const TRANSIT_ROUTES: TransitRoute[] = [
     origin: "Main Campus Central Bus Park",
     destination: "Main Boys' Hostel Stop (Kado)",
     days: "Monday – Friday",
-    cutoff: "15 mins before departure (03:45 PM)",
+    cutoff: "Closes prior to departure (default 15m cutoff)",
     description: "Point-to-point evening return express from Main Campus directly back to Main Boys' Hostel.",
   },
   {
@@ -65,8 +65,8 @@ const TRANSIT_ROUTES: TransitRoute[] = [
     via: "Wuye Boys' Hostel Stop",
     destination: "Main Boys' Hostel Stop (Kado)",
     days: "Monday – Friday",
-    cutoff: "15 mins before departure (04:35 PM)",
-    description: "Comprehensive evening service returning students from Main Campus with scheduled stop at Wuye hostel.",
+    cutoff: "Closes prior to departure (default 15m cutoff)",
+    description: "Scheduled evening service returning students from Main Campus with designated stop at Wuye hostel.",
   },
 ];
 
@@ -118,8 +118,8 @@ export function RoutesAndCampuses() {
             Official Routes & Timetable
           </h2>
           <p className="mt-3 text-sm sm:text-base text-slate-600 leading-relaxed">
-            All departures operate strictly to West Africa Time (WAT) with certified 30-passenger seating
-            and automated 15-minute booking cutoff windows.
+            All departures operate strictly to West Africa Time (WAT) with a 32-passenger operating capacity
+            (20 seated, 12 standing) and scheduled booking cutoff windows.
           </p>
 
           {/* Filter Tabs */}
@@ -245,7 +245,7 @@ export function RoutesAndCampuses() {
                 </div>
                 <div className="flex items-center gap-1 text-[11px] font-mono text-amber-700 bg-amber-50 rounded-lg px-2 py-0.5 border border-amber-200">
                   <Clock className="h-3 w-3" />
-                  <span>Cutoff: 15m prior</span>
+                  <span>{c.cutoff}</span>
                 </div>
               </div>
             </div>

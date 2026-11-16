@@ -31,7 +31,7 @@ export function LandingFooter() {
 
             <p className="text-xs text-slate-400 max-w-md leading-relaxed">
               Official campus mobility and scheduled bus transit platform for Cosmopolitan University.
-              Providing guaranteed seating, encrypted digital boarding passes, and reliable inter-campus
+              Providing defined 32-passenger capacity, digital QR boarding passes, and reliable inter-campus
               connectivity across Abuja.
             </p>
 

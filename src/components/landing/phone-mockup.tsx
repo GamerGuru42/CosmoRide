@@ -1,5 +1,4 @@
-import { QrCode, Bus, ShieldCheck, Clock, CheckCircle2, Wifi, Battery, Sparkles } from "lucide-react";
-import { APP_NAME } from "@/lib/constants";
+import { ShieldCheck, Clock, Wifi, Battery, AlertCircle, Info } from "lucide-react";
 
 export function PhoneMockup() {
   return (
@@ -7,33 +6,33 @@ export function PhoneMockup() {
       {/* Ambient glow behind phone */}
       <div className="absolute -inset-4 bg-gradient-to-tr from-[#20A477]/30 via-[#102D4A]/50 to-emerald-500/20 rounded-[50px] blur-2xl opacity-70 transform -rotate-1" />
 
-      {/* Floating Accent Card 1 — Certified Safe Seat */}
+      {/* Floating Accent Card 1 — Capacity Model */}
       <div className="hidden sm:flex absolute -left-8 top-16 z-20 items-center gap-2.5 rounded-2xl bg-white/95 backdrop-blur-md px-4 py-3 shadow-xl border border-slate-200/80 transform -rotate-3 hover:rotate-0 transition-transform">
         <div className="flex h-9 w-9 items-center justify-center rounded-xl bg-emerald-100 text-[#20A477]">
           <ShieldCheck className="h-5 w-5" />
         </div>
         <div>
           <div className="text-[10px] font-bold uppercase tracking-wider text-slate-500">
-            Capacity Guarantee
+            Operating Capacity
           </div>
           <div className="text-xs font-black text-[#102D4A]">
-            30 Safe Seats Max
+            32 (20 Seated, 12 Standing)
           </div>
         </div>
       </div>
 
-      {/* Floating Accent Card 2 — Live Status */}
+      {/* Floating Accent Card 2 — FIDS Status Board */}
       <div className="hidden sm:flex absolute -right-6 bottom-24 z-20 items-center gap-2.5 rounded-2xl bg-white/95 backdrop-blur-md px-4 py-3 shadow-xl border border-slate-200/80 transform rotate-2 hover:rotate-0 transition-transform">
         <div className="flex h-9 w-9 items-center justify-center rounded-xl bg-blue-100 text-[#102D4A]">
           <Clock className="h-5 w-5" />
         </div>
         <div>
           <div className="text-[10px] font-bold uppercase tracking-wider text-slate-500">
-            Timetable Status
+            Departure Board
           </div>
           <div className="text-xs font-black text-[#102D4A] flex items-center gap-1.5">
             <span className="h-2 w-2 rounded-full bg-[#20A477] animate-ping" />
-            <span>Punctual Departure</span>
+            <span>Scheduled Timetable</span>
           </div>
         </div>
       </div>
@@ -52,6 +51,12 @@ export function PhoneMockup() {
             </div>
           </div>
 
+          {/* Illustrative Product Preview Banner */}
+          <div className="bg-amber-500/20 border-b border-amber-500/30 px-3 py-1 flex items-center justify-center gap-1.5 text-[9px] font-mono font-bold text-amber-300">
+            <Info className="h-3 w-3 shrink-0" />
+            <span>ILLUSTRATIVE INTERFACE PREVIEW</span>
+          </div>
+
           {/* App Header Inside Mockup */}
           <div className="px-5 pt-2 pb-3 flex items-center justify-between border-b border-white/5">
             <div className="flex items-center gap-2.5">
@@ -68,29 +73,34 @@ export function PhoneMockup() {
               </div>
             </div>
             <div className="flex items-center gap-1.5 bg-white/10 rounded-full px-2.5 py-1 text-[10px] text-slate-300">
-              <span className="h-1.5 w-1.5 rounded-full bg-emerald-400" />
-              <span>Active</span>
+              <span className="h-1.5 w-1.5 rounded-full bg-amber-400" />
+              <span>Sample View</span>
             </div>
           </div>
 
-          {/* Screen Content: Active Boarding Pass */}
-          <div className="p-4 space-y-3.5">
+          {/* Screen Content: Illustrative Boarding Pass */}
+          <div className="p-4 space-y-3">
             {/* Digital Pass Card */}
             <div className="rounded-2xl bg-white text-slate-900 p-4 shadow-xl relative overflow-hidden border border-slate-100">
               {/* Top Accent Strip */}
               <div className="absolute top-0 left-0 right-0 h-1.5 bg-gradient-to-r from-[#102D4A] via-[#20A477] to-[#102D4A]" />
 
-              <div className="flex items-start justify-between mb-3 pt-0.5">
+              {/* Sample Label Watermark */}
+              <div className="mb-2 inline-flex items-center gap-1 rounded bg-slate-100 px-2 py-0.5 text-[8px] font-mono font-bold uppercase text-slate-600 border border-slate-200">
+                <span>Sample Data • Not an Active Ticket</span>
+              </div>
+
+              <div className="flex items-start justify-between mb-3">
                 <div>
                   <div className="text-[9px] font-mono font-bold tracking-widest text-[#102D4A] uppercase">
-                    Official Boarding Pass
+                    Sample Boarding Pass
                   </div>
                   <div className="text-sm font-black text-slate-900 tracking-tight">
                     Boys&apos; Morning Route
                   </div>
                 </div>
                 <span className="inline-flex items-center gap-1 rounded-full bg-[#20A477]/10 px-2 py-0.5 text-[9px] font-extrabold text-[#20A477] border border-[#20A477]/20 uppercase tracking-wide">
-                  <span className="h-1.5 w-1.5 rounded-full bg-[#20A477] animate-pulse" />
+                  <span className="h-1.5 w-1.5 rounded-full bg-[#20A477]" />
                   Confirmed
                 </span>
               </div>
@@ -121,33 +131,29 @@ export function PhoneMockup() {
               {/* Passenger & Vehicle Details Grid */}
               <div className="grid grid-cols-2 gap-2 text-[10px] mb-3 pb-3 border-b border-dashed border-slate-200">
                 <div>
-                  <span className="text-slate-400 block text-[9px]">Vehicle Allocation</span>
-                  <span className="font-bold text-slate-800 font-mono">CU-BUS-01 (Shuttle 1)</span>
+                  <span className="text-slate-400 block text-[9px]">Vehicle Assignment</span>
+                  <span className="font-bold text-slate-800 font-mono">Shuttle 1 (Sample)</span>
                 </div>
                 <div>
-                  <span className="text-slate-400 block text-[9px]">Seat Category</span>
-                  <span className="font-bold text-[#20A477]">Seated Passenger</span>
+                  <span className="text-slate-400 block text-[9px]">Category Allocation</span>
+                  <span className="font-bold text-[#20A477]">Seated (1 of 20)</span>
                 </div>
               </div>
 
-              {/* Visual QR Code Display */}
+              {/* Sample QR Code with Clear Decorative Watermark */}
               <div className="flex items-center gap-3">
-                <div className="h-20 w-20 shrink-0 rounded-xl bg-slate-900 p-1.5 flex items-center justify-center text-white shadow-inner">
+                <div className="relative h-20 w-20 shrink-0 rounded-xl bg-slate-900 p-1.5 flex items-center justify-center text-white shadow-inner overflow-hidden">
                   {/* High fidelity SVG QR pattern */}
-                  <svg viewBox="0 0 100 100" className="h-full w-full fill-white">
-                    {/* Top Left Corner */}
+                  <svg viewBox="0 0 100 100" className="h-full w-full fill-white opacity-40">
                     <rect x="5" y="5" width="28" height="28" rx="4" />
                     <rect x="11" y="11" width="16" height="16" fill="#0f172a" />
                     <rect x="15" y="15" width="8" height="8" />
-                    {/* Top Right Corner */}
                     <rect x="67" y="5" width="28" height="28" rx="4" />
                     <rect x="73" y="11" width="16" height="16" fill="#0f172a" />
                     <rect x="77" y="15" width="8" height="8" />
-                    {/* Bottom Left Corner */}
                     <rect x="5" y="67" width="28" height="28" rx="4" />
                     <rect x="11" y="73" width="16" height="16" fill="#0f172a" />
                     <rect x="15" y="77" width="8" height="8" />
-                    {/* Center matrix elements */}
                     <rect x="40" y="8" width="6" height="12" />
                     <rect x="52" y="16" width="8" height="6" />
                     <rect x="42" y="38" width="16" height="16" rx="2" />
@@ -161,34 +167,38 @@ export function PhoneMockup() {
                     <rect x="70" y="68" width="12" height="8" />
                     <rect x="84" y="78" width="8" height="8" />
                   </svg>
+                  {/* Distinct Watermark Over the QR code */}
+                  <div className="absolute inset-0 bg-slate-900/70 flex flex-col items-center justify-center text-center p-1">
+                    <span className="text-[8px] font-mono font-bold text-amber-300 leading-tight">
+                      SAMPLE QR
+                    </span>
+                    <span className="text-[6px] font-mono text-slate-300 leading-none">
+                      NOT VALID
+                    </span>
+                  </div>
                 </div>
                 <div className="flex-1 space-y-1">
                   <div className="text-[10px] font-bold text-slate-800">
-                    Scan for Boarding
+                    Product Mockup Preview
                   </div>
                   <p className="text-[9px] text-slate-500 leading-tight">
-                    Present to the Hostel Representative when boarding the bus at Main Boys&apos; Hostel.
+                    Demonstration of the student mobile pass interface. Real passes are issued upon authenticated booking.
                   </p>
                   <div className="text-[8px] font-mono text-slate-400">
-                    Token: CR-8941-WAT
+                    Token: DEMO-SAMPLE-TOKEN
                   </div>
                 </div>
               </div>
             </div>
 
-            {/* Quick Navigation Card Inside Phone */}
+            {/* Quick Informational Notice */}
             <div className="rounded-xl bg-slate-900/90 border border-slate-800 p-2.5 flex items-center justify-between text-xs">
-              <div className="flex items-center gap-2">
-                <div className="flex h-7 w-7 items-center justify-center rounded-lg bg-[#102D4A] text-slate-200">
-                  <Bus className="h-3.5 w-3.5" />
-                </div>
-                <div>
-                  <div className="text-[10px] font-bold text-white">Next Departure</div>
-                  <div className="text-[9px] text-slate-400">08:30 AM Express Direct</div>
-                </div>
+              <div className="space-y-0.5">
+                <div className="text-[10px] font-bold text-white">Timetable Schedule</div>
+                <div className="text-[9px] text-slate-400">Regular Mon–Fri Campus Departures</div>
               </div>
-              <span className="rounded-full bg-emerald-500/20 px-2 py-0.5 text-[9px] font-bold text-emerald-400 font-mono">
-                Seats Open
+              <span className="rounded-full bg-slate-800 px-2 py-0.5 text-[9px] font-mono text-slate-300 border border-slate-700">
+                Preview Only
               </span>
             </div>
           </div>

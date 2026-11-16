@@ -22,15 +22,15 @@ export function SafetyStandards() {
 
             <p className="text-sm sm:text-base text-slate-300 leading-relaxed">
               CosmoRide was architected specifically for {UNIVERSITY_NAME}. It rejects commercial
-              hailing unpredictability in favor of strict capacity limits, verified university identity,
-              and dedicated route supervision.
+              hailing unpredictability in favor of defined capacity limits, verified university identity,
+              and structured route supervision.
             </p>
 
             <div className="pt-2 space-y-3">
               <div className="flex items-start gap-3">
                 <CheckCircle2 className="h-5 w-5 text-[#20A477] shrink-0 mt-0.5" />
                 <div className="text-xs sm:text-sm text-slate-200">
-                  <strong className="text-white">Strict Capacity Cap:</strong> 30 seats per shuttle, zero standing room, zero overcrowding.
+                  <strong className="text-white">Defined 32 Capacity:</strong> 20 seated and 12 standing allocations per bus, preventing uncontrolled overloading.
                 </div>
               </div>
 
@@ -44,7 +44,7 @@ export function SafetyStandards() {
               <div className="flex items-start gap-3">
                 <CheckCircle2 className="h-5 w-5 text-[#20A477] shrink-0 mt-0.5" />
                 <div className="text-xs sm:text-sm text-slate-200">
-                  <strong className="text-white">West Africa Time Anchor:</strong> Automated 15-minute booking cutoff ensures buses depart on the second.
+                  <strong className="text-white">Booking Cutoff Window:</strong> Closes prior to departure (default 15 minutes) to finalize passenger manifests.
                 </div>
               </div>
             </div>
@@ -58,11 +58,11 @@ export function SafetyStandards() {
                 <ShieldCheck className="h-5 w-5" />
               </div>
               <h3 className="text-base font-bold text-white">
-                Zero-Oversell Guarantee
+                Enforced 32-Capacity Limit
               </h3>
               <p className="text-xs text-slate-300 leading-relaxed">
-                Database-level row locks ensure no bus ever accepts more than 30 passenger reservations.
-                When capacity is reached, instant waitlisting preserves seat integrity.
+                Database-level concurrency controls enforce a hard 32-passenger ceiling (20 seated, 12 standing).
+                When full, students can join the waiting list for promoted placement if cancellations occur.
               </p>
             </div>
 
@@ -72,11 +72,11 @@ export function SafetyStandards() {
                 <Users className="h-5 w-5" />
               </div>
               <h3 className="text-base font-bold text-white">
-                Hostel Rep Supervised
+                Supervised Boarding Verification
               </h3>
               <p className="text-xs text-slate-300 leading-relaxed">
                 Every boarding operation is directly overseen by official Hostel Representatives who scan
-                encrypted QR passes with live camera verification before doors close.
+                digital QR passes with camera verification before doors close.
               </p>
             </div>
 
@@ -100,11 +100,11 @@ export function SafetyStandards() {
                 <Clock className="h-5 w-5" />
               </div>
               <h3 className="text-base font-bold text-white">
-                FIDS Departure Discipline
+                FIDS Departure Lifecycle
               </h3>
               <p className="text-xs text-slate-300 leading-relaxed">
-                Campus screens and mobile portals display live flight-style departure boards (FIDS)
-                updating from Scheduled to Bus Arrived, Boarding Now, and In Transit.
+                Campus screens and student portals display flight-style departure boards (FIDS)
+                updating through Scheduled, Bus Arrived, Boarding Now, and In Transit states.
               </p>
             </div>
           </div>

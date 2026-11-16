@@ -23,41 +23,41 @@ const STEPS = [
     step: "02",
     title: "Browse Real-Time Timetable",
     description:
-      "Inspect airport-grade FIDS departure boards for morning and evening routes across Main Campus, Kado Campus, and student hostels.",
+      "Inspect flight-style departure boards for morning and evening routes across Main Campus, Kado Campus, and student residences.",
     icon: CalendarSearch,
-    badge: "Live FIDS",
+    badge: "Departure Board",
   },
   {
     step: "03",
-    title: "Reserve Your Guaranteed Seat",
+    title: "Reserve Your Boarding Pass",
     description:
-      "Select your journey before the 15-minute booking cutoff. Strictly limited to 30 passengers per bus to eliminate dangerous overcrowding.",
+      "Select your journey before the booking cutoff. Capacity is capped at 32 passengers per bus (20 seated, 12 standing) according to university operating standards.",
     icon: CheckCircle2,
-    badge: "Guaranteed Seat",
+    badge: "Reserved Spot",
   },
   {
     step: "04",
-    title: "Receive Encrypted QR Pass",
+    title: "Receive Digital QR Pass",
     description:
-      "Your dynamic digital boarding pass is instantly generated with your journey token, vehicle allocation, and departure station details.",
+      "Your digital boarding pass is generated with your ticket token, vehicle assignment, allocated passenger category (seated or standing), and pickup stop.",
     icon: QrCode,
-    badge: "100% Digital",
+    badge: "Digital Pass",
   },
   {
     step: "05",
     title: "Doorstep Camera Verification",
     description:
-      "Present your QR pass at the bus entrance. The assigned Hostel Representative scans and confirms your ticket via optical camera in under two seconds.",
+      "Present your QR pass at the bus entrance. The assigned Hostel Representative scans and verifies your ticket via camera before departure.",
     icon: ScanLine,
-    badge: "Instant Scan",
+    badge: "Camera Scan",
   },
   {
     step: "06",
-    title: "Punctual, Relaxed Transit",
+    title: "Punctual, Supervised Transit",
     description:
-      "Step aboard, take your allocated seat, and travel comfortably with certified drivers across dedicated university routes in Abuja.",
+      "Step aboard, take your allocated position, and travel safely with official university drivers across dedicated campus routes in Abuja.",
     icon: Bus,
-    badge: "Safe Arrival",
+    badge: "Campus Transit",
   },
 ];
 
@@ -75,8 +75,8 @@ export function HowItWorks() {
             How CosmoRide Works
           </h2>
           <p className="mt-3 text-sm sm:text-base text-slate-600 leading-relaxed">
-            From schedule lookup to arrival at your lecture hall, every step of the journey
-            is engineered for predictability, safety, and speed.
+            From schedule lookup to boarding at your stop, every step of the journey
+            is structured for predictability, safety, and speed.
           </p>
         </div>
 
@@ -118,7 +118,7 @@ export function HowItWorks() {
                 <div className="mt-6 pt-4 border-t border-slate-200/60 flex items-center justify-between text-[11px] font-mono text-slate-400">
                   <span>Step {s.step} of 06</span>
                   <span className="text-[#20A477] font-bold opacity-0 group-hover:opacity-100 transition-opacity">
-                    Verified Flow →
+                    Standard Flow →
                   </span>
                 </div>
               </div>
@@ -132,7 +132,7 @@ export function HowItWorks() {
             href="/login"
             className="inline-flex items-center gap-2 rounded-2xl bg-[#102D4A] px-7 py-3.5 text-xs sm:text-sm font-bold text-white shadow-md hover:bg-[#18426C] transition-all"
           >
-            <span>Experience CosmoRide Today</span>
+            <span>Access Student Portal</span>
             <ArrowRight className="h-4 w-4" />
           </Link>
         </div>
